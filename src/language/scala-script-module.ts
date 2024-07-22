@@ -1,22 +1,29 @@
-import { type Module, inject } from 'langium';
-import { createDefaultModule, createDefaultSharedModule, type DefaultSharedModuleContext, type LangiumServices, type LangiumSharedServices, type PartialLangiumServices } from 'langium/lsp';
-import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from './generated/module.js';
-import { ScalaScriptValidator, registerValidationChecks } from './scala-script-validator.js';
+import { type Module, inject } from "langium";
+import {
+  createDefaultModule,
+  createDefaultSharedModule,
+  type DefaultSharedModuleContext,
+  type LangiumServices,
+  type LangiumSharedServices,
+  type PartialLangiumServices,
+} from "langium/lsp";
+import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "./generated/module.js";
+import { ScalaScriptValidator, registerValidationChecks } from "./scala-script-validator.js";
 
 /**
  * Declaration of custom services - add your own service classes here.
  */
 export type ScalaScriptAddedServices = {
-    validation: {
-        ScalaScriptValidator: ScalaScriptValidator
-    }
-}
+  validation: {
+    ScalaScriptValidator: ScalaScriptValidator;
+  };
+};
 
 /**
  * Union of Langium default services and your custom services - use this as constructor parameter
  * of custom service classes.
  */
-export type ScalaScriptServices = LangiumServices & ScalaScriptAddedServices
+export type ScalaScriptServices = LangiumServices & ScalaScriptAddedServices;
 
 /**
  * Dependency injection module that overrides Langium default services and contributes the
@@ -24,9 +31,9 @@ export type ScalaScriptServices = LangiumServices & ScalaScriptAddedServices
  * selected services, while the custom services must be fully specified.
  */
 export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServices & ScalaScriptAddedServices> = {
-    validation: {
-        ScalaScriptValidator: () => new ScalaScriptValidator()
-    }
+  validation: {
+    ScalaScriptValidator: () => new ScalaScriptValidator(),
+  },
 };
 
 /**
@@ -45,24 +52,17 @@ export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServic
  * @returns An object wrapping the shared services and the language-specific services
  */
 export function createScalaScriptServices(context: DefaultSharedModuleContext): {
-    shared: LangiumSharedServices,
-    ScalaScript: ScalaScriptServices
+  shared: LangiumSharedServices;
+  ScalaScript: ScalaScriptServices;
 } {
-    const shared = inject(
-        createDefaultSharedModule(context),
-        ScalaScriptGeneratedSharedModule
-    );
-    const ScalaScript = inject(
-        createDefaultModule({ shared }),
-        ScalaScriptGeneratedModule,
-        ScalaScriptModule
-    );
-    shared.ServiceRegistry.register(ScalaScript);
-    registerValidationChecks(ScalaScript);
-    if (!context.connection) {
-        // We don't run inside a language server
-        // Therefore, initialize the configuration provider instantly
-        shared.workspace.ConfigurationProvider.initialized({});
-    }
-    return { shared, ScalaScript };
+  const shared = inject(createDefaultSharedModule(context), ScalaScriptGeneratedSharedModule);
+  const ScalaScript = inject(createDefaultModule({ shared }), ScalaScriptGeneratedModule, ScalaScriptModule);
+  shared.ServiceRegistry.register(ScalaScript);
+  registerValidationChecks(ScalaScript);
+  if (!context.connection) {
+    // We don't run inside a language server
+    // Therefore, initialize the configuration provider instantly
+    shared.workspace.ConfigurationProvider.initialized({});
+  }
+  return { shared, ScalaScript };
 }

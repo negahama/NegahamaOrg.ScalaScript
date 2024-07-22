@@ -1,7 +1,7 @@
-import { startLanguageServer } from 'langium/lsp';
-import { NodeFileSystem } from 'langium/node';
-import { createConnection, ProposedFeatures } from 'vscode-languageserver/node.js';
-import { createScalaScriptServices } from './scala-script-module.js';
+import { startLanguageServer } from "langium/lsp";
+import { NodeFileSystem } from "langium/node";
+import { createConnection, ProposedFeatures } from "vscode-languageserver/node.js";
+import { createScalaScriptServices } from "./scala-script-module.js";
 
 // Create a connection to the client
 const connection = createConnection(ProposedFeatures.all);

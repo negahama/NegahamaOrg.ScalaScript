@@ -1,15 +1,17 @@
 {
-    "projectName": "ScalaScript",
-    "languages": [{
-        "id": "scala-script",
-        "grammar": "src/language/scala-script.langium",
-        "fileExtensions": [".ss"],
-        "textMate": {
-            "out": "syntaxes/scala-script.tmLanguage.json"
-        },
-        "monarch": {
-            "out": "src/syntaxes/scala-script.monarch.ts"
-        }
-    }],
-    "out": "src/language/generated"
+  "projectName": "ScalaScript",
+  "languages": [
+    {
+      "id": "scala-script",
+      "grammar": "src/language/scala-script.langium",
+      "fileExtensions": [".ss"],
+      "textMate": {
+        "out": "syntaxes/scala-script.tmLanguage.json"
+      },
+      "monarch": {
+        "out": "src/syntaxes/scala-script.monarch.ts"
+      }
+    }
+  ],
+  "out": "src/language/generated"
 }
