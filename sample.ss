@@ -1,9 +1,5 @@
+def sum(a: number, b: number): number = {
 %%
-var a = 0
-console.log(a)
+  return a + b;
 %%
-
-%%
-var b = 1
-console.log(b)
-%%
+}

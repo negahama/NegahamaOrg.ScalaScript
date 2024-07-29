@@ -1,16 +1,19 @@
 grammar ScalaScript
 
 entry Model:
-  (bypasses+=Bypass | declarations+=Dcl | definitions+=Def | statements+=Stmt | prints+=Print)*;
+  (bypasses+=Bypass | declarations+=Dcl | definitions+=Def | expressions+=Expr)*;
 
-terminal Bypass returns string: /%%[\s\S]*?%%/;
+Bypass: bypass=BYPASS;
+terminal BYPASS returns string: /%%[\s\S]*?%%/;
 
 // Basic Declarations and Definitions
 // A declaration introduces names and assigns them types.
 // It can form part of a class definition or of a refinement in a compound type.
 
-Dcl: ValDcl | VarDcl | FunDcl;
-Def: ValDef | VarDef | FunDef;
+Dcl:
+  ValDcl | VarDcl | FunDcl;
+Def:
+  ValDef | VarDef | FunDef;
 
 // Value Declarations and Definitions
 ValDcl:
@@ -25,64 +28,69 @@ VarDef:
   'var' name=ID (':' type=ID)? '=' value=Expr;
 
 // Function Declarations and Definitions
-FunDcl:
-  // 'def' FunSig (':' Type)?;
-  'def' name=ID '(' (params+=Param (',' params+=Param)*)? ')' Block;
-// FunDef:
-//   'def' FunSig (':' Type)? '=' value=Expr;
-FunDef:
-  'def' name=ID '(' (params+=Param (',' params+=Param)*)? ')' Block;
-// FunSig:
-//   name=ID [FunTypeParamClause] ParamClauses;
-// FunTypeParamClause:
-//   '[' TypeParam {',' TypeParam} ']';
-// ParamClauses:
-//   {ParamClause} [[NL] '(' 'implicit' Params ')'];
-// ParamClause:
-//   [NL] '(' [Params] ')';
-// Params:
-//   Param {',' Param};
-// Param:
-//   {Annotation} id [':' ParamType] ['=' Expr];
-// ParamType:
-//   Type
-//   | '=>' Type
-//   | Type '*';
-Param: name=ID;
+// 여기서 fragment를 사용하는 이유는 이 함수 정의와 선언의 루트 노드의 타입을 FunDcl, FunDef로 해주기 위해서이다.
+// fragment를 사용하지 않으면 루트 노드의 타입이 Params이 된다.
 
+FunDcl:
+  'def' FunSig;
+FunDef:
+  'def' FunSig '=' Block;
+fragment FunSig:
+  name=ID '(' Params? ')' (':' returnType=ID)?;
+fragment Params:
+  params+=Param (',' params+=Param)*;
+Param:
+  name=ID (':' type=ID)? ('=' initVal=Expr)?;
+fragment Block:
+  '{' body+=Expr* '}';
+
+FunCall:
+  def=[FunDef:ID] '(' (args+=Expr (',' args+=Expr)*)? ')';
 
 // Expressions
 // Expressions are composed of operators and operands.
 // Expression forms are discussed subsequently in decreasing order of precedence.
 
 Expr:
-  Add
-  | Literal
-  // | PrimExpr
+  PrimExpr
+  | Add
   | IfExpr
   | DoExpr
   | WhileExpr
   | ForExpr
   // | ReturnExpr
   // | ThrowExpr
+  | FunCall
+  | Bypass
   ;
 
+PrimExpr:
+  Literal | Group | Ref;
+
+// Literals
+// There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
+// The syntax of these literals is in each case as in Java.
+Literal: 
+  ('-')? value=IntegerLiteral
+  | ('-')? value=FloatingPointLiteral
+  | value=BooleanLiteral
+  | value=StringLiteral
+  | value=CharLiteral
+  | 'null';
+
+// grouped expression with parentheses
+Group:
+  '(' group=Expr ')';
+
+// cross-reference to a parameter
+Ref:
+  value=[Def:ID];
+
 Add  infers Expr: 
-    Mult ({infer BinExpr.e1=current} op=('+'|'-') e2=Mult)*;
+  Mult ({infer BinExpr.e1=current} op=('+'|'-') e2=Mult)*;
 
 Mult infers Expr: 
-    PrimExpr ({infer BinExpr.e1=current} op=('*'|'/') e2=PrimExpr)*;
-
-PrimExpr: Lit | Ref | Group | NegExpr;
-
-// literal int
-Lit:        val=INT;
-// cross-reference to a parameter
-Ref:        value=[Def:ID];
-// grouped expression with parentheses
-Group:      '(' group=Expr ')';
-// negated expression
-NegExpr:    '-' negex=Expr;
+  PrimExpr ({infer BinExpr.e1=current} op=('*'|'/') e2=PrimExpr)*;
 
 // Assignments
 // Expr1:
@@ -94,10 +102,12 @@ IfExpr:
   'if' '(' condition=Expr ')' (NL)* then=Expr ((Semi)? 'else' else=Expr)?;
 
 // Do Loop Expressions
-DoExpr: 'do' loop=Expr (Semi)? 'while' '(' condition=Expr ')';
+DoExpr:
+  'do' loop=Expr (Semi)? 'while' '(' condition=Expr ')';
 
 // While Loop Expressions
-WhileExpr: 'while' '(' condition=Expr ')' (NL)* loop=Expr;
+WhileExpr:
+  'while' '(' condition=Expr ')' (NL)* loop=Expr;
 
 // For Comprehensions and For Loops
 // Expr1:
@@ -139,49 +149,81 @@ ForExpr:
 //   | {Annotation} {Modifier} Dcl
 //   | Expr;
 
-// Stmt: FunctionCall | Print;
-Stmt: FunctionCall;
 
-FunctionCall:
-  def=[Def:ID] '(' (args+=Expr (',' args+=Expr)*)? ')';
+// Type:
+//     DataType | Entity;
 
-Type:
-    DataType | Entity;
+// DataType:
+//     'datatype' name=ID;
 
-DataType:
-    'datatype' name=ID;
+// Entity:
+//     'entity' name=ID ('extends' superType=[Entity:QualifiedName])? '{'
+//         (features+=Feature)*
+//     '}';
 
-Entity:
-    'entity' name=ID ('extends' superType=[Entity:QualifiedName])? '{'
-        (features+=Feature)*
-    '}';
+// Feature:
+//     (many?='many')? name=ID ':' type=[Type:QualifiedName];
 
-Feature:
-    (many?='many')? name=ID ':' type=[Type:QualifiedName];
-
-QualifiedName returns string:
-    ID ('.' ID)*;
-
-// 
-
-fragment Block: '{' body+=Stmt* '}';
-
-Print:
-  'print' value=Expr;
-
+// QualifiedName returns string:
+//     ID ('.' ID)*;
 
 // Parentheses
-terminal Paren    : '(' | ')' | '[' | ']' | '{' | '}';
+// terminal Paren    : '(' | ')' | '[' | ']' | '{' | '}';
 
 // Delimiter characters
 // terminal Delim : '`' | ''' | '"' | '.' | ';' | ',';
-terminal Delim    : /[`'".;,]/;
+// terminal Delim    : /[`'".;,]/;
 
 // New line and semicolon
 terminal NL       : /[\n\r]/;
 terminal Semi     : ';' |  (NL)+;
 
+// Boolean Literals
+// It has to place before ID or Identifier
+// Otherwise `true` and `false` is identified for Indentifier
+
+terminal BooleanLiteral returns boolean: 'true' | 'false';
+
+// Floating Point Literals
+// example : 0.0    1e30f    3.14159f    1.0e-100    .1
+// It has to also place before defining the Integer literal
+
+terminal FloatingPointLiteral returns number:
+  (Digit)+ '.' (Digit)+ (ExponentPart)? (FloatType)?
+  |  '.' (Digit)+ (ExponentPart)? (FloatType)?
+  |  (Digit)+ ExponentPart (FloatType)?
+  |  (Digit)+ (ExponentPart)? FloatType;
+terminal ExponentPart : ('E' | 'e') ('+' | '-')? (Digit)+;
+terminal FloatType    : /[FfDd]/;
+
+// Integer Literals
+// terminal INT              returns number: /[0-9]+/;
+terminal IntegerLiteral   returns number: (DecimalNumeral | HexNumeral);
+terminal DecimalNumeral   returns number: '0' | NonZeroDigit Digit*;
+terminal HexNumeral       returns number: '0' ('x' | 'X') HexDigit+;
+//terminal Digit          returns number: /[0-9]/;
+terminal Digit            returns number: '0' | NonZeroDigit;
+terminal HexDigit         returns string: /[0-9a-fA-F]/;
+terminal NonZeroDigit     returns number: /[1-9]/;
+
+// Character Literals
+terminal CharLiteral  : ''' (PrintableChar | CharEscapeSeq) ''';
+terminal PrintableChar: /[\u0020-\u007F]/;
+terminal CharEscapeSeq: '\b' | '\t' | '\n' | '\f' | '\r' | '\"' | '\'' | '\\';
+
+// terminal Upper        :  /[A-Z$_]/;     // and Unicode category Lu
+// terminal Lower        :  /[a-z]/;       // and Unicode category Ll
+// terminal Letter       :  Upper | Lower; // and Unicode categories Lo, Lt, Nl
+
+// String Literals
+// terminal STRING       : /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
+terminal StringLiteral: '"' (StringElement)+ '"';
+terminal StringElement: PrintableChar |  CharEscapeSeq;
+
 // Identifiers
+// 이것은 BooleanLiteral 다음에 와야 한다.
+// 그렇지 않으면 true, false가 ID로 취급되어진다.
+
 // op       ::=  opchar {opchar}
 // varid    ::=  lower idrest
 // plainid  ::=  upper idrest
@@ -191,55 +233,7 @@ terminal Semi     : ';' |  (NL)+;
 //            |  '`' stringLiteral '`'
 // idrest   ::=  {letter | digit} ['_' op]
 
-terminal Upper    :  /[A-Z$_]/;  // and Unicode category Lu
-terminal Lower    :  /[a-z]/;    // and Unicode category Ll
-terminal Letter   :  Upper | Lower; // and Unicode categories Lo, Lt, Nl
-
 terminal ID       : /[_a-zA-Z][\w_]*/;
-
-// Literals
-// There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
-// The syntax of these literals is in each case as in Java.
-terminal Literal: 
-  ('-')? IntegerLiteral
-  | ('-')? FloatingPointLiteral
-  | BooleanLiteral
-  | CharacterLiteral
-  | StringLiteral
-  | 'null';
-
-// Integer Literals
-terminal INT              returns number : /[0-9]+/;
-terminal IntegerLiteral   returns number : (DecimalNumeral | HexNumeral);
-terminal DecimalNumeral   returns number : '0' | NonZeroDigit Digit*;
-terminal HexNumeral       returns number : '0' ('x' | 'X') HexDigit+;
-//terminal Digit          returns number : /[0-9]/;
-terminal Digit            returns number : '0' | NonZeroDigit;
-terminal HexDigit         returns string : /[0-9a-fA-F]/;
-terminal NonZeroDigit     returns number : /[1-9]/;
-
-// Floating Point Literals
-// example : 0.0    1e30f    3.14159f    1.0e-100    .1
-terminal FloatingPointLiteral returns number :
-  (Digit)+ '.' (Digit)+ (ExponentPart)? (FloatType)?
-  |  '.' (Digit)+ (ExponentPart)? (FloatType)?
-  |  (Digit)+ ExponentPart (FloatType)?
-  |  (Digit)+ (ExponentPart)? FloatType;
-terminal ExponentPart: ('E' | 'e') ('+' | '-')? (Digit)+;
-terminal FloatType   : /[FfDd]/;
-
-// Boolean Literals
-terminal BooleanLiteral   returns boolean: 'true' | 'false';
-
-// Character Literals
-terminal CharacterLiteral : ''' (PrintableChar | CharEscapeSeq) ''';
-terminal PrintableChar    : /[\u0020-\u007F]/;
-terminal CharEscapeSeq    : '\b' | '\t' | '\n' | '\f' | '\r' | '\"' | '\'' | '\\';
-
-// String Literals
-terminal STRING           : /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
-terminal StringLiteral    : '"' (StringElement)+ '"';
-terminal StringElement    : PrintableChar |  CharEscapeSeq;
 
 // Whitespace and Comments
 hidden terminal WS        : /\s+/;
