@@ -4,7 +4,7 @@ import { Command } from "commander";
 import { ScalaScriptLanguageMetaData } from "../language/generated/module.js";
 import { createScalaScriptServices } from "../language/scala-script-module.js";
 import { extractAstNode } from "./cli-util.js";
-import { generateJavaScript } from "./generator.js";
+import { generateTypeScript } from "./generator.js";
 import { NodeFileSystem } from "langium/node";
 import * as url from "node:url";
 import * as fs from "node:fs/promises";
@@ -17,7 +17,7 @@ const packageContent = await fs.readFile(packagePath, "utf-8");
 export const generateAction = async (fileName: string, opts: GenerateOptions): Promise<void> => {
   const services = createScalaScriptServices(NodeFileSystem).ScalaScript;
   const model = await extractAstNode<Model>(fileName, services);
-  const generatedFilePath = generateJavaScript(model, fileName, opts.destination);
+  const generatedFilePath = generateTypeScript(model, fileName, opts.destination);
   console.log(chalk.green(`JavaScript code generated successfully: ${generatedFilePath}`));
 };
 

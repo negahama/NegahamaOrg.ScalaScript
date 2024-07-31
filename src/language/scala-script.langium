@@ -1,7 +1,7 @@
 grammar ScalaScript
 
 entry Model:
-  (bypasses+=Bypass | declarations+=Dcl | definitions+=Def | expressions+=Expr)*;
+  (expressions+=Expr | statements+=Stmt)*;
 
 Bypass: bypass=BYPASS;
 terminal BYPASS returns string: /%%[\s\S]*?%%/;
@@ -42,7 +42,8 @@ fragment Params:
 Param:
   name=ID (':' type=ID)? ('=' initVal=Expr)?;
 fragment Block:
-  '{' body+=Expr* '}';
+  '{' (body+=(Expr | Stmt))* '}';
+  // '{' body+=Expr ((Semi*) body+=Expr)* result=Expr? '}';
 
 FunCall:
   def=[FunDef:ID] '(' (args+=Expr (',' args+=Expr)*)? ')';
@@ -50,6 +51,9 @@ FunCall:
 // Expressions
 // Expressions are composed of operators and operands.
 // Expression forms are discussed subsequently in decreasing order of precedence.
+
+// Exprs:
+//   exprs+=Expr (',' exprs+=Expr)*;
 
 Expr:
   PrimExpr
@@ -84,7 +88,9 @@ Group:
 
 // cross-reference to a parameter
 Ref:
-  value=[Def:ID];
+  // value=[Def:ID];
+  // value=[Param:ID];
+  value=ID;
 
 Add  infers Expr: 
   Mult ({infer BinExpr.e1=current} op=('+'|'-') e2=Mult)*;
@@ -117,7 +123,7 @@ WhileExpr:
 // Generator  : Pattern1 '<-' Expr {[Semi] Guard | Semi Pattern1 '=' Expr};
 // Guard      : 'if' PostfixExpr;
 ForExpr:
-  'for' '(' var=Param '=' e1=Expr 'to' e2=Expr ')' Block;
+  'for' '(' var=Param '=' e1=PrimExpr 'to' e2=PrimExpr ')' Block;
 
 // Return Expressions
 // ReturnExpr: 'return' (Expr)?;
@@ -137,18 +143,8 @@ ForExpr:
 
 
 // Statements
-// BlockStat:
-//   Import
-//   | {Annotation} ['implicit' | 'lazy'] Def
-//   | {Annotation} {LocalModifier} TmplDef
-//   | Expr1;
-
-// TemplateStat:
-//   Import
-//   | {Annotation} {Modifier} Def
-//   | {Annotation} {Modifier} Dcl
-//   | Expr;
-
+Stmt:
+  Dcl | Def;
 
 // Type:
 //     DataType | Entity;
@@ -175,8 +171,9 @@ ForExpr:
 // terminal Delim    : /[`'".;,]/;
 
 // New line and semicolon
+// Whitespace를 hidden terminal로 설정한 WS로 인해 NL은 인식되지 않고 있음
 terminal NL       : /[\n\r]/;
-terminal Semi     : ';' |  (NL)+;
+terminal Semi     : ';' | (NL)+;
 
 // Boolean Literals
 // It has to place before ID or Identifier

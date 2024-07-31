@@ -1,5 +1,4 @@
 def sum(a: number, b: number): number = {
-%%
-  return a + b;
-%%
+  var sum = a + b + 0
+  sum
 }
