@@ -1,10 +1,15 @@
 import {
+  Code,
   Expr,
+  isAssign,
   isBinExpr,
   isBypass,
+  isCompare,
   isExpr,
+  isFunCall,
   isFunDef,
   isGroup,
+  isIfExpr,
   isLiteral,
   isRef,
   isStmt,
@@ -26,11 +31,7 @@ export function generateTypeScript(model: Model, filePath: string, destination: 
     // This is transpiled by ScalaScript
     "use strict";
 
-    ${joinToNode(model.statements, (statement) => generateStatementElement(statement), {
-      appendNewLineIfNotEmpty: true,
-    })}
-
-    ${joinToNode(model.expressions, (expression) => generateExpressionElement(expression), {
+    ${joinToNode(model.codes, (code) => generateCodeElement(code), {
       appendNewLineIfNotEmpty: true,
     })}
   `.appendNewLineIfNotEmpty();
@@ -42,16 +43,28 @@ export function generateTypeScript(model: Model, filePath: string, destination: 
   return generatedFilePath;
 }
 
+function generateCodeElement(code: Code): string {
+  let result = "";
+  if (isStmt(code)) result += generateStatementElement(code);
+  else if (isExpr(code)) result += generateExpressionElement(code);
+  else {
+    console.log(code);
+  }
+  return result;
+}
+
 function generateStatementElement(stmt: Stmt): string {
   let result = "";
   if (isVarDef(stmt)) {
     result += `let ${stmt.name}`;
     if (stmt.type) result += ": " + stmt.type;
     if (stmt.value) result += " = " + generateExpressionElement(stmt.value);
+    result += ";";
   } else if (isValDef(stmt)) {
     result += `const ${stmt.name}`;
     if (stmt.type) result += ": " + stmt.type;
     if (stmt.value) result += " = " + generateExpressionElement(stmt.value);
+    result += ";";
   } else if (isFunDef(stmt)) {
     result += `function ${stmt.name}(`;
     stmt.params.forEach((param, index) => {
@@ -62,6 +75,8 @@ function generateStatementElement(stmt: Stmt): string {
     result += ")";
     if (stmt.returnType) result += ": " + stmt.returnType;
     result += " " + generateBlockElement(stmt.body);
+  } else if (isBypass(stmt)) {
+    result += generateBypassElement(stmt.bypass);
   } else {
     console.log(stmt.$type);
   }
@@ -70,7 +85,42 @@ function generateStatementElement(stmt: Stmt): string {
 
 function generateExpressionElement(expr: Expr): string {
   let result = "";
-  if (isBinExpr(expr)) {
+  if (isAssign(expr)) {
+    result += `${expr.name} = ` + generateExpressionElement(expr.value);
+    result += ";";
+  } else if (isCompare(expr)) {
+    result += generateExpressionElement(expr.e1);
+    result += ` ${expr.op} `;
+    result += generateExpressionElement(expr.e2);
+  } else if (isIfExpr(expr)) {
+    result += "if (" + generateExpressionElement(expr.condition) + ") ";
+    if (expr.then) {
+      if (isExpr(expr.then.body)) {
+        result += "{ ";
+        result += generateExpressionElement(expr.then.body);
+        result += " }";
+      } else {
+        if (expr.then.body != undefined) result += generateBlockElement(expr.then.body);
+      }
+    }
+    if (expr.else) {
+      result += " else ";
+      if (isExpr(expr.else.body)) {
+        result += "{ ";
+        result += generateExpressionElement(expr.else.body);
+        result += " }";
+      } else {
+        if (expr.else.body != undefined) result += generateBlockElement(expr.else.body);
+      }
+    }
+  } else if (isFunCall(expr)) {
+    result += expr.def + "(";
+    expr.args.forEach((arg, index) => {
+      if (index != 0) result += ", ";
+      result += generateExpressionElement(arg);
+    });
+    result += ")";
+  } else if (isBinExpr(expr)) {
     result += generateExpressionElement(expr.e1);
     result += " " + expr.op + " ";
     result += generateExpressionElement(expr.e2);
@@ -81,8 +131,6 @@ function generateExpressionElement(expr: Expr): string {
     result += `${expr.value}`;
   } else if (isLiteral(expr)) {
     result += expr.value;
-  } else if (isBypass(expr)) {
-    result += generateBypassElement(expr.bypass);
   } else {
     console.log(expr.$type);
   }
@@ -110,8 +158,8 @@ function generateBlockElement(body: (Expr | Stmt)[]): string {
     if (index == body.length - 1) {
       result += "return ";
     }
-    if (isStmt(expr)) result += generateStatementElement(expr) + ";\n";
-    else if (isExpr(expr)) result += generateExpressionElement(expr) + ";\n";
+    if (isStmt(expr)) result += generateStatementElement(expr) + "\n";
+    else if (isExpr(expr)) result += generateExpressionElement(expr) + "\n";
     else {
       console.log("ERROR:", body);
     }

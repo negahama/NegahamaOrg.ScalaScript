@@ -1,10 +1,31 @@
 grammar ScalaScript
 
-entry Model:
-  (expressions+=Expr | statements+=Stmt)*;
+entry Model: (codes+=Code)*;
 
-Bypass: bypass=BYPASS;
-terminal BYPASS returns string: /%%[\s\S]*?%%/;
+Code: Stmt | Expr;
+
+// Statements
+Stmt: Dcl | Def | Bypass;
+
+// Identifiers
+// opchar ::= // printableChar not matched by (whiteSpace | upper | lower |
+//              // letter | digit | paren | delim | opchar | Unicode_Sm | Unicode_So)
+// op     ::=  opchar {opchar}
+
+// terminal VarId returns string:
+//   Lower (Letter | Digit)*;
+// terminal PlainId returns string:
+//   Upper (Letter | Digit)* | VarId;
+
+terminal PlainId returns string: ID;
+Id returns string:
+  PlainId ('.' PlainId)* // QualifiedName returns string:
+  | '`' StringLiteral '`';
+
+// Type
+Type returns string:
+  Id '[]'
+  | Id;
 
 // Basic Declarations and Definitions
 // A declaration introduces names and assigns them types.
@@ -17,15 +38,15 @@ Def:
 
 // Value Declarations and Definitions
 ValDcl:
-  'val' ids+=ID ((',' ids+=ID)*)? (':' type=ID)?;
+  'val' ids+=PlainId ((',' ids+=PlainId)*)? (':' type=Type)?;
 ValDef:
-  'val' name=ID (':' type=ID)? '=' value=Expr;
+  'val' name=PlainId (':' type=Type)? '=' value=Expr;
 
 // Variable Declarations and Definitions
 VarDcl:
-  'var' ids+=ID ((',' ids+=ID)*)? (':' type=ID)?;
+  'var' ids+=PlainId ((',' ids+=PlainId)*)? (':' type=Type)?;
 VarDef:
-  'var' name=ID (':' type=ID)? '=' value=Expr;
+  'var' name=PlainId (':' type=Type)? '=' value=Expr;
 
 // Function Declarations and Definitions
 // 여기서 fragment를 사용하는 이유는 이 함수 정의와 선언의 루트 노드의 타입을 FunDcl, FunDef로 해주기 위해서이다.
@@ -36,17 +57,22 @@ FunDcl:
 FunDef:
   'def' FunSig '=' Block;
 fragment FunSig:
-  name=ID '(' Params? ')' (':' returnType=ID)?;
+  name=PlainId '(' Params? ')' (':' returnType=Type)?;
 fragment Params:
   params+=Param (',' params+=Param)*;
 Param:
-  name=ID (':' type=ID)? ('=' initVal=Expr)?;
+  name=PlainId (':' type=Type)? ('=' initVal=Expr)?;
 fragment Block:
   '{' (body+=(Expr | Stmt))* '}';
   // '{' body+=Expr ((Semi*) body+=Expr)* result=Expr? '}';
 
 FunCall:
-  def=[FunDef:ID] '(' (args+=Expr (',' args+=Expr)*)? ')';
+  // def=[FunDef:Id] '(' (args+=Expr (',' args+=Expr)*)? ')';
+  def=Id '(' (args+=Expr (',' args+=Expr)*)? ')';
+
+// Bypass
+Bypass: bypass=BYPASS;
+terminal BYPASS returns string: /%%[\s\S]*?%%/;
 
 // Expressions
 // Expressions are composed of operators and operands.
@@ -55,9 +81,14 @@ FunCall:
 // Exprs:
 //   exprs+=Expr (',' exprs+=Expr)*;
 
+// Add rule은 많은 rule을 내포하고 있다.
+// 이것은 덧셈 뿐만 아니라 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
+// 이 경우는 PrimExpr이 되고 이것은 Liter, Group, Ref를 포함한다.
+
 Expr:
-  PrimExpr
-  | Add
+  Add
+  | Assign
+  | Compare
   | IfExpr
   | DoExpr
   | WhileExpr
@@ -65,7 +96,6 @@ Expr:
   // | ReturnExpr
   // | ThrowExpr
   | FunCall
-  | Bypass
   ;
 
 PrimExpr:
@@ -88,24 +118,30 @@ Group:
 
 // cross-reference to a parameter
 Ref:
-  // value=[Def:ID];
-  // value=[Param:ID];
-  value=ID;
-
-Add  infers Expr: 
-  Mult ({infer BinExpr.e1=current} op=('+'|'-') e2=Mult)*;
-
-Mult infers Expr: 
-  PrimExpr ({infer BinExpr.e1=current} op=('*'|'/') e2=PrimExpr)*;
+  // value=[Def:Id];
+  // value=[Param:Id];
+  value=Id;
 
 // Assignments
-// Expr1:
-//   [SimpleExpr '.'] id '=' Expr
-//   | SimpleExpr1 ArgumentExprs '=' Expr;
+Assign:
+  name=Id '=' value=Expr;
+
+Add:
+  Mul ({infer BinExpr.e1=current} op=('+'|'-') e2=Mul)*;
+
+Mul:
+  PrimExpr ({infer BinExpr.e1=current} op=('*'|'/') e2=PrimExpr)*;
+
+// Compare operations
+Compare:
+  e1=PrimExpr op=('<'|'<='|'>'|'>=') e2=PrimExpr;
 
 // Conditional Expressions
 IfExpr:
-  'if' '(' condition=Expr ')' (NL)* then=Expr ((Semi)? 'else' else=Expr)?;
+  'if' '(' condition=Expr ')' (NL)* then=IfBlock ((Semi)? 'else' else=IfBlock)?;
+
+IfBlock:
+  Block | body=Expr;
 
 // Do Loop Expressions
 DoExpr:
@@ -142,16 +178,6 @@ ForExpr:
 // Binding     : (id | '_') [':' Type];
 
 
-// Statements
-Stmt:
-  Dcl | Def;
-
-// Type:
-//     DataType | Entity;
-
-// DataType:
-//     'datatype' name=ID;
-
 // Entity:
 //     'entity' name=ID ('extends' superType=[Entity:QualifiedName])? '{'
 //         (features+=Feature)*
@@ -160,8 +186,6 @@ Stmt:
 // Feature:
 //     (many?='many')? name=ID ':' type=[Type:QualifiedName];
 
-// QualifiedName returns string:
-//     ID ('.' ID)*;
 
 // Parentheses
 // terminal Paren    : '(' | ')' | '[' | ']' | '{' | '}';
@@ -213,24 +237,14 @@ terminal CharEscapeSeq: '\b' | '\t' | '\n' | '\f' | '\r' | '\"' | '\'' | '\\';
 // terminal Letter       :  Upper | Lower; // and Unicode categories Lo, Lt, Nl
 
 // String Literals
-// terminal STRING       : /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
-terminal StringLiteral: '"' (StringElement)+ '"';
-terminal StringElement: PrintableChar |  CharEscapeSeq;
+terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
+// terminal StringLiteral: '"' (StringElement)+ '"';
+// terminal StringElement: PrintableChar |  CharEscapeSeq;
 
 // Identifiers
 // 이것은 BooleanLiteral 다음에 와야 한다.
 // 그렇지 않으면 true, false가 ID로 취급되어진다.
-
-// op       ::=  opchar {opchar}
-// varid    ::=  lower idrest
-// plainid  ::=  upper idrest
-//            |  varid
-//            |  op
-// id       ::=  plainid
-//            |  '`' stringLiteral '`'
-// idrest   ::=  {letter | digit} ['_' op]
-
-terminal ID       : /[_a-zA-Z][\w_]*/;
+terminal ID: /[_a-zA-Z][\w_]*/;
 
 // Whitespace and Comments
 hidden terminal WS        : /\s+/;
