@@ -92,10 +92,13 @@ WhileStatement:
 
 // For Comprehensions and For Loops
 ForStatement:
-  // 'for' '(' var=Param '=' e1=SimpleExpr 'to' e2=SimpleExpr ')' Block;
-  'for' '(' iterator=Iterator ')' Block;
+  'for' '(' iterators+=Iterator (';' iterators+=Iterator)* ')' Block;
 
-Iterator: name=PlainId '<-' e1=SimpleExpr 'to' e2=SimpleExpr;
+Iterator: ForOf | ForTo | ForUntil;
+
+ForOf   : name=PlainId '<-' of=SimpleExpr;
+ForTo   : name=PlainId '<-' e1=SimpleExpr 'to'    e2=SimpleExpr;
+ForUntil: name=PlainId '<-' e1=SimpleExpr 'until' e2=SimpleExpr;
 
 // Return Statement
 // ReturnStatement: 'return' (Expression)?;
@@ -127,12 +130,15 @@ Expression:
   ;
 
 SimpleExpr:
-  Literal | Group | Ref;
+  ArrayLiteral | Literal | Group | Ref;
+
+ArrayLiteral:
+  '[' items+=Literal (',' items+=Literal )* ']';
 
 // Literals
 // There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
 // The syntax of these literals is in each case as in Java.
-Literal: 
+Literal:
   ('-')? value=IntegerLiteral
   | ('-')? value=FloatingPointLiteral
   | value=BooleanLiteral

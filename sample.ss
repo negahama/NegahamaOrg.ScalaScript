@@ -16,9 +16,12 @@ else {
   console.log("error")
 }
 
-for (a <- 1 to 10) {
+for (a <- 1 to 10; b <- 1 to 10; c <- 1 to 10) {
   console.log(a)
 }
+
+val array1 = ['a', 'b', 'c']
+for (a <- array1; a <- array1) { console.log(a, b) }
 
 def generateBypassElement(bypass: string[]): string = {
   var result = ""

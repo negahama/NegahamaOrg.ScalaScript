@@ -1,11 +1,15 @@
 import {
   Code,
   Expression,
+  isArrayLiteral,
   isAssignment,
   isBinaryExpression,
   isBypass,
   isExpression,
+  isForOf,
   isForStatement,
+  isForTo,
+  isForUntil,
   isFunCall,
   isFunDefinition,
   isGroup,
@@ -53,7 +57,7 @@ function generateCodeElement(code: Code): string {
   return result;
 }
 
-function generateStatementElement(stmt: Statement): string {
+function generateStatementElement(stmt: Statement, indent: number = 0): string {
   let result = "";
   if (isVarDefinition(stmt)) {
     result += `let ${stmt.name}`;
@@ -74,13 +78,29 @@ function generateStatementElement(stmt: Statement): string {
     });
     result += ")";
     if (stmt.returnType) result += ": " + stmt.returnType;
-    result += " " + generateBlockElement(stmt.body, true);
+    result += " " + generateBlockElement(stmt.body, indent + 1, true);
   } else if (isForStatement(stmt)) {
-    const name = stmt.iterator.name;
-    const e1 = generateExpressionElement(stmt.iterator.e1);
-    const e2 = generateExpressionElement(stmt.iterator.e2);
-    result += `for (let ${name} = ${e1}; ${name} <= ${e2}; ${name}++)`;
-    result += " " + generateBlockElement(stmt.body);
+    let forIndent = indent;
+    stmt.iterators.forEach((iter, idx) => {
+      const name = iter.name;
+      if (isForOf(iter)) {
+        result += applyIndent(forIndent, `for (const ${name} of ${generateExpressionElement(iter.of)}) `);
+      } else if (isForTo(iter)) {
+        const e1 = generateExpressionElement(iter.e1);
+        const e2 = generateExpressionElement(iter.e2);
+        result += applyIndent(forIndent, `for (let ${name} = ${e1}; ${name} <= ${e2}; ${name}++) `);
+      } else if (isForUntil(iter)) {
+        const e1 = generateExpressionElement(iter.e1);
+        const e2 = generateExpressionElement(iter.e2);
+        result += applyIndent(forIndent, `for (let ${name} = ${e1}; ${name} < ${e2}; ${name}++) `);
+      }
+      if (idx < stmt.iterators.length - 1) result += "{\n";
+      forIndent++;
+    });
+    result += generateBlockElement(stmt.body, forIndent);
+    for (let i = forIndent - 1; i > indent; i--) {
+      result += "\n" + applyIndent(i - 1, "}");
+    }
   } else if (isBypass(stmt)) {
     result += generateBypassElement(stmt.bypass);
   } else {
@@ -89,58 +109,60 @@ function generateStatementElement(stmt: Statement): string {
   return result;
 }
 
-function generateExpressionElement(expr: Expression): string {
+function generateExpressionElement(expr: Expression, indent: number = 0): string {
   let result = "";
   if (isAssignment(expr)) {
-    result += `${expr.name} ${expr.operator} ` + generateExpressionElement(expr.value);
-    result += ";";
+    result += `${expr.name} ${expr.operator} ${generateExpressionElement(expr.value)};`;
   } else if (isBinaryExpression(expr)) {
-    result += generateExpressionElement(expr.left);
+    let op = "";
     switch (expr.operator) {
       case "and": {
-        result += " && ";
+        op = "&&";
         break;
       }
       case "or": {
-        result += " || ";
+        op = "||";
         break;
       }
       default: {
-        result += " " + expr.operator + " ";
+        op = expr.operator;
       }
     }
-    result += generateExpressionElement(expr.right);
+    result += `${generateExpressionElement(expr.left)} ${op} ${generateExpressionElement(expr.right)}`;
   } else if (isIfExpression(expr)) {
     result += "if (" + generateExpressionElement(expr.condition) + ") ";
     if (expr.then) {
       if (isExpression(expr.then.body)) {
-        result += "{ ";
-        result += generateExpressionElement(expr.then.body);
-        result += " }";
+        result += `{ ${generateExpressionElement(expr.then.body)} }`;
+        // result += "{\n";
+        // result += applyIndent(indent + 1, generateExpressionElement(expr.then.body));
+        // result += "\n" + applyIndent(indent, "}");
       } else {
-        if (expr.then.body != undefined) result += generateBlockElement(expr.then.body);
+        if (expr.then.body != undefined) result += generateBlockElement(expr.then.body, indent + 1);
       }
     }
     expr.elif.forEach((elif) => {
       result += "\nelse if (" + generateExpressionElement(elif.condition) + ") ";
       if (elif.elif) {
         if (isExpression(elif.elif.body)) {
-          result += "{ ";
-          result += generateExpressionElement(elif.elif.body);
-          result += " }";
+          result += `{ ${generateExpressionElement(elif.elif.body)} }`;
+          // result += "{\n";
+          // result += applyIndent(indent + 1, generateExpressionElement(elif.elif.body));
+          // result += "\n" + applyIndent(indent, "}");
         } else {
-          if (elif.elif.body != undefined) result += generateBlockElement(elif.elif.body);
+          if (elif.elif.body != undefined) result += generateBlockElement(elif.elif.body, indent + 1);
         }
       }
     });
     if (expr.else) {
       result += "\nelse ";
       if (isExpression(expr.else.body)) {
-        result += "{ ";
-        result += generateExpressionElement(expr.else.body);
-        result += " }";
+        result += `{ ${generateExpressionElement(expr.else.body)} }`;
+        // result += "{\n";
+        // result += applyIndent(indent + 1, generateExpressionElement(expr.else.body));
+        // result += "\n" + applyIndent(indent, "}");
       } else {
-        if (expr.else.body != undefined) result += generateBlockElement(expr.else.body);
+        if (expr.else.body != undefined) result += generateBlockElement(expr.else.body, indent + 1);
       }
     }
   } else if (isFunCall(expr)) {
@@ -150,13 +172,20 @@ function generateExpressionElement(expr: Expression): string {
       result += generateExpressionElement(arg);
     });
     result += ")";
+  } else if (isArrayLiteral(expr)) {
+    result += "[";
+    expr.items.forEach((item, idx) => {
+      if (idx != 0) result += ", ";
+      result += item.value;
+    });
+    result += "]";
+  } else if (isLiteral(expr)) {
+    result += expr.value;
   } else if (isGroup(expr)) {
     result += "(" + generateExpressionElement(expr.group) + ")";
   } else if (isRef(expr)) {
     // result += `${expr.value.ref?.name}`;
     result += `${expr.value}`;
-  } else if (isLiteral(expr)) {
-    result += expr.value;
   } else {
     console.log(expr);
   }
@@ -178,19 +207,29 @@ function generateBypassElement(bypass: string): string {
   return result;
 }
 
-function generateBlockElement(body: (Expression | Statement)[], supportReturn: boolean = false): string {
-  let result = "";
+function generateBlockElement(
+  body: (Expression | Statement)[],
+  indent: number,
+  supportReturn: boolean = false
+): string {
+  let result = "{\n";
   body.forEach((expr, index) => {
-    if (supportReturn) {
-      if (index == body.length - 1) {
-        result += "return ";
-      }
-    }
-    if (isStatement(expr)) result += generateStatementElement(expr) + "\n";
-    else if (isExpression(expr)) result += generateExpressionElement(expr) + "\n";
+    let element = "";
+    if (isStatement(expr)) element += generateStatementElement(expr, indent) + "\n";
+    else if (isExpression(expr)) element += generateExpressionElement(expr, indent) + "\n";
     else {
       console.log("ERROR:", body);
     }
+
+    if (supportReturn && index == body.length - 1) {
+      result += applyIndent(indent, "return ");
+    } else result += applyIndent(indent, "");
+    result += element;
   });
-  return "{\n" + result + "}";
+  result += applyIndent(indent - 1, "}");
+  return result;
+}
+
+function applyIndent(lv: number, s: string) {
+  return "  ".repeat(lv) + s;
 }
