@@ -23,17 +23,30 @@ for (let a = 1; a <= 10; a++) {
 }
 const array1 = ['a', 'b', 'c'];
 for (const a of array1) {
-  for (const a of array1) {
+  for (const b of array1) {
     console.log(a, b)
   }
 }
+while (a <= 10) {
+  console.log(a)
+  a += 1;
+}
+do {
+  console.log(a)
+  a += 1;
+} while (a <= 10)
 function generateBypassElement(bypass: string[]): string {
   let result = "";
-  let ns = s;
-  if (s.startsWith("\r\n")) { ns = ns.slice(2); }
-  ns = ns.trimEnd();
-  result += ns;
+  bypass.forEach((s) => {
+    let ns = s;
+    if (s.startsWith("\r\n")) { ns = ns.slice(2); }
+    ns = ns.trimEnd();
+    result += ns;
+  })
   return result
 }
 function test() {
+  return if (fs.existsSync(data.destination)) {
+    fs.mkdirSync(data.destination, true)
+  }
 }

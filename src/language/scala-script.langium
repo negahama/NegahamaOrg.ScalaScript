@@ -40,6 +40,9 @@ Type returns string:
   Id '[]'
   | Id;
 
+Bindings: '(' bindings+=Binding (',' bindings+=Binding)* ')';
+Binding : name=PlainId (':' type=Type)?;
+
 // Basic Declarations and Definitions
 // A declaration introduces names and assigns them types.
 // It can form part of a class definition or of a refinement in a compound type.
@@ -48,13 +51,13 @@ Type returns string:
 ValDeclaration:
   'val' ids+=PlainId ((',' ids+=PlainId)*)? (':' type=Type)?;
 ValDefinition:
-  'val' name=PlainId (':' type=Type)? '=' value=Expression;
+  'val' bind=Binding '=' value=Expression;
 
 // Variable Declarations and Definitions
 VarDeclaration:
   'var' ids+=PlainId ((',' ids+=PlainId)*)? (':' type=Type)?;
 VarDefinition:
-  'var' name=PlainId (':' type=Type)? '=' value=Expression;
+  'var' bind=Binding '=' value=Expression;
 
 // Function Declarations and Definitions
 // 여기서 fragment를 사용하는 이유는 이 함수 정의와 선언의 루트 노드의 타입을 FunDcl, FunDef로 해주기 위해서이다.
@@ -69,14 +72,19 @@ fragment FunSig:
 fragment Params:
   params+=Param (',' params+=Param)*;
 Param:
-  name=PlainId (':' type=Type)? ('=' initVal=Expression)?;
+  bind=Binding ('=' value=Expression)?;
 fragment Block:
   '{' (body+=(Expression | Statement))* '}';
   // '{' body+=Expression ((Semi*) body+=Expression)* result=Expression? '}';
+ExprOrBlock:
+  Block | body=Expression;
 
 FunCall:
   // def=[FunDefinition:Id] '(' (args+=Expression (',' args+=Expression)*)? ')';
   def=Id '(' (args+=Expression (',' args+=Expression)*)? ')';
+
+// Anonymous Functions
+AnonyFunCall: params=Bindings (':' returnType=Type)? '=>' body=ExprOrBlock;
 
 // Bypass
 Bypass: bypass=BYPASS;
@@ -84,11 +92,11 @@ terminal BYPASS returns string: /%%[\s\S]*?%%/;
 
 // Do Loop
 DoStatement:
-  'do' loop=Expression (Semi)? 'while' '(' condition=Expression ')';
+  'do' loop=ExprOrBlock 'while' '(' condition=Expression ')';
 
 // While Loop
 WhileStatement:
-  'while' '(' condition=Expression ')' (NL)* loop=Expression;
+  'while' '(' condition=Expression ')' loop=ExprOrBlock;
 
 // For Comprehensions and For Loops
 ForStatement:
@@ -127,6 +135,7 @@ Expression:
   | Assignment
   | IfExpression
   | FunCall
+  | AnonyFunCall
   ;
 
 SimpleExpr:
@@ -177,21 +186,12 @@ Multiplication infers Expression:
 // Conditional Expressions
 IfExpression:
   'if' '(' condition=Expression ')'
-    'then'? then=IfBlock
+    'then'? then=ExprOrBlock
     (elif+=IfElseExpression)*
-    ('else' else=IfBlock)?;
+    ('else' else=ExprOrBlock)?;
 
 IfElseExpression:
-  'elif' '(' condition=Expression ')' elif=IfBlock?;
-
-IfBlock:
-  Block | body=Expression;
-
-// Anonymous Functions
-// Expr        : (Bindings | ['implicit'] id | '_') '=>' Expr;
-// ResultExpr  : (Bindings | (['implicit'] id | '_') ':' CompoundType) '=>' Block;
-// Bindings    : '(' Binding {',' Binding} ')';
-// Binding     : (id | '_') [':' Type];
+  'elif' '(' condition=Expression ')' elif=ExprOrBlock?;
 
 
 // Entity:
@@ -212,8 +212,8 @@ IfBlock:
 
 // New line and semicolon
 // Whitespace를 hidden terminal로 설정한 WS로 인해 NL은 인식되지 않고 있음
-terminal NL       : /[\n\r]/;
-terminal Semi     : ';' | (NL)+;
+// terminal NL       : /[\n\r]/;
+// terminal Semi     : ';' | (NL)+;
 
 // Boolean Literals
 // It has to place before ID or Identifier

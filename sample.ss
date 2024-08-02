@@ -21,23 +21,33 @@ for (a <- 1 to 10; b <- 1 to 10; c <- 1 to 10) {
 }
 
 val array1 = ['a', 'b', 'c']
-for (a <- array1; a <- array1) { console.log(a, b) }
+for (a <- array1; b <- array1) { console.log(a, b) }
+
+while (a <= 10) {
+  console.log(a)
+  a += 1
+}
+
+do {
+  console.log(a)
+  a += 1
+} while (a <= 10)
 
 def generateBypassElement(bypass: string[]): string = {
   var result = ""
-//  bypass.forEach((s) => {
+  bypass.forEach((s) => {
     // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
     var ns = s
     if (s.startsWith("\r\n")) ns = ns.slice(2)
     ns = ns.trimEnd()
     result += ns
-//  })
+  })
   result
 }
 
 def test() = {
-//  if (fs.existsSync(data.destination)) {
-//    fs.mkdirSync(data.destination, true)
-//  }
+  if (fs.existsSync(data.destination)) {
+    fs.mkdirSync(data.destination, true)
+  }
 }
 
