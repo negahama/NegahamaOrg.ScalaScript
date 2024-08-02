@@ -2,10 +2,23 @@ grammar ScalaScript
 
 entry Model: (codes+=Code)*;
 
-Code: Stmt | Expr;
+Code: Statement | Expression;
 
 // Statements
-Stmt: Dcl | Def | Bypass;
+Statement:
+  Declaration
+  | Definition
+  | Bypass
+  | DoStatement
+  | WhileStatement
+  | ForStatement
+  // | ReturnStatement
+  // | TryStatement
+  // | ThrowStatement
+  ;
+
+Declaration: ValDeclaration | VarDeclaration | FunDeclaration;
+Definition : ValDefinition  | VarDefinition  | FunDefinition;
 
 // Identifiers
 // opchar ::= // printableChar not matched by (whiteSpace | upper | lower |
@@ -19,7 +32,7 @@ Stmt: Dcl | Def | Bypass;
 
 terminal PlainId returns string: ID;
 Id returns string:
-  PlainId ('.' PlainId)* // QualifiedName returns string:
+  PlainId (('.'|'::') PlainId)* // QualifiedName returns string:
   | '`' StringLiteral '`';
 
 // Type
@@ -31,74 +44,89 @@ Type returns string:
 // A declaration introduces names and assigns them types.
 // It can form part of a class definition or of a refinement in a compound type.
 
-Dcl:
-  ValDcl | VarDcl | FunDcl;
-Def:
-  ValDef | VarDef | FunDef;
-
 // Value Declarations and Definitions
-ValDcl:
+ValDeclaration:
   'val' ids+=PlainId ((',' ids+=PlainId)*)? (':' type=Type)?;
-ValDef:
-  'val' name=PlainId (':' type=Type)? '=' value=Expr;
+ValDefinition:
+  'val' name=PlainId (':' type=Type)? '=' value=Expression;
 
 // Variable Declarations and Definitions
-VarDcl:
+VarDeclaration:
   'var' ids+=PlainId ((',' ids+=PlainId)*)? (':' type=Type)?;
-VarDef:
-  'var' name=PlainId (':' type=Type)? '=' value=Expr;
+VarDefinition:
+  'var' name=PlainId (':' type=Type)? '=' value=Expression;
 
 // Function Declarations and Definitions
 // 여기서 fragment를 사용하는 이유는 이 함수 정의와 선언의 루트 노드의 타입을 FunDcl, FunDef로 해주기 위해서이다.
 // fragment를 사용하지 않으면 루트 노드의 타입이 Params이 된다.
 
-FunDcl:
+FunDeclaration:
   'def' FunSig;
-FunDef:
+FunDefinition:
   'def' FunSig '=' Block;
 fragment FunSig:
   name=PlainId '(' Params? ')' (':' returnType=Type)?;
 fragment Params:
   params+=Param (',' params+=Param)*;
 Param:
-  name=PlainId (':' type=Type)? ('=' initVal=Expr)?;
+  name=PlainId (':' type=Type)? ('=' initVal=Expression)?;
 fragment Block:
-  '{' (body+=(Expr | Stmt))* '}';
-  // '{' body+=Expr ((Semi*) body+=Expr)* result=Expr? '}';
+  '{' (body+=(Expression | Statement))* '}';
+  // '{' body+=Expression ((Semi*) body+=Expression)* result=Expression? '}';
 
 FunCall:
-  // def=[FunDef:Id] '(' (args+=Expr (',' args+=Expr)*)? ')';
-  def=Id '(' (args+=Expr (',' args+=Expr)*)? ')';
+  // def=[FunDefinition:Id] '(' (args+=Expression (',' args+=Expression)*)? ')';
+  def=Id '(' (args+=Expression (',' args+=Expression)*)? ')';
 
 // Bypass
 Bypass: bypass=BYPASS;
 terminal BYPASS returns string: /%%[\s\S]*?%%/;
 
+// Do Loop
+DoStatement:
+  'do' loop=Expression (Semi)? 'while' '(' condition=Expression ')';
+
+// While Loop
+WhileStatement:
+  'while' '(' condition=Expression ')' (NL)* loop=Expression;
+
+// For Comprehensions and For Loops
+ForStatement:
+  // 'for' '(' var=Param '=' e1=SimpleExpr 'to' e2=SimpleExpr ')' Block;
+  'for' '(' iterator=Iterator ')' Block;
+
+Iterator: name=PlainId '<-' e1=SimpleExpr 'to' e2=SimpleExpr;
+
+// Return Statement
+// ReturnStatement: 'return' (Expression)?;
+
+// Try Statement
+// TryStatement: 'try' ('{' Block '}' | Expr) ['catch' '{' CaseClauses '}']
+//   ['finally' Expr] ;
+
+// Throw Statement
+// ThrowStatement: 'throw' Expression;
+
+
 // Expressions
 // Expressions are composed of operators and operands.
 // Expression forms are discussed subsequently in decreasing order of precedence.
 
-// Exprs:
-//   exprs+=Expr (',' exprs+=Expr)*;
+// Expressions:
+//   exprs+=Expression (',' exprs+=Expression)*;
 
-// Add rule은 많은 rule을 내포하고 있다.
-// 이것은 덧셈 뿐만 아니라 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
-// 이 경우는 PrimExpr이 되고 이것은 Liter, Group, Ref를 포함한다.
+// Logical rule은 많은 rule을 내포하고 있다.
+// 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
+// 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, Ref를 포함한다.
 
-Expr:
-  Add
-  | Assign
-  | Compare
-  | IfExpr
-  | DoExpr
-  | WhileExpr
-  | ForExpr
-  // | ReturnExpr
-  // | ThrowExpr
+Expression:
+  Logical
+  | Assignment
+  | IfExpression
   | FunCall
   ;
 
-PrimExpr:
+SimpleExpr:
   Literal | Group | Ref;
 
 // Literals
@@ -114,7 +142,7 @@ Literal:
 
 // grouped expression with parentheses
 Group:
-  '(' group=Expr ')';
+  '(' group=Expression ')';
 
 // cross-reference to a parameter
 Ref:
@@ -123,53 +151,35 @@ Ref:
   value=Id;
 
 // Assignments
-Assign:
-  name=Id '=' value=Expr;
+// Assignment infers Expression:
+//     Logical      ({infer BinaryExpression.left=current} operator=('=') right=Addition)*;
+Assignment:
+  name=Id operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
-Add:
-  Mul ({infer BinExpr.e1=current} op=('+'|'-') e2=Mul)*;
+Logical infers Expression:
+  Comparison     ({infer BinaryExpression.left=current} operator=('and' | 'or') right=Comparison)*;
 
-Mul:
-  PrimExpr ({infer BinExpr.e1=current} op=('*'|'/') e2=PrimExpr)*;
+Comparison infers Expression:
+  Addition       ({infer BinaryExpression.left=current} operator=('<' | '<=' | '>' | '>=' | '==' | '!=') right=Addition)*;
 
-// Compare operations
-Compare:
-  e1=PrimExpr op=('<'|'<='|'>'|'>=') e2=PrimExpr;
+Addition infers Expression:
+  Multiplication ({infer BinaryExpression.left=current} operator=('+' | '-') right=Multiplication)*;
+
+Multiplication infers Expression:
+  SimpleExpr     ({infer BinaryExpression.left=current} operator=('*' | '/') right=SimpleExpr)*;
 
 // Conditional Expressions
-IfExpr:
-  'if' '(' condition=Expr ')' (NL)* then=IfBlock ((Semi)? 'else' else=IfBlock)?;
+IfExpression:
+  'if' '(' condition=Expression ')'
+    'then'? then=IfBlock
+    (elif+=IfElseExpression)*
+    ('else' else=IfBlock)?;
+
+IfElseExpression:
+  'elif' '(' condition=Expression ')' elif=IfBlock?;
 
 IfBlock:
-  Block | body=Expr;
-
-// Do Loop Expressions
-DoExpr:
-  'do' loop=Expr (Semi)? 'while' '(' condition=Expr ')';
-
-// While Loop Expressions
-WhileExpr:
-  'while' '(' condition=Expr ')' (NL)* loop=Expr;
-
-// For Comprehensions and For Loops
-// Expr1:
-//   'for' ('(' Enumerators ')' | '{' Enumerators '}')
-//   {NL} ['yield'] Expr;
-// Enumerators: Generator {Semi Generator};
-// Generator  : Pattern1 '<-' Expr {[Semi] Guard | Semi Pattern1 '=' Expr};
-// Guard      : 'if' PostfixExpr;
-ForExpr:
-  'for' '(' var=Param '=' e1=PrimExpr 'to' e2=PrimExpr ')' Block;
-
-// Return Expressions
-// ReturnExpr: 'return' (Expr)?;
-
-// Throw Expressions
-// ThrowExpr: 'throw' Expr;
-
-// Try Expressions
-// Expr1: 'try' ('{' Block '}' | Expr) ['catch' '{' CaseClauses '}']
-//   ['finally' Expr] ;
+  Block | body=Expression;
 
 // Anonymous Functions
 // Expr        : (Bindings | ['implicit'] id | '_') '=>' Expr;
@@ -229,8 +239,8 @@ terminal NonZeroDigit     returns number: /[1-9]/;
 
 // Character Literals
 terminal CharLiteral  : ''' (PrintableChar | CharEscapeSeq) ''';
-terminal PrintableChar: /[\u0020-\u007F]/;
-terminal CharEscapeSeq: '\b' | '\t' | '\n' | '\f' | '\r' | '\"' | '\'' | '\\';
+// terminal PrintableChar: /[\u0020-\u007F]/;
+// terminal CharEscapeSeq: '\b' | '\t' | '\n' | '\f' | '\r' | '\"' | '\'' | '\\';
 
 // terminal Upper        :  /[A-Z$_]/;     // and Unicode category Lu
 // terminal Lower        :  /[a-z]/;       // and Unicode category Ll

@@ -5,6 +5,21 @@ def sum(a: number, b: number): number = {
 val s:string = ""
 s.startsWith("\r\n")
 
+var a = 0
+var b = 0
+
+if (a == b)
+then console.log("a == b")
+elif (a < b) console.log("a < b")
+elif (a > b) console.log("a > b")
+else {
+  console.log("error")
+}
+
+for (a <- 1 to 10) {
+  console.log(a)
+}
+
 def generateBypassElement(bypass: string[]): string = {
   var result = ""
 //  bypass.forEach((s) => {
@@ -12,19 +27,14 @@ def generateBypassElement(bypass: string[]): string = {
     var ns = s
     if (s.startsWith("\r\n")) ns = ns.slice(2)
     ns = ns.trimEnd()
-//    result += ns
-    result = result + ns
+    result += ns
 //  })
   result
 }
 
-def test(a:number, b:number) = {
-  if (a < b) {
-    var c = b - a
-    console.log("b - a:", c)
-  } else console.log("a > b")
-  if (fs.existsSync(data.destination)) {
-    fs.mkdirSync(data.destination, true)
-  }
+def test() = {
+//  if (fs.existsSync(data.destination)) {
+//    fs.mkdirSync(data.destination, true)
+//  }
 }
 

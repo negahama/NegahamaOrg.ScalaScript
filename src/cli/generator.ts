@@ -1,21 +1,21 @@
 import {
   Code,
-  Expr,
-  isAssign,
-  isBinExpr,
+  Expression,
+  isAssignment,
+  isBinaryExpression,
   isBypass,
-  isCompare,
-  isExpr,
+  isExpression,
+  isForStatement,
   isFunCall,
-  isFunDef,
+  isFunDefinition,
   isGroup,
-  isIfExpr,
+  isIfExpression,
   isLiteral,
   isRef,
-  isStmt,
-  isValDef,
-  isVarDef,
-  Stmt,
+  isStatement,
+  isValDefinition,
+  isVarDefinition,
+  Statement,
   type Model,
 } from "../language/generated/ast.js";
 import { expandToNode, joinToNode, toString } from "langium/generate";
@@ -45,27 +45,27 @@ export function generateTypeScript(model: Model, filePath: string, destination: 
 
 function generateCodeElement(code: Code): string {
   let result = "";
-  if (isStmt(code)) result += generateStatementElement(code);
-  else if (isExpr(code)) result += generateExpressionElement(code);
+  if (isStatement(code)) result += generateStatementElement(code);
+  else if (isExpression(code)) result += generateExpressionElement(code);
   else {
     console.log(code);
   }
   return result;
 }
 
-function generateStatementElement(stmt: Stmt): string {
+function generateStatementElement(stmt: Statement): string {
   let result = "";
-  if (isVarDef(stmt)) {
+  if (isVarDefinition(stmt)) {
     result += `let ${stmt.name}`;
     if (stmt.type) result += ": " + stmt.type;
     if (stmt.value) result += " = " + generateExpressionElement(stmt.value);
     result += ";";
-  } else if (isValDef(stmt)) {
+  } else if (isValDefinition(stmt)) {
     result += `const ${stmt.name}`;
     if (stmt.type) result += ": " + stmt.type;
     if (stmt.value) result += " = " + generateExpressionElement(stmt.value);
     result += ";";
-  } else if (isFunDef(stmt)) {
+  } else if (isFunDefinition(stmt)) {
     result += `function ${stmt.name}(`;
     stmt.params.forEach((param, index) => {
       if (index != 0) result += ", ";
@@ -74,6 +74,12 @@ function generateStatementElement(stmt: Stmt): string {
     });
     result += ")";
     if (stmt.returnType) result += ": " + stmt.returnType;
+    result += " " + generateBlockElement(stmt.body, true);
+  } else if (isForStatement(stmt)) {
+    const name = stmt.iterator.name;
+    const e1 = generateExpressionElement(stmt.iterator.e1);
+    const e2 = generateExpressionElement(stmt.iterator.e2);
+    result += `for (let ${name} = ${e1}; ${name} <= ${e2}; ${name}++)`;
     result += " " + generateBlockElement(stmt.body);
   } else if (isBypass(stmt)) {
     result += generateBypassElement(stmt.bypass);
@@ -83,19 +89,31 @@ function generateStatementElement(stmt: Stmt): string {
   return result;
 }
 
-function generateExpressionElement(expr: Expr): string {
+function generateExpressionElement(expr: Expression): string {
   let result = "";
-  if (isAssign(expr)) {
-    result += `${expr.name} = ` + generateExpressionElement(expr.value);
+  if (isAssignment(expr)) {
+    result += `${expr.name} ${expr.operator} ` + generateExpressionElement(expr.value);
     result += ";";
-  } else if (isCompare(expr)) {
-    result += generateExpressionElement(expr.e1);
-    result += ` ${expr.op} `;
-    result += generateExpressionElement(expr.e2);
-  } else if (isIfExpr(expr)) {
+  } else if (isBinaryExpression(expr)) {
+    result += generateExpressionElement(expr.left);
+    switch (expr.operator) {
+      case "and": {
+        result += " && ";
+        break;
+      }
+      case "or": {
+        result += " || ";
+        break;
+      }
+      default: {
+        result += " " + expr.operator + " ";
+      }
+    }
+    result += generateExpressionElement(expr.right);
+  } else if (isIfExpression(expr)) {
     result += "if (" + generateExpressionElement(expr.condition) + ") ";
     if (expr.then) {
-      if (isExpr(expr.then.body)) {
+      if (isExpression(expr.then.body)) {
         result += "{ ";
         result += generateExpressionElement(expr.then.body);
         result += " }";
@@ -103,9 +121,21 @@ function generateExpressionElement(expr: Expr): string {
         if (expr.then.body != undefined) result += generateBlockElement(expr.then.body);
       }
     }
+    expr.elif.forEach((elif) => {
+      result += "\nelse if (" + generateExpressionElement(elif.condition) + ") ";
+      if (elif.elif) {
+        if (isExpression(elif.elif.body)) {
+          result += "{ ";
+          result += generateExpressionElement(elif.elif.body);
+          result += " }";
+        } else {
+          if (elif.elif.body != undefined) result += generateBlockElement(elif.elif.body);
+        }
+      }
+    });
     if (expr.else) {
-      result += " else ";
-      if (isExpr(expr.else.body)) {
+      result += "\nelse ";
+      if (isExpression(expr.else.body)) {
         result += "{ ";
         result += generateExpressionElement(expr.else.body);
         result += " }";
@@ -120,10 +150,6 @@ function generateExpressionElement(expr: Expr): string {
       result += generateExpressionElement(arg);
     });
     result += ")";
-  } else if (isBinExpr(expr)) {
-    result += generateExpressionElement(expr.e1);
-    result += " " + expr.op + " ";
-    result += generateExpressionElement(expr.e2);
   } else if (isGroup(expr)) {
     result += "(" + generateExpressionElement(expr.group) + ")";
   } else if (isRef(expr)) {
@@ -132,7 +158,7 @@ function generateExpressionElement(expr: Expr): string {
   } else if (isLiteral(expr)) {
     result += expr.value;
   } else {
-    console.log(expr.$type);
+    console.log(expr);
   }
   return result;
 }
@@ -152,14 +178,16 @@ function generateBypassElement(bypass: string): string {
   return result;
 }
 
-function generateBlockElement(body: (Expr | Stmt)[]): string {
+function generateBlockElement(body: (Expression | Statement)[], supportReturn: boolean = false): string {
   let result = "";
   body.forEach((expr, index) => {
-    if (index == body.length - 1) {
-      result += "return ";
+    if (supportReturn) {
+      if (index == body.length - 1) {
+        result += "return ";
+      }
     }
-    if (isStmt(expr)) result += generateStatementElement(expr) + "\n";
-    else if (isExpr(expr)) result += generateExpressionElement(expr) + "\n";
+    if (isStatement(expr)) result += generateStatementElement(expr) + "\n";
+    else if (isExpression(expr)) result += generateExpressionElement(expr) + "\n";
     else {
       console.log("ERROR:", body);
     }
