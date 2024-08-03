@@ -84,7 +84,11 @@ FunCall:
   def=Id '(' (args+=Expression (',' args+=Expression)*)? ')';
 
 // Anonymous Functions
-AnonyFunCall: params=Bindings (':' returnType=Type)? '=>' body=ExprOrBlock;
+AnonyFunCall:
+  (params=Bindings | param=PlainId) (':' returnType=Type)? '=>' body=ExprOrBlock;
+
+FunCallChain:
+  calls+=FunCall ('.' calls+=FunCall)*;
 
 // Bypass
 Bypass: bypass=BYPASS;
@@ -92,11 +96,11 @@ terminal BYPASS returns string: /%%[\s\S]*?%%/;
 
 // Do Loop
 DoStatement:
-  'do' loop=ExprOrBlock 'while' '(' condition=Expression ')';
+  'do' loop=ExprOrBlock 'while' ConditionClause;
 
 // While Loop
 WhileStatement:
-  'while' '(' condition=Expression ')' loop=ExprOrBlock;
+  'while' ConditionClause loop=ExprOrBlock;
 
 // For Comprehensions and For Loops
 ForStatement:
@@ -134,12 +138,12 @@ Expression:
   Logical
   | Assignment
   | IfExpression
-  | FunCall
   | AnonyFunCall
+  | ArrayLiteral
   ;
 
 SimpleExpr:
-  ArrayLiteral | Literal | Group | Ref;
+  FunCallChain | Literal | Group | Ref;
 
 ArrayLiteral:
   '[' items+=Literal (',' items+=Literal )* ']';
@@ -157,7 +161,7 @@ Literal:
 
 // grouped expression with parentheses
 Group:
-  '(' group=Expression ')';
+  '(' value=Expression ')';
 
 // cross-reference to a parameter
 Ref:
@@ -184,14 +188,22 @@ Multiplication infers Expression:
   SimpleExpr     ({infer BinaryExpression.left=current} operator=('*' | '/') right=SimpleExpr)*;
 
 // Conditional Expressions
+// ConditionClause는 if, while, do-while등에서 사용되는데 single expression 이면 괄호를 생략할 수 있다.
+// Single expression으로 취급할 수 있는 것들이 FunCall, Literal, Group, Ref가 있으며 이들을 이용한 연산도
+// 마찬가지이다. 이 모든 것이 Logical Rule 하나에 들어가 있다.
+
 IfExpression:
-  'if' '(' condition=Expression ')'
+  'if' ConditionClause
     'then'? then=ExprOrBlock
     (elif+=IfElseExpression)*
     ('else' else=ExprOrBlock)?;
 
+fragment ConditionClause:
+  // '(' condition=Logical ')';
+  condition=Logical;
+
 IfElseExpression:
-  'elif' '(' condition=Expression ')' elif=ExprOrBlock?;
+  'elif' ConditionClause elif=ExprOrBlock?;
 
 
 // Entity:

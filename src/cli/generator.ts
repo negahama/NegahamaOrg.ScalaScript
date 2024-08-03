@@ -1,4 +1,5 @@
 import {
+  Binding,
   Code,
   Expression,
   isAnonyFunCall,
@@ -11,8 +12,7 @@ import {
   isForOf,
   isForStatement,
   isForTo,
-  isForUntil,
-  isFunCall,
+  isFunCallChain,
   isFunDefinition,
   isGroup,
   isIfExpression,
@@ -61,48 +61,39 @@ function generateCode(code: Code): string {
 }
 
 function generateStatement(stmt: Statement, indent: number = 0): string {
+  const genVariable = (bind: Binding, value: Expression): string => {
+    let result = bind.name;
+    if (bind.type) result += ": " + bind.type;
+    if (value) result += " = " + generateExpression(value);
+    return result;
+  };
+
   let result = "";
   if (isVarDefinition(stmt)) {
-    result += `let ${stmt.bind.name}`;
-    if (stmt.bind.type) result += ": " + stmt.bind.type;
-    if (stmt.value) result += " = " + generateExpression(stmt.value);
-    result += ";";
+    result = "let " + genVariable(stmt.bind, stmt.value) + ";";
   } else if (isValDefinition(stmt)) {
-    result += `const ${stmt.bind.name}`;
-    if (stmt.bind.type) result += ": " + stmt.bind.type;
-    if (stmt.value) result += " = " + generateExpression(stmt.value);
-    result += ";";
+    result = "const " + genVariable(stmt.bind, stmt.value) + ";";
   } else if (isFunDefinition(stmt)) {
-    result += `function ${stmt.name}(`;
-    stmt.params.forEach((param, index) => {
-      if (index != 0) result += ", ";
-      result += param.bind.name;
-      if (param.bind.type) result += ": " + param.bind.type;
+    const params = stmt.params.map((param, index) => {
+      return (index != 0 ? " " : "") + param.bind.name + (param.bind.type ? ": " + param.bind.type : "");
     });
-    result += ")";
-    if (stmt.returnType) result += ": " + stmt.returnType;
-    result += " " + generateBlock(stmt.body, indent + 1, true);
+    result += `function ${stmt.name}(${params})` + (stmt.returnType ? ": " + stmt.returnType : "") + " ";
+    result += generateBlock(stmt.body, indent + 1, true);
   } else if (isDoStatement(stmt)) {
-    result += "do ";
-    result += generateExprOrBlock(stmt.loop.body, indent);
-    result += ` while (${generateExpression(stmt.condition)})`;
+    result = `do ${generateExprOrBlock(stmt.loop.body, indent)} while ${generateCondition(stmt.condition)}`;
   } else if (isWhileStatement(stmt)) {
-    result += `while (${generateExpression(stmt.condition)}) `;
-    result += generateExprOrBlock(stmt.loop.body, indent);
+    result = `while ${generateCondition(stmt.condition)} ${generateExprOrBlock(stmt.loop.body, indent)}`;
   } else if (isForStatement(stmt)) {
     let forIndent = indent;
     stmt.iterators.forEach((iter, idx) => {
       const name = iter.name;
       if (isForOf(iter)) {
         result += applyIndent(forIndent, `for (const ${name} of ${generateExpression(iter.of)}) `);
-      } else if (isForTo(iter)) {
+      } else {
+        const mark = isForTo(iter) ? "<=" : "<";
         const e1 = generateExpression(iter.e1);
         const e2 = generateExpression(iter.e2);
-        result += applyIndent(forIndent, `for (let ${name} = ${e1}; ${name} <= ${e2}; ${name}++) `);
-      } else if (isForUntil(iter)) {
-        const e1 = generateExpression(iter.e1);
-        const e2 = generateExpression(iter.e2);
-        result += applyIndent(forIndent, `for (let ${name} = ${e1}; ${name} < ${e2}; ${name}++) `);
+        result += applyIndent(forIndent, `for (let ${name} = ${e1}; ${name} ${mark} ${e2}; ${name}++) `);
       }
       if (idx < stmt.iterators.length - 1) result += "{\n";
       forIndent++;
@@ -112,7 +103,16 @@ function generateStatement(stmt: Statement, indent: number = 0): string {
       result += "\n" + applyIndent(i - 1, "}");
     }
   } else if (isBypass(stmt)) {
-    result += generateBypass(stmt.bypass);
+    stmt.bypass
+      .split("%%")
+      .filter((s) => s != "")
+      .forEach((s) => {
+        // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
+        let ns = s;
+        if (s.startsWith("\r\n")) ns = ns.slice(2);
+        ns = ns.trimEnd();
+        result += ns;
+      });
   } else {
     console.log(stmt.$type);
   }
@@ -140,70 +140,54 @@ function generateExpression(expr: Expression, indent: number = 0): string {
     }
     result += `${generateExpression(expr.left)} ${op} ${generateExpression(expr.right)}`;
   } else if (isIfExpression(expr)) {
-    result += "if (" + generateExpression(expr.condition) + ") ";
+    result += "if " + generateCondition(expr.condition) + " ";
     if (expr.then) {
       result += generateExprOrBlock(expr.then.body, indent);
     }
     expr.elif.forEach((elif) => {
-      result += "\nelse if (" + generateExpression(elif.condition) + ") ";
+      result += "\nelse if " + generateCondition(elif.condition) + " ";
       if (elif.elif) {
         result += generateExprOrBlock(elif.elif.body, indent);
       }
     });
     if (expr.else) {
-      result += "\nelse ";
-      result += generateExprOrBlock(expr.else.body, indent);
+      result += "\nelse " + generateExprOrBlock(expr.else.body, indent);
     }
-  } else if (isFunCall(expr)) {
-    result += expr.def + "(";
-    expr.args.forEach((arg, index) => {
-      if (index != 0) result += ", ";
-      result += generateExpression(arg);
+  } else if (isFunCallChain(expr)) {
+    expr.calls.forEach((call, idx) => {
+      result += (idx != 0 ? "." : "") + call.def + "(";
+      call.args.forEach((arg, index) => {
+        result += (index != 0 ? ", " : "") + generateExpression(arg);
+      });
+      result += ")";
     });
-    result += ")";
   } else if (isAnonyFunCall(expr)) {
     result += "(";
-    expr.params.bindings.forEach((bind, idx) => {
-      if (idx != 0) result += ", ";
-      result += bind.name;
-      if (bind.type) result += ": " + bind.type;
-    });
-    result += ")";
-    if (expr.returnType) result += ": " + expr.returnType;
-    result += " => ";
-    result += generateExprOrBlock(expr.body.body, indent + 1);
+    if (expr.params) {
+      expr.params.bindings.forEach((bind, idx) => {
+        result += (idx != 0 ? ", " : "") + bind.name + bind.type ? ": " + bind.type : "";
+      });
+    } else if (expr.param) {
+      result += expr.param;
+    }
+    result += ")" + (expr.returnType ? ": " + expr.returnType : "");
+    result += " => " + generateExprOrBlock(expr.body.body, indent + 1);
   } else if (isArrayLiteral(expr)) {
     result += "[";
-    expr.items.forEach((item, idx) => {
-      if (idx != 0) result += ", ";
-      result += item.value;
+    result += expr.items.map((item) => {
+      return item.value;
     });
     result += "]";
   } else if (isLiteral(expr)) {
     result += expr.value;
   } else if (isGroup(expr)) {
-    result += "(" + generateExpression(expr.group) + ")";
+    result += "(" + generateExpression(expr.value) + ")";
   } else if (isRef(expr)) {
     // result += `${expr.value.ref?.name}`;
     result += `${expr.value}`;
   } else {
     console.log(expr);
   }
-  return result;
-}
-
-function generateBypass(bypass: string): string {
-  let result = "";
-  bypass
-    .split("%%")
-    .filter((s) => s != "")
-    .forEach((s) => {
-      // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
-      let ns = s;
-      if (s.startsWith("\r\n")) ns = ns.slice(2);
-      ns = ns.trimEnd();
-      result += ns;
-    });
   return result;
 }
 
@@ -217,9 +201,8 @@ function generateBlock(body: (Expression | Statement)[], indent: number, support
       console.log("ERROR:", body);
     }
 
-    if (supportReturn && index == body.length - 1) {
-      result += applyIndent(indent, "return ");
-    } else result += applyIndent(indent, "");
+    if (supportReturn && index == body.length - 1) result += applyIndent(indent, "return ");
+    else result += applyIndent(indent, "");
     result += element;
   });
   result += applyIndent(indent - 1, "}");
@@ -241,6 +224,11 @@ function generateExprOrBlock(
     if (body != undefined) result += generateBlock(body, indent + 1);
   }
   return result;
+}
+
+function generateCondition(condition: Expression, indent: number = 0): string {
+  const e = generateExpression(condition);
+  return isGroup(condition) ? e : "(" + e + ")";
 }
 
 function applyIndent(lv: number, s: string) {

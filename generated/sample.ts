@@ -6,6 +6,10 @@ function sum(a: number, b: number): number {
 }
 const s: string = "";
 s.startsWith("\r\n")
+let list1 = s.concat("2");
+let list2 = s.concat("2").trim().split(",");
+let list = if (s.startsWith("* ")) { s.trim() }
+else { s };
 let a = 0;
 let b = 0;
 if (a == b) { console.log("a == b") }
@@ -21,16 +25,14 @@ for (let a = 1; a <= 10; a++) {
     }
   }
 }
-const array1 = ['a', 'b', 'c'];
+const array1 = ['a','b','c'];
 for (const a of array1) {
   for (const b of array1) {
     console.log(a, b)
   }
 }
-while (a <= 10) {
-  console.log(a)
-  a += 1;
-}
+while (a < array1.length && sum(a, b) == 2) { b += 1; }
+do { console.log(a) } while (a < array1.length && sum(a, b) == 2)
 do {
   console.log(a)
   a += 1;
