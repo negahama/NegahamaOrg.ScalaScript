@@ -1,5 +1,6 @@
 import {
   Binding,
+  Bypass,
   Code,
   Expression,
   isAnonyFunCall,
@@ -17,7 +18,9 @@ import {
   isGroup,
   isIfExpression,
   isLiteral,
+  isMatchExpression,
   isRef,
+  isReturnStatement,
   isStatement,
   isValDefinition,
   isVarDefinition,
@@ -78,7 +81,7 @@ function generateStatement(stmt: Statement, indent: number = 0): string {
       return (index != 0 ? " " : "") + param.bind.name + (param.bind.type ? ": " + param.bind.type : "");
     });
     result += `function ${stmt.name}(${params})` + (stmt.returnType ? ": " + stmt.returnType : "") + " ";
-    result += generateBlock(stmt.body, indent + 1, true);
+    result += generateBlock(stmt.body, indent + 1);
   } else if (isDoStatement(stmt)) {
     result = `do ${generateExprOrBlock(stmt.loop.body, indent)} while ${generateCondition(stmt.condition)}`;
   } else if (isWhileStatement(stmt)) {
@@ -102,17 +105,13 @@ function generateStatement(stmt: Statement, indent: number = 0): string {
     for (let i = forIndent - 1; i > indent; i--) {
       result += "\n" + applyIndent(i - 1, "}");
     }
+  } else if (isReturnStatement(stmt)) {
+    result += "return";
+    if (stmt.value) {
+      result += " " + generateExpression(stmt.value);
+    }
   } else if (isBypass(stmt)) {
-    stmt.bypass
-      .split("%%")
-      .filter((s) => s != "")
-      .forEach((s) => {
-        // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
-        let ns = s;
-        if (s.startsWith("\r\n")) ns = ns.slice(2);
-        ns = ns.trimEnd();
-        result += ns;
-      });
+    result += generateBypass(stmt);
   } else {
     console.log(stmt.$type);
   }
@@ -161,6 +160,18 @@ function generateExpression(expr: Expression, indent: number = 0): string {
       });
       result += ")";
     });
+  } else if (isMatchExpression(expr)) {
+    result += `switch (${expr.name}) {\n`;
+    expr.cases.forEach((mc) => {
+      if (isBypass(mc)) {
+        result += generateBypass(mc) + "\n";
+      } else {
+        const pattern = generateExpression(mc.pattern);
+        result += applyIndent(indent + 1, `case ${pattern}: `);
+        result += generateExprOrBlock(mc.body.body, indent) + "\n";
+      }
+    });
+    result += "}";
   } else if (isAnonyFunCall(expr)) {
     result += "(";
     if (expr.params) {
@@ -191,7 +202,27 @@ function generateExpression(expr: Expression, indent: number = 0): string {
   return result;
 }
 
-function generateBlock(body: (Expression | Statement)[], indent: number, supportReturn: boolean = false): string {
+function generateBypass(bypass: Bypass, indent: number = 0): string {
+  let result = "";
+  if (bypass.bypass) {
+    bypass.bypass
+      .split("%%")
+      .filter((s) => s != "")
+      .forEach((s) => {
+        // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
+        let ns = s;
+        if (s.startsWith("\r\n")) ns = ns.slice(2);
+        ns = ns.trimEnd();
+        result += ns;
+      });
+  }
+  if (bypass.comment) {
+    result += bypass.comment;
+  }
+  return result;
+}
+
+function generateBlock(body: (Expression | Statement)[], indent: number): string {
   let result = "{\n";
   body.forEach((expr, index) => {
     let element = "";
@@ -201,19 +232,13 @@ function generateBlock(body: (Expression | Statement)[], indent: number, support
       console.log("ERROR:", body);
     }
 
-    if (supportReturn && index == body.length - 1) result += applyIndent(indent, "return ");
-    else result += applyIndent(indent, "");
-    result += element;
+    result += applyIndent(indent, element);
   });
   result += applyIndent(indent - 1, "}");
   return result;
 }
 
-function generateExprOrBlock(
-  body: Expression | (Expression | Statement)[] | undefined,
-  indent: number,
-  supportReturn: boolean = false
-): string {
+function generateExprOrBlock(body: Expression | (Expression | Statement)[] | undefined, indent: number): string {
   let result = "";
   if (isExpression(body)) {
     result += `{ ${generateExpression(body)} }`;

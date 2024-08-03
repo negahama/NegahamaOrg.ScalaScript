@@ -12,7 +12,7 @@ Statement:
   | DoStatement
   | WhileStatement
   | ForStatement
-  // | ReturnStatement
+  | ReturnStatement
   // | TryStatement
   // | ThrowStatement
   ;
@@ -90,10 +90,6 @@ AnonyFunCall:
 FunCallChain:
   calls+=FunCall ('.' calls+=FunCall)*;
 
-// Bypass
-Bypass: bypass=BYPASS;
-terminal BYPASS returns string: /%%[\s\S]*?%%/;
-
 // Do Loop
 DoStatement:
   'do' loop=ExprOrBlock 'while' ConditionClause;
@@ -113,7 +109,7 @@ ForTo   : name=PlainId '<-' e1=SimpleExpr 'to'    e2=SimpleExpr;
 ForUntil: name=PlainId '<-' e1=SimpleExpr 'until' e2=SimpleExpr;
 
 // Return Statement
-// ReturnStatement: 'return' (Expression)?;
+ReturnStatement: 'return' (value=Expression)?;
 
 // Try Statement
 // TryStatement: 'try' ('{' Block '}' | Expr) ['catch' '{' CaseClauses '}']
@@ -138,6 +134,7 @@ Expression:
   Logical
   | Assignment
   | IfExpression
+  | MatchExpression
   | AnonyFunCall
   | ArrayLiteral
   ;
@@ -204,6 +201,23 @@ fragment ConditionClause:
 
 IfElseExpression:
   'elif' ConditionClause elif=ExprOrBlock?;
+
+MatchExpression:
+  name=PlainId 'match' '{' cases+=(CaseClause | Bypass)+ '}';
+
+CaseClause:
+  'case' pattern=Pattern '=>' body=ExprOrBlock;
+
+Pattern: Literal;
+  // '_'
+  // | Literal
+  // | '(' Pattern ')';
+
+// Bypass & Comment
+Bypass: (bypass=BYPASS | comment=ML_COMMENT | comment=SL_COMMENT);
+terminal BYPASS     returns string: /%%[\s\S]*?%%/;
+terminal ML_COMMENT returns string: /\/\*[\s\S]*?\*\//;
+terminal SL_COMMENT returns string: /\/\/[^\n\r]*/;
 
 
 // Entity:
@@ -276,5 +290,5 @@ terminal ID: /[_a-zA-Z][\w_]*/;
 
 // Whitespace and Comments
 hidden terminal WS        : /\s+/;
-hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
-hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;
+// hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
+// hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;

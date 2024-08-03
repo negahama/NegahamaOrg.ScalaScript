@@ -8,8 +8,14 @@ const s: string = "";
 s.startsWith("\r\n")
 let list1 = s.concat("2");
 let list2 = s.concat("2").trim().split(",");
-let list = if (s.startsWith("* ")) { s.trim() }
-else { s };
+//var list = if s.startsWith("* ") then s.trim() else s
+const x: number = 2;
+switch (x) {
+  case 0: { "zero" }
+  case 1: { "one" }
+  case 2: { "two" }
+//case _ => "other"
+}
 let a = 0;
 let b = 0;
 if (a == b) { console.log("a == b") }
@@ -37,18 +43,17 @@ do {
   console.log(a)
   a += 1;
 } while (a <= 10)
+/*
+  주석은 그대로 변환되어야 한다.
+*/
 function generateBypassElement(bypass: string[]): string {
   let result = "";
   bypass.forEach((s) => {
+    // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
     let ns = s;
     if (s.startsWith("\r\n")) { ns = ns.slice(2); }
     ns = ns.trimEnd();
     result += ns;
   })
   return result
-}
-function test() {
-  return if (fs.existsSync(data.destination)) {
-    fs.mkdirSync(data.destination, true)
-  }
 }

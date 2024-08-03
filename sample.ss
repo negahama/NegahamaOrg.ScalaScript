@@ -1,12 +1,20 @@
 def sum(a: number, b: number): number = {
-  a + b
+  return a + b
 }
 
 val s:string = ""
 s.startsWith("\r\n")
 var list1 = s.concat("2")
 var list2 = s.concat("2").trim().split(",")
-var list = if s.startsWith("* ") then s.trim() else s
+//var list = if s.startsWith("* ") then s.trim() else s
+
+val x: number = 2
+x match {
+  case 0 => "zero"
+  case 1 => "one"
+  case 2 => "two"
+  //case _ => "other"
+}
 
 var a = 0
 var b = 0
@@ -33,6 +41,9 @@ do {
   a += 1
 } while (a <= 10)
 
+/*
+  주석은 그대로 변환되어야 한다.
+*/
 def generateBypassElement(bypass: string[]): string = {
   var result = ""
   bypass.forEach(s => {
@@ -42,12 +53,5 @@ def generateBypassElement(bypass: string[]): string = {
     ns = ns.trimEnd()
     result += ns
   })
-  result
+  return result
 }
-
-def test() = {
-  if (fs.existsSync(data.destination)) {
-    fs.mkdirSync(data.destination, true)
-  }
-}
-
