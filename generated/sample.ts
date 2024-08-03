@@ -14,7 +14,7 @@ switch (x) {
   case 0: { "zero" }
   case 1: { "one" }
   case 2: { "two" }
-//case _ => "other"
+  default: { "other" }
 }
 let a = 0;
 let b = 0;

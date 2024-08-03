@@ -166,8 +166,12 @@ function generateExpression(expr: Expression, indent: number = 0): string {
       if (isBypass(mc)) {
         result += generateBypass(mc) + "\n";
       } else {
-        const pattern = generateExpression(mc.pattern);
-        result += applyIndent(indent + 1, `case ${pattern}: `);
+        if (isLiteral(mc.pattern)) {
+          const pattern = generateExpression(mc.pattern);
+          result += applyIndent(indent + 1, `case ${pattern}: `);
+        } else {
+          result += applyIndent(indent + 1, `default: `);
+        }
         result += generateExprOrBlock(mc.body.body, indent) + "\n";
       }
     });

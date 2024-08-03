@@ -206,8 +206,9 @@ MatchExpression:
   name=PlainId 'match' '{' cases+=(CaseClause | Bypass)+ '}';
 
 CaseClause:
-  'case' pattern=Pattern '=>' body=ExprOrBlock;
+  'case' pattern=(Underbar | Pattern) '=>' body=ExprOrBlock;
 
+Underbar returns string: '_';
 Pattern: Literal;
   // '_'
   // | Literal
