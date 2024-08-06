@@ -1,106 +1,71 @@
 grammar ScalaScript
 
-entry Model: (codes+=Code)*;
+entry Model: codes+=Code*;
 
 Code: Statement | Expression;
 
 // Statements
 Statement:
-  Declaration
-  | Definition
+  VariableDeclaration | FunctionDeclaration
+  | VariableDefinition | FunctionDefinition
   | Bypass
   | DoStatement
-  | WhileStatement
   | ForStatement
+  | WhileStatement
   | ReturnStatement
   // | TryStatement
   // | ThrowStatement
   ;
 
-Declaration: ValDeclaration | VarDeclaration | FunDeclaration;
-Definition : ValDefinition  | VarDefinition  | FunDefinition;
-
-// Identifiers
-// opchar ::= // printableChar not matched by (whiteSpace | upper | lower |
-//              // letter | digit | paren | delim | opchar | Unicode_Sm | Unicode_So)
-// op     ::=  opchar {opchar}
-
-// terminal VarId returns string:
-//   Lower (Letter | Digit)*;
-// terminal PlainId returns string:
-//   Upper (Letter | Digit)* | VarId;
-
-terminal PlainId returns string: ID;
-Id returns string:
-  PlainId (('.'|'::') PlainId)* // QualifiedName returns string:
-  | '`' StringLiteral '`';
-
-// Type
-Type returns string:
-  Id '[]'
-  | Id;
-
-Bindings: '(' bindings+=Binding (',' bindings+=Binding)* ')';
-Binding : name=PlainId (':' type=Type)?;
-
 // Basic Declarations and Definitions
 // A declaration introduces names and assigns them types.
 // It can form part of a class definition or of a refinement in a compound type.
 
-// Value Declarations and Definitions
-ValDeclaration:
-  'val' ids+=PlainId ((',' ids+=PlainId)*)? (':' type=Type)?;
-ValDefinition:
-  'val' bind=Binding '=' value=Expression;
-
-// Variable Declarations and Definitions
-VarDeclaration:
-  'var' ids+=PlainId ((',' ids+=PlainId)*)? (':' type=Type)?;
-VarDefinition:
-  'var' bind=Binding '=' value=Expression;
+// Value and Variable Declarations and Definitions
+VariableKind returns string: 'val' | 'var';
+VariableDeclaration:
+  kind=VariableKind names+=PlainId ((',' names+=PlainId)*)? (':' type=Type)?;
+VariableDefinition:
+  kind=VariableKind Variable '=' value=Expression;
+fragment Variable: name=PlainId (':' type=Type)?;
 
 // Function Declarations and Definitions
-// 여기서 fragment를 사용하는 이유는 이 함수 정의와 선언의 루트 노드의 타입을 FunDcl, FunDef로 해주기 위해서이다.
-// fragment를 사용하지 않으면 루트 노드의 타입이 Params이 된다.
-
-FunDeclaration:
-  'def' FunSig;
-FunDefinition:
-  'def' FunSig '=' Block;
-fragment FunSig:
+FunctionDeclaration: 'def' FunSigniture;
+FunctionDefinition : 'def' FunSigniture '=' body=Block;
+fragment FunSigniture:
   name=PlainId '(' Params? ')' (':' returnType=Type)?;
 fragment Params:
   params+=Param (',' params+=Param)*;
 Param:
-  bind=Binding ('=' value=Expression)?;
-fragment Block:
-  '{' (body+=(Expression | Statement))* '}';
-  // '{' body+=Expression ((Semi*) body+=Expression)* result=Expression? '}';
-ExprOrBlock:
-  Block | body=Expression;
+  Variable ('=' value=Expression)?;
+Block:
+  ('{' codes+=Code* '}') | expression=Expression;
 
+// Function call and Chaining of function calls
 FunCall:
-  // def=[FunDefinition:Id] '(' (args+=Expression (',' args+=Expression)*)? ')';
   def=Id '(' (args+=Expression (',' args+=Expression)*)? ')';
-
-// Anonymous Functions
-AnonyFunCall:
-  (params=Bindings | param=PlainId) (':' returnType=Type)? '=>' body=ExprOrBlock;
 
 FunCallChain:
   calls+=FunCall ('.' calls+=FunCall)*;
 
+// Anonymous Functions
+AnonymousCall:
+  ('(' Bindings? ')' | bindings+=Binding) (':' returnType=Type)? '=>' body=Block;
+
+fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
+Binding : Variable; // Binding : name=PlainId (':' type=Type)?;
+
 // Do Loop
 DoStatement:
-  'do' loop=ExprOrBlock 'while' ConditionClause;
+  'do' loop=Block 'while' ConditionClause;
 
 // While Loop
 WhileStatement:
-  'while' ConditionClause loop=ExprOrBlock;
+  'while' ConditionClause loop=Block;
 
 // For Comprehensions and For Loops
 ForStatement:
-  'for' '(' iterators+=Iterator (';' iterators+=Iterator)* ')' Block;
+  'for' '(' iterators+=Iterator (';' iterators+=Iterator)* ')' loop=Block;
 
 Iterator: ForOf | ForTo | ForUntil;
 
@@ -135,7 +100,7 @@ Expression:
   | Assignment
   | IfExpression
   | MatchExpression
-  | AnonyFunCall
+  | AnonymousCall
   | ArrayLiteral
   ;
 
@@ -191,28 +156,25 @@ Multiplication infers Expression:
 
 IfExpression:
   'if' ConditionClause
-    'then'? then=ExprOrBlock
+    'then'? then=Block
     (elif+=IfElseExpression)*
-    ('else' else=ExprOrBlock)?;
+    ('else' else=Block)?;
 
 fragment ConditionClause:
   // '(' condition=Logical ')';
   condition=Logical;
 
 IfElseExpression:
-  'elif' ConditionClause elif=ExprOrBlock?;
+  'elif' ConditionClause elif=Block?;
 
 MatchExpression:
   name=PlainId 'match' '{' cases+=(CaseClause | Bypass)+ '}';
 
 CaseClause:
-  'case' pattern=(Underbar | Pattern) '=>' body=ExprOrBlock;
+  'case' pattern=(CaseDefalut | CasePattern) '=>' body=Block;
 
-Underbar returns string: '_';
-Pattern: Literal;
-  // '_'
-  // | Literal
-  // | '(' Pattern ')';
+CaseDefalut returns string: '_';
+CasePattern: Literal;
 
 // Bypass & Comment
 Bypass: (bypass=BYPASS | comment=ML_COMMENT | comment=SL_COMMENT);
@@ -231,53 +193,47 @@ terminal SL_COMMENT returns string: /\/\/[^\n\r]*/;
 
 
 // Parentheses
-// terminal Paren    : '(' | ')' | '[' | ']' | '{' | '}';
+// terminal Paren: '(' | ')' | '[' | ']' | '{' | '}';
 
 // Delimiter characters
-// terminal Delim : '`' | ''' | '"' | '.' | ';' | ',';
-// terminal Delim    : /[`'".;,]/;
+// terminal Delim: '`' | ''' | '"' | '.' | ';' | ',';
+// terminal Delim: /[`'".;,]/;
 
 // New line and semicolon
 // Whitespace를 hidden terminal로 설정한 WS로 인해 NL은 인식되지 않고 있음
-// terminal NL       : /[\n\r]/;
-// terminal Semi     : ';' | (NL)+;
+// terminal NL   : /[\n\r]/;
+// terminal Semi : ';' | (NL)+;
 
 // Boolean Literals
 // It has to place before ID or Identifier
 // Otherwise `true` and `false` is identified for Indentifier
-
 terminal BooleanLiteral returns boolean: 'true' | 'false';
 
 // Floating Point Literals
 // example : 0.0    1e30f    3.14159f    1.0e-100    .1
 // It has to also place before defining the Integer literal
-
 terminal FloatingPointLiteral returns number:
   (Digit)+ '.' (Digit)+ (ExponentPart)? (FloatType)?
   |  '.' (Digit)+ (ExponentPart)? (FloatType)?
   |  (Digit)+ ExponentPart (FloatType)?
   |  (Digit)+ (ExponentPart)? FloatType;
-terminal ExponentPart : ('E' | 'e') ('+' | '-')? (Digit)+;
-terminal FloatType    : /[FfDd]/;
+terminal ExponentPart: ('E' | 'e') ('+' | '-')? (Digit)+;
+terminal FloatType   : /[FfDd]/;
 
 // Integer Literals
-// terminal INT              returns number: /[0-9]+/;
-terminal IntegerLiteral   returns number: (DecimalNumeral | HexNumeral);
-terminal DecimalNumeral   returns number: '0' | NonZeroDigit Digit*;
-terminal HexNumeral       returns number: '0' ('x' | 'X') HexDigit+;
-//terminal Digit          returns number: /[0-9]/;
-terminal Digit            returns number: '0' | NonZeroDigit;
-terminal HexDigit         returns string: /[0-9a-fA-F]/;
-terminal NonZeroDigit     returns number: /[1-9]/;
+// terminal INT         returns number: /[0-9]+/;
+// terminal Digit       returns number: /[0-9]/;
+terminal IntegerLiteral returns number: (DecimalNumeral | HexNumeral);
+terminal DecimalNumeral returns number: '0' | NonZeroDigit Digit*;
+terminal HexNumeral     returns number: '0' ('x' | 'X') HexDigit+;
+terminal Digit          returns number: '0' | NonZeroDigit;
+terminal HexDigit       returns string: /[0-9a-fA-F]/;
+terminal NonZeroDigit   returns number: /[1-9]/;
 
 // Character Literals
 terminal CharLiteral  : ''' (PrintableChar | CharEscapeSeq) ''';
 // terminal PrintableChar: /[\u0020-\u007F]/;
 // terminal CharEscapeSeq: '\b' | '\t' | '\n' | '\f' | '\r' | '\"' | '\'' | '\\';
-
-// terminal Upper        :  /[A-Z$_]/;     // and Unicode category Lu
-// terminal Lower        :  /[a-z]/;       // and Unicode category Ll
-// terminal Letter       :  Upper | Lower; // and Unicode categories Lo, Lt, Nl
 
 // String Literals
 terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
@@ -289,7 +245,26 @@ terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
 // 그렇지 않으면 true, false가 ID로 취급되어진다.
 terminal ID: /[_a-zA-Z][\w_]*/;
 
+// opchar ::= // printableChar not matched by (whiteSpace | upper | lower |
+//            // letter | digit | paren | delim | opchar | Unicode_Sm | Unicode_So)
+// op     ::= opchar {opchar}
+
+// terminal Upper  : /[A-Z$_]/;     // and Unicode category Lu
+// terminal Lower  : /[a-z]/;       // and Unicode category Ll
+// terminal Letter : Upper | Lower; // and Unicode categories Lo, Lt, Nl
+// terminal VarId  : Lower (Letter | Digit)*;
+// terminal PlainId: Upper (Letter | Digit)* | VarId;
+
+// Identifiers
+terminal PlainId returns string: ID;
+Id returns string:
+  PlainId (('.'|'::') PlainId)* // QualifiedName returns string:
+  | '`' StringLiteral '`';
+
+// Type
+Type returns string:
+  Id '[]'
+  | Id;
+
 // Whitespace and Comments
-hidden terminal WS        : /\s+/;
-// hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
-// hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;
+hidden terminal WS: /\s+/;
