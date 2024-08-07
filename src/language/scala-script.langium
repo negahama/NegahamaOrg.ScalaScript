@@ -12,7 +12,6 @@ Statement:
   | DoStatement
   | ForStatement
   | WhileStatement
-  | ReturnStatement
   // | TryStatement
   // | ThrowStatement
   ;
@@ -72,9 +71,6 @@ Iterator: ForOf | ForTo | ForUntil;
 ForOf   : name=PlainId '<-' of=SimpleExpr;
 ForTo   : name=PlainId '<-' e1=SimpleExpr 'to'    e2=SimpleExpr;
 ForUntil: name=PlainId '<-' e1=SimpleExpr 'until' e2=SimpleExpr;
-
-// Return Statement
-ReturnStatement: 'return' (value=Expression)?;
 
 // Try Statement
 // TryStatement: 'try' ('{' Block '}' | Expr) ['catch' '{' CaseClauses '}']
@@ -266,9 +262,14 @@ Id returns string:
 fragment Ids: names+=PlainId (',' names+=PlainId)*;
 
 // Type
-Type returns string:
-  Id '[]'
-  | Id;
+Type:
+  FunSigType
+  | ArrayType
+  | type=Id;
+FunSigType:
+  '(' (args+=FunArgType (',' args+=FunArgType)*)? ')' '=>' returnType=Type;
+FunArgType: Variable;
+ArrayType: type=Id '[]';
 
 // Whitespace and Comments
 hidden terminal WS: /\s+/;

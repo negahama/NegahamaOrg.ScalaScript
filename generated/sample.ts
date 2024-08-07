@@ -4,6 +4,15 @@
 function sum(a: number, b: number): number {
   return a + b
 }
+function oncePerSecond(callback: (p: string) => void): void {
+  //while (true) { callback(); Thread sleep 1000 }
+}
+function timeFlies(): void {
+  //println("time flies like an arrow...")
+}
+//def main(args: Array[String]): Unit = {
+//  oncePerSecond(timeFlies)
+//}
 const s: string = "";
 s.startsWith("\r\n")
 let list1 = s.concat("2");

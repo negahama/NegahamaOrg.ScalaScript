@@ -14,19 +14,21 @@ import {
   isForStatement,
   isForTo,
   isFunCallChain,
+  isFunSigType,
   isFunctionDefinition,
   isGroup,
   isIfExpression,
   isLiteral,
   isMatchExpression,
   isRef,
-  isReturnStatement,
   isStatement,
   isVariableDeclaration,
   isVariableDefinition,
   isWhileStatement,
   Statement,
+  Type,
   type Model,
+  isArrayType,
 } from "../language/generated/ast.js";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as fs from "node:fs";
@@ -80,7 +82,7 @@ function generateStatement(stmt: Statement, indent: number = 0): string {
       return (index != 0 ? " " : "") + param.name + generateType(param.type);
     });
     result += `function ${stmt.name}(${params})${generateType(stmt.returnType)} `;
-    result += generateBlock(stmt.body, indent);
+    result += generateBlock(stmt.body, indent, true);
   } else if (isDoStatement(stmt)) {
     result = `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition)}`;
   } else if (isWhileStatement(stmt)) {
@@ -106,8 +108,6 @@ function generateStatement(stmt: Statement, indent: number = 0): string {
     for (let i = forIndent; i > indent; i--) {
       result += "\n" + applyIndent(i - 1, "}");
     }
-  } else if (isReturnStatement(stmt)) {
-    result += "return" + (stmt.value ? " " + generateExpression(stmt.value) : "");
   } else if (isBypass(stmt)) {
     result += generateBypass(stmt);
   } else {
@@ -221,10 +221,12 @@ function generateBypass(bypass: Bypass, indent: number = 0): string {
   return result;
 }
 
-function generateBlock(body: Block, indent: number): string {
+function generateBlock(body: Block, indent: number, isFunctionBody: boolean = false): string {
   let result = "";
   if (body.expression) {
-    result += `{ ${generateExpression(body.expression)} }`;
+    result += isFunctionBody
+      ? `{ return ${generateExpression(body.expression)} }`
+      : `{ ${generateExpression(body.expression)} }`;
     // result += "{\n";
     // result += applyIndent(indent + 1, generateExpressionElement(body));
     // result += "\n" + applyIndent(indent, "}");
@@ -233,8 +235,10 @@ function generateBlock(body: Block, indent: number): string {
     body.codes.forEach((code, index) => {
       let element = "";
       if (isStatement(code)) element += generateStatement(code, indent + 1) + "\n";
-      else if (isExpression(code)) element += generateExpression(code, indent + 1) + "\n";
-      else {
+      else if (isExpression(code)) {
+        if (isFunctionBody && index == body.codes.length - 1) element += "return ";
+        element += generateExpression(code, indent + 1) + "\n";
+      } else {
         console.log("ERROR:", code);
       }
 
@@ -250,8 +254,21 @@ function generateCondition(condition: Expression, indent: number = 0): string {
   return isGroup(condition) ? e : "(" + e + ")";
 }
 
-function generateType(type: string | undefined): string {
-  return type ? ": " + type : "";
+function generateType(type: Type | undefined): string {
+  let result = "";
+  if (type == undefined) return result;
+  if (isFunSigType(type)) {
+    result += ": (";
+    type.args.forEach((arg, idx) => {
+      result += (idx != 0 ? ", " : "") + arg.name + generateType(arg.type);
+    });
+    result += ")" + (type.returnType ? ` => ${type.returnType.type}` : "");
+  } else if (isArrayType(type)) {
+    result += ": " + type.type + "[]";
+  } else {
+    result += ": " + type.type;
+  }
+  return result;
 }
 
 function applyIndent(lv: number, s: string) {

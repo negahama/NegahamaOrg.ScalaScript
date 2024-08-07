@@ -1,6 +1,18 @@
 def sum(a: number, b: number): number = {
-  return a + b
+  a + b
 }
+
+def oncePerSecond(callback: (p: string) => void): void = {
+  //while (true) { callback(); Thread sleep 1000 }
+}
+
+def timeFlies(): void = {
+  //println("time flies like an arrow...")
+}
+
+//def main(args: Array[String]): Unit = {
+//  oncePerSecond(timeFlies)
+//}
 
 val s:string = ""
 s.startsWith("\r\n")
@@ -53,5 +65,5 @@ def generateBypassElement(bypass: string[]): string = {
     ns = ns.trimEnd()
     result += ns
   })
-  return result
+  result
 }
