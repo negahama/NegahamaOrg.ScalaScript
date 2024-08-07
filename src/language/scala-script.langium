@@ -24,9 +24,9 @@ Statement:
 // Value and Variable Declarations and Definitions
 VariableKind returns string: 'val' | 'var';
 VariableDeclaration:
-  kind=VariableKind names+=PlainId ((',' names+=PlainId)*)? (':' type=Type)?;
+  kind=VariableKind Ids (':' type=Type)?;
 VariableDefinition:
-  kind=VariableKind Variable '=' value=Expression;
+  kind=VariableKind Ids (':' type=Type)? '=' value=Expression;
 fragment Variable: name=PlainId (':' type=Type)?;
 
 // Function Declarations and Definitions
@@ -114,11 +114,10 @@ ArrayLiteral:
 // There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
 // The syntax of these literals is in each case as in Java.
 Literal:
-  ('-')? value=IntegerLiteral
-  | ('-')? value=FloatingPointLiteral
-  | value=BooleanLiteral
+  value=BooleanLiteral
+  | value=NumberLiteral
   | value=StringLiteral
-  | value=CharLiteral
+  // | value=CharLiteral
   | 'null';
 
 // grouped expression with parentheses
@@ -209,29 +208,32 @@ terminal SL_COMMENT returns string: /\/\/[^\n\r]*/;
 // Otherwise `true` and `false` is identified for Indentifier
 terminal BooleanLiteral returns boolean: 'true' | 'false';
 
+NumberLiteral returns number:
+  ('-')? FloatingPointLiteral
+  | ('-')? IntegerLiteral;
+
 // Floating Point Literals
-// example : 0.0    1e30f    3.14159f    1.0e-100    .1
+// example : 0.0    3.14159    1e30    1.0e-100
 // It has to also place before defining the Integer literal
 terminal FloatingPointLiteral returns number:
-  (Digit)+ '.' (Digit)+ (ExponentPart)? (FloatType)?
-  |  '.' (Digit)+ (ExponentPart)? (FloatType)?
-  |  (Digit)+ ExponentPart (FloatType)?
-  |  (Digit)+ (ExponentPart)? FloatType;
+  (Digit)+ '.' (Digit)+ (ExponentPart)?
+  | (Digit)+ ExponentPart;
 terminal ExponentPart: ('E' | 'e') ('+' | '-')? (Digit)+;
-terminal FloatType   : /[FfDd]/;
 
 // Integer Literals
-// terminal INT         returns number: /[0-9]+/;
-// terminal Digit       returns number: /[0-9]/;
-terminal IntegerLiteral returns number: (DecimalNumeral | HexNumeral);
-terminal DecimalNumeral returns number: '0' | NonZeroDigit Digit*;
+// DecNumeral는 BinNumeral, OctNumeral, HexNumeral보다 뒤에 있어야 한다.
+terminal IntegerLiteral returns number: (BinNumeral | OctNumeral | HexNumeral | DecNumeral );
+terminal BinNumeral     returns number: '0' ('b' | 'B') BinDigit+;
+terminal OctNumeral     returns number: '0' ('o' | 'O') OctDigit+;
 terminal HexNumeral     returns number: '0' ('x' | 'X') HexDigit+;
-terminal Digit          returns number: '0' | NonZeroDigit;
-terminal HexDigit       returns string: /[0-9a-fA-F]/;
-terminal NonZeroDigit   returns number: /[1-9]/;
+terminal DecNumeral     returns number: /[0-9]+/;
+terminal BinDigit       returns number: /[0-1]/;
+terminal OctDigit       returns number: /[0-7]/;
+terminal HexDigit       returns number: /[0-9a-fA-F]/;
+terminal Digit          returns number: /[0-9]/;
 
 // Character Literals
-terminal CharLiteral  : ''' (PrintableChar | CharEscapeSeq) ''';
+// terminal CharLiteral  : "'" (PrintableChar | CharEscapeSeq) "'";
 // terminal PrintableChar: /[\u0020-\u007F]/;
 // terminal CharEscapeSeq: '\b' | '\t' | '\n' | '\f' | '\r' | '\"' | '\'' | '\\';
 
@@ -260,6 +262,8 @@ terminal PlainId returns string: ID;
 Id returns string:
   PlainId (('.'|'::') PlainId)* // QualifiedName returns string:
   | '`' StringLiteral '`';
+
+fragment Ids: names+=PlainId (',' names+=PlainId)*;
 
 // Type
 Type returns string:

@@ -16,11 +16,11 @@ x match {
   case _ => "other"
 }
 
-var a = 0
-var b = 0
+var a, b, c : number = 0xff
+a = b = c = 1e5
 
 if a == b
-then console.log("a == b")
+then console.log('a == b')
 elif (a < b) console.log("a < b")
 elif (a > b) console.log("a > b")
 else {

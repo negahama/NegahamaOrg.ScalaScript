@@ -22,6 +22,7 @@ import {
   isRef,
   isReturnStatement,
   isStatement,
+  isVariableDeclaration,
   isVariableDefinition,
   isWhileStatement,
   Statement,
@@ -64,11 +65,16 @@ function generateCode(code: Code): string {
 
 function generateStatement(stmt: Statement, indent: number = 0): string {
   let result = "";
-  if (isVariableDefinition(stmt)) {
+  if (isVariableDeclaration(stmt) || isVariableDefinition(stmt)) {
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
-    result += stmt.name + generateType(stmt.type);
-    if (stmt.value) result += " = " + generateExpression(stmt.value) + ";";
+    stmt.names.forEach((name, idx) => {
+      result += (idx != 0 ? ", " : "") + name + generateType(stmt.type);
+      if (isVariableDefinition(stmt)) {
+        result += stmt.value ? " = " + generateExpression(stmt.value) : "";
+      }
+    });
+    result += ";";
   } else if (isFunctionDefinition(stmt)) {
     const params = stmt.params.map((param, index) => {
       return (index != 0 ? " " : "") + param.name + generateType(param.type);
@@ -113,7 +119,8 @@ function generateStatement(stmt: Statement, indent: number = 0): string {
 function generateExpression(expr: Expression, indent: number = 0): string {
   let result = "";
   if (isAssignment(expr)) {
-    result += `${expr.name} ${expr.operator} ${generateExpression(expr.value)};`;
+    result += `${expr.name} ${expr.operator} ${generateExpression(expr.value)}`;
+    result += isAssignment(expr.value) ? "" : ";";
   } else if (isBinaryExpression(expr)) {
     let op = "";
     switch (expr.operator) {

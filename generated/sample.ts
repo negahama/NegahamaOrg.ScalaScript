@@ -16,9 +16,9 @@ switch (x) {
   case 2: { "two" }
   default: { "other" }
 }
-let a = 0;
-let b = 0;
-if (a == b) { console.log("a == b") }
+let a: number = 255, b: number = 255, c: number = 255;
+a = b = c = 100000;
+if (a == b) { console.log('a == b') }
 else if (a < b) { console.log("a < b") }
 else if (a > b) { console.log("a > b") }
 else {
