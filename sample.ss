@@ -1,51 +1,67 @@
+/*
+  자료형 및 선언과 정의, 다중 대입
+*/
+var a, b, c : number = 0xff
+a = b = c = 1e5
+b = 0b11 + 0o11 + 0x11 + 11.1 + 1.1e+1
+c = (1 + 2) * 3 % 2 ** 3
+val s:string = "abc" .. 'def' + 's'
+val array1 = ['a', 'b', 'c']
+
+/*
+  함수 호출
+*/
+s.startsWith("\r\n")
+var list2 = s.concat("2" + 'def').trim().split(",")
+//var list = if s.startsWith("* ") then s.trim() else s
+
+/*
+  함수 정의
+*/
 def sum(a: number, b: number): number = {
   a + b
 }
 
-def oncePerSecond(callback: (p: string) => void): void = {
-  //while (true) { callback(); Thread sleep 1000 }
+val oncePerSecond = (callback: (p:string) => void): void => {
+//def oncePerSecond(callback: (p: string) => void): void = {
+  while (true) { callback('1초 지남!') /*Thread sleep 1000*/ }
+  setTimeout(() => {
+    callback('1초 지남!')
+  }, 1000)
 }
 
-def timeFlies(): void = {
-  //println("time flies like an arrow...")
+val timeFlies = (msg: string) => {
+//def timeFlies(msg: string): void = {
+  console.log("time flies like an arrow... ", msg)
 }
 
 //def main(args: Array[String]): Unit = {
 //  oncePerSecond(timeFlies)
 //}
 
-val s:string = ""
-s.startsWith("\r\n")
-var list1 = s.concat("2")
-var list2 = s.concat("2").trim().split(",")
-//var list = if s.startsWith("* ") then s.trim() else s
-
-val x: number = 2
-x match {
-  case 0 => "zero"
-  case 1 => "one"
-  case 2 => "two"
-  case _ => "other"
-}
-
-var a, b, c : number = 0xff
-a = b = c = 1e5
-
-if a == b
-then console.log('a == b')
-elif (a < b) console.log("a < b")
-elif (a > b) console.log("a > b")
-else {
-  console.log("error")
-}
-
+/*
+  조건문, 반복문 관련
+*/
 for (a <- 1 to 10; b <- 1 to 10; c <- 1 to 10) {
   console.log(a)
+  if a == b
+  then console.log('a == b')
+  elif (a < b) console.log("a < b")
+  elif (a > b) console.log("a > b")
+  else {
+    console.log("error")
+    val x: number = 2
+    x match {
+      case 0 => "zero"
+      case 1 => "one"
+      case 2 => "two"
+      case _ => "other"
+    }
+  }
 }
 
-val array1 = ['a', 'b', 'c']
+if not a console log 'a is not true'
 for (a <- array1; b <- array1) { console.log(a, b) }
-
 while a < array1.length and sum(a, b) == 2 b += 1
 do console.log(a) while a < array1.length and sum(a, b) == 2
 do {
@@ -58,7 +74,7 @@ do {
 */
 def generateBypassElement(bypass: string[]): string = {
   var result = ""
-  bypass.forEach(s => {
+  bypass.forEach(s:string => {
     // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
     var ns = s
     if (s.startsWith("\r\n")) ns = ns.slice(2)

@@ -92,13 +92,18 @@ ForUntil: name=PlainId '<-' e1=SimpleExpr 'until' e2=SimpleExpr;
 // 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, Ref를 포함한다.
 
 Expression:
-  Logical
+  LogicalNot
+  | Logical
   | Assignment
   | IfExpression
   | MatchExpression
   | AnonymousCall
   | ArrayLiteral
+  | InfixExpr
   ;
+
+InfixExpr:
+  e1=PlainId name=PlainId e2=Literal;
 
 SimpleExpr:
   FunCallChain | Literal | Group | Ref;
@@ -126,23 +131,30 @@ Ref:
   // value=[Param:Id];
   value=Id;
 
-// Assignments
+// Unary operators
+LogicalNot infers UnaryExpression:
+  operator=('not' | '!') value=SimpleExpr;
+
+// Binary Operators
 // Assignment infers Expression:
 //     Logical      ({infer BinaryExpression.left=current} operator=('=') right=Addition)*;
 Assignment:
   name=Id operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
 Logical infers Expression:
-  Comparison     ({infer BinaryExpression.left=current} operator=('and' | 'or') right=Comparison)*;
+  Comparison     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '&&' | '||') right=Comparison)*;
 
 Comparison infers Expression:
   Addition       ({infer BinaryExpression.left=current} operator=('<' | '<=' | '>' | '>=' | '==' | '!=') right=Addition)*;
 
 Addition infers Expression:
-  Multiplication ({infer BinaryExpression.left=current} operator=('+' | '-') right=Multiplication)*;
+  Multiplication ({infer BinaryExpression.left=current} operator=('+' | '-' | '..') right=Multiplication)*;
 
 Multiplication infers Expression:
-  SimpleExpr     ({infer BinaryExpression.left=current} operator=('*' | '/') right=SimpleExpr)*;
+  Exponentiation ({infer BinaryExpression.left=current} operator=('*' | '/' | '%') right=Exponentiation)*;
+
+Exponentiation infers Expression:
+  SimpleExpr     ({infer BinaryExpression.left=current} operator=('**') right=SimpleExpr)*;
 
 // Conditional Expressions
 // ConditionClause는 if, while, do-while등에서 사용되는데 single expression 이면 괄호를 생략할 수 있다.
@@ -156,8 +168,8 @@ IfExpression:
     ('else' else=Block)?;
 
 fragment ConditionClause:
-  // '(' condition=Logical ')';
-  condition=Logical;
+  // '(' condition=(Logical | LogicalNot) ')';
+  condition=(Logical | LogicalNot);
 
 IfElseExpression:
   'elif' ConditionClause elif=Block?;

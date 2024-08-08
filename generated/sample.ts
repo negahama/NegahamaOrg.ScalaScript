@@ -1,46 +1,68 @@
 // This is transpiled by ScalaScript
 "use strict";
 
+/*
+  자료형 및 선언과 정의, 다중 대입
+*/
+let a: number = 255, b: number = 255, c: number = 255;
+a = b = c = 100000;
+b = 3 + 9 + 17 + 11.1 + 11;
+c = (1 + 2) * 3 % 2 ** 3;
+const s: string = "abc" + 'def' + 's';
+const array1 = ['a','b','c'];
+/*
+  함수 호출
+*/
+s.startsWith("\r\n")
+let list2 = s.concat("2" + 'def').trim().split(",");
+//var list = if s.startsWith("* ") then s.trim() else s
+/*
+  함수 정의
+*/
 function sum(a: number, b: number): number {
   return a + b
 }
-function oncePerSecond(callback: (p: string) => void): void {
-  //while (true) { callback(); Thread sleep 1000 }
-}
-function timeFlies(): void {
-  //println("time flies like an arrow...")
-}
+const oncePerSecond = (callback: (p: string) => void): void => {
+  //def oncePerSecond(callback: (p: string) => void): void = {
+  while (true) {
+    callback('1초 지남!')
+    /*Thread sleep 1000*/
+  }
+  setTimeout(() => {
+    callback('1초 지남!')
+  }, 1000)
+};
+const timeFlies = (msg: string) => {
+  //def timeFlies(msg: string): void = {
+  console.log("time flies like an arrow... ", msg)
+};
 //def main(args: Array[String]): Unit = {
 //  oncePerSecond(timeFlies)
 //}
-const s: string = "";
-s.startsWith("\r\n")
-let list1 = s.concat("2");
-let list2 = s.concat("2").trim().split(",");
-//var list = if s.startsWith("* ") then s.trim() else s
-const x: number = 2;
-switch (x) {
-  case 0: { "zero" }
-  case 1: { "one" }
-  case 2: { "two" }
-  default: { "other" }
-}
-let a: number = 255, b: number = 255, c: number = 255;
-a = b = c = 100000;
-if (a == b) { console.log('a == b') }
-else if (a < b) { console.log("a < b") }
-else if (a > b) { console.log("a > b") }
-else {
-  console.log("error")
-}
+/*
+  조건문, 반복문 관련
+*/
 for (let a = 1; a <= 10; a++) {
   for (let b = 1; b <= 10; b++) {
     for (let c = 1; c <= 10; c++) {
       console.log(a)
+      if (a == b) { console.log('a == b') }
+      else if (a < b) { console.log("a < b") }
+      else if (a > b) { console.log("a > b") }
+      else {
+        console.log("error")
+        const x: number = 2;
+        switch (x) {
+          case 0: { "zero" }
+          case 1: { "one" }
+          case 2: { "two" }
+          default: { "other" }
+        }
+      }
     }
   }
 }
-const array1 = ['a','b','c'];
+if (! a) { console.log('a is not true') }
 for (const a of array1) {
   for (const b of array1) {
     console.log(a, b)
@@ -57,7 +79,7 @@ do {
 */
 function generateBypassElement(bypass: string[]): string {
   let result = "";
-  bypass.forEach((s) => {
+  bypass.forEach((s: string) => {
     // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
     let ns = s;
     if (s.startsWith("\r\n")) { ns = ns.slice(2); }
