@@ -6,15 +6,15 @@ Code: Statement | Expression;
 
 // Statements
 Statement:
-  VariableDeclaration
+  Bypass
+  | VariableDeclaration
   | FunctionDeclaration
   | Class
   | DoStatement
   | ForStatement
   | WhileStatement
   | ThrowStatement
-  | CatchStatement
-  | Bypass;
+  | CatchStatement;
 
 // Value and Variable Declarations and Definitions
 // VariableDeclaration returns NamedElement:
@@ -99,13 +99,11 @@ type NamedElement = VariableDeclaration
 // Type
 Type:
   LambdaType
-  | ArrayType
-  // | primitive=("string" | "number" | "boolean" | "void") 
+  | type=("string" | "number" | "boolean" | "void") (isArray?='[]')?
   // | reference=[Class:ID]
-  | type=Id;
+  | type=Id (isArray?='[]')?;
 LambdaType:
   '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
-ArrayType: type=Id '[]';
 
 // Expressions
 // Expressions:
@@ -125,13 +123,10 @@ Expression:
   | InfixExpr;
 
 SimpleExpr infers Expression:
-  Literal
+  UnaryExpression
+  | Literal
   | Group
-  | Ref;
-
-// PrimitiveExpr:
-//   UnaryExpression
-//   | Literal;
+  | FeatureCall;
 
 // Literals
 // There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
@@ -148,17 +143,18 @@ Literal:
 Group:
   '(' value=Expression ')';
 
-// cross-reference to a parameter
-Ref:
-  // value=[Def:Id];
-  // value=[Param:Id];
-  value=PlainId;
+FeatureCall infers Expression: {infer MemberCall}
+	// (element=[NamedElement:ID] | element=[NamedElement:'this'] | element=[NamedElement:'super'])
+	(element=PlainId | element='this' | element='super')
+  // Optional function call after referencing an element
+  (explicitCall?='(' Arguments? ')')?;
 
 // Unary operators
-// UnaryExpression:
-//   operator=('!' | '-' | '+') value=Expression;
+UnaryExpression:
+  operator=('-' | '+') value=Expression;
+
 LogicalNot infers UnaryExpression:
-  operator=('not' | '!') value=SimpleExpr;
+  operator=('not' | '!') value=Expression;
 
 // Binary Operators
 // Assignment infers Expression:
@@ -179,24 +175,19 @@ Multiplication infers Expression:
   Exponentiation ({infer BinaryExpression.left=current} operator=('*' | '/' | '%') right=Exponentiation)*;
 
 Exponentiation infers Expression:
-  CallChain      ({infer BinaryExpression.left=current} operator=('**') right=CallChain)*;
+  MemberCall     ({infer BinaryExpression.left=current} operator=('**') right=MemberCall)*;
 
 // Member call and Chaining of Member calls
 // 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수도 있다.
 // 즉 다음과 같은 것들을 파싱할 수 있다. ()안에는 인수들이 있을 수도 있다.
 // a, a(), a.b, a().b, a.b(), a().b(), ... 
-CallChain infers Expression:
-  SimpleExpr ({infer CallChain.previous=current} 
+MemberCall infers Expression:
+  SimpleExpr ({infer MemberCall.previous=current} 
     // ( (explicitCall?='(' Arguments? ')') | "." element=[NamedElement:PlainId] (explicitCall?='(' Arguments? ')')? )
     ( (explicitCall?='(' Arguments? ')') | "." element=PlainId (explicitCall?='(' Arguments? ')')? )
   )*;
 fragment Arguments:
   args+=Expression (',' args+=Expression)*;
-
-// FeatureCall infers Expression: {infer CallChain}
-// 	(element=[NamedElement:ID] | element=[NamedElement:'this'] | element=[NamedElement:'super'])
-//   // Optional function call after referencing an element
-//   (explicitCall?='(' Arguments? ')')?;
 
 
 // Conditional Expressions
@@ -288,7 +279,7 @@ terminal Digit          returns number: /[0-9]/;
 
 // String Literals
 // terminal STRING: /"[^"]*"/;
-terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
+terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'|`(\\.|[^'\\])*`/;
 // terminal StringLiteral: '"' (StringElement)+ '"';
 // terminal StringElement: PrintableChar |  CharEscapeSeq;
 

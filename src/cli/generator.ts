@@ -5,11 +5,9 @@ import {
   Expression,
   isAnonymousCall,
   isArrayLiteral,
-  isArrayType,
   isAssignment,
   isBinaryExpression,
   isBypass,
-  isCallChain,
   isDoStatement,
   isExpression,
   isForOf,
@@ -22,7 +20,7 @@ import {
   isInfixExpr,
   isLiteral,
   isMatchExpression,
-  isRef,
+  isMemberCall,
   isStatement,
   isUnaryExpression,
   isVariableDeclaration,
@@ -88,8 +86,6 @@ function generateStatement(stmt: Statement, indent: number): string {
     }
   } else if (isDoStatement(stmt)) {
     result = `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition)}`;
-  } else if (isWhileStatement(stmt)) {
-    result = `while ${generateCondition(stmt.condition)} ${generateBlock(stmt.loop, indent)}`;
   } else if (isForStatement(stmt)) {
     let forIndent = indent;
     stmt.iterators.forEach((iter, idx) => {
@@ -111,6 +107,8 @@ function generateStatement(stmt: Statement, indent: number): string {
     for (let i = forIndent; i > indent; i--) {
       result += "\n" + applyIndent(i - 1, "}");
     }
+  } else if (isWhileStatement(stmt)) {
+    result = `while ${generateCondition(stmt.condition)} ${generateBlock(stmt.loop, indent)}`;
   } else if (isBypass(stmt)) {
     result += generateBypass(stmt);
   } else {
@@ -124,6 +122,20 @@ function generateExpression(expr: Expression, indent: number): string {
   if (isAssignment(expr)) {
     result += `${expr.name} ${expr.operator} ${generateExpression(expr.value, indent)}`;
     result += isAssignment(expr.value) ? "" : ";";
+  } else if (isMemberCall(expr)) {
+    if (expr.previous) {
+      result += generateExpression(expr.previous, indent);
+      result += expr.element ? "." + expr.element : "";
+    } else {
+      result += expr.element ? expr.element : "";
+    }
+    if (expr.explicitCall) {
+      result += "(";
+      expr.args.forEach((arg, index) => {
+        result += (index != 0 ? ", " : "") + generateExpression(arg, indent);
+      });
+      result += ")";
+    }
   } else if (isUnaryExpression(expr)) {
     let op = "";
     switch (expr.operator) {
@@ -156,16 +168,6 @@ function generateExpression(expr: Expression, indent: number): string {
       }
     }
     result += `${generateExpression(expr.left, indent)} ${op} ${generateExpression(expr.right, indent)}`;
-  } else if (isCallChain(expr)) {
-    result += generateExpression(expr.previous, indent);
-    result += expr.element ? "." + expr.element : "";
-    if (expr.explicitCall) {
-      result += "(";
-      expr.args.forEach((arg, index) => {
-        result += (index != 0 ? ", " : "") + generateExpression(arg, indent);
-      });
-      result += ")";
-    }
   } else if (isIfExpression(expr)) {
     result += "if " + generateCondition(expr.condition) + " ";
     if (expr.then) {
@@ -207,9 +209,6 @@ function generateExpression(expr: Expression, indent: number): string {
     result += expr.value;
   } else if (isGroup(expr)) {
     result += "(" + generateExpression(expr.value, indent) + ")";
-  } else if (isRef(expr)) {
-    // result += `${expr.value.ref?.name}`;
-    result += `${expr.value}`;
   } else if (isArrayLiteral(expr)) {
     result += "[";
     result += expr.items.map((item) => {
@@ -285,7 +284,7 @@ function generateType(type: Type | undefined): string {
       result += (idx != 0 ? ", " : "") + arg.name + generateType(arg.type);
     });
     result += ")" + (type.returnType ? ` => ${type.returnType.type}` : "");
-  } else if (isArrayType(type)) {
+  } else if (type.isArray) {
     result += ": " + type.type + "[]";
   } else {
     result += ": " + type.type;
