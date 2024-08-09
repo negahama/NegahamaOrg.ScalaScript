@@ -1,68 +1,57 @@
 grammar ScalaScript
 
-entry Model: codes+=Code*;
+entry Program: codes+=Code*;
 
 Code: Statement | Expression;
 
 // Statements
 Statement:
-  VariableDeclaration | FunctionDeclaration
-  | VariableDefinition | FunctionDefinition
-  | Bypass
+  VariableDeclaration
+  | FunctionDeclaration
+  | Class
   | DoStatement
   | ForStatement
   | WhileStatement
-  // | TryStatement
-  // | ThrowStatement
-  ;
-
-// Basic Declarations and Definitions
-// A declaration introduces names and assigns them types.
-// It can form part of a class definition or of a refinement in a compound type.
+  | ThrowStatement
+  | CatchStatement
+  | Bypass;
 
 // Value and Variable Declarations and Definitions
+// VariableDeclaration returns NamedElement:
+//   {infer VariableDeclaration} kind=VariableKind Ids (':' type=Type)? (assignment?='=' value=Expression)?;
 VariableKind returns string: 'val' | 'var';
 VariableDeclaration:
-  kind=VariableKind Ids (':' type=Type)?;
-VariableDefinition:
-  kind=VariableKind Ids (':' type=Type)? '=' value=Expression;
-fragment Variable: name=PlainId (':' type=Type)?;
+  kind=VariableKind Ids (':' type=Type)? (assignment?='=' value=Expression)?;
+fragment Ids: names+=PlainId (',' names+=PlainId)*;
 
 // Function Declarations and Definitions
 FunctionDeclaration: 'def' FunSigniture;
-FunctionDefinition : 'def' FunSigniture '=' body=Block;
 fragment FunSigniture:
-  name=PlainId '(' Params? ')' (':' returnType=Type)?;
-fragment Params:
-  params+=Param (',' params+=Param)*;
-Param:
-  Variable ('=' value=Expression)?;
+  name=PlainId '(' Parameters? ')' (':' returnType=Type)? (assignment?='=' body=Block)?;
+fragment Parameters:
+  parameters+=Parameter (',' parameters+=Parameter)*;
+Parameter: Variable;
 Block:
   ('{' codes+=Code* '}') | expression=Expression;
 
-// Function call and Chaining of function calls
-FunCall:
-  def=Id '(' (args+=Expression (',' args+=Expression)*)? ')';
-
-FunCallChain:
-  calls+=FunCall ('.' calls+=FunCall)*;
-
-// Anonymous Functions
-AnonymousCall:
-  ('(' Bindings? ')' | bindings+=Binding) (':' returnType=Type)? '=>' body=Block;
-
-fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
-Binding : Variable; // Binding : name=PlainId (':' type=Type)?;
+// Class Declarations
+// 아래 규칙은 MethodMember의 파라메터로 초기값을 가질 수 있고 FieldMember로 타입이 없을 수도 있다.
+// class ClassName extends SuperClass {
+//   display(msg: string = "hello")
+//   message
+// }
+Class: 'class' name=PlainId ('extends' superClass=[Class:PlainId])? '{' members+=ClassMember* '}';
+ClassMember: MethodMember | FieldMember;
+MethodMember: FunSigniture;
+FieldMember: Variable;
 
 // Do Loop
 DoStatement:
   'do' loop=Block 'while' ConditionClause;
 
-// While Loop
-WhileStatement:
-  'while' ConditionClause loop=Block;
-
 // For Comprehensions and For Loops
+// ForStatement:
+//   'for' '(' counter=VariableDeclaration? ';' condition=Expression? ';' execution=Expression? ')' loop=Block;
 ForStatement:
   'for' '(' iterators+=Iterator (';' iterators+=Iterator)* ')' loop=Block;
 
@@ -72,25 +61,59 @@ ForOf   : name=PlainId '<-' of=SimpleExpr;
 ForTo   : name=PlainId '<-' e1=SimpleExpr 'to'    e2=SimpleExpr;
 ForUntil: name=PlainId '<-' e1=SimpleExpr 'until' e2=SimpleExpr;
 
-// Try Statement
-// TryStatement: 'try' ('{' Block '}' | Expr) ['catch' '{' CaseClauses '}']
-//   ['finally' Expr] ;
+// While Loop
+WhileStatement:
+  'while' ConditionClause loop=Block;
 
 // Throw Statement
-// ThrowStatement: 'throw' Expression;
+ThrowStatement: 'throw' throw=Expression;
 
+// Try Statement
+CatchStatement: 'try' body=Block ('catch' '{' cases+=(CaseClause | Bypass)+ '}')?
+  ('finally' finally=Expression)?;
+
+// Bypass & Comment
+Bypass: (bypass=BYPASS | comment=ML_COMMENT | comment=SL_COMMENT);
+terminal BYPASS     returns string: /%%[\s\S]*?%%/;
+terminal ML_COMMENT returns string: /\/\*[\s\S]*?\*\//;
+terminal SL_COMMENT returns string: /\/\/[^\n\r]*/;
+
+// 모든 변수는 다음의 규칙을 가지고 있다.
+// 이름 : 타입 = 값
+// 이름은 유효한 식별자이어야 한다.
+// 타입이나 값을 통해서 변수의 타입을 정할 수 있어야 한다.
+// 즉 타입이나 값 둘다 있거나 적어도 하나는 있어야만 된다.
+// 타입과 값은 모두 있으면 값은 명시된 타입으로 변환되며 이 변환이 실패하면 에러가 된다.
+// var, val 은 변수를 선언하는 것이지만 엄밀하게 말하면 변수의 성격을 결정하는 것으로써
+// var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
+// 그래서 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다. 
+fragment Variable: name=PlainId (':' type=Type)? ('=' value=Expression)?;
+
+type NamedElement = VariableDeclaration
+  | FunctionDeclaration
+  | Class
+  | MethodMember
+  | FieldMember
+  | Parameter;
+
+// Type
+Type:
+  LambdaType
+  | ArrayType
+  // | primitive=("string" | "number" | "boolean" | "void") 
+  // | reference=[Class:ID]
+  | type=Id;
+LambdaType:
+  '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
+ArrayType: type=Id '[]';
 
 // Expressions
-// Expressions are composed of operators and operands.
-// Expression forms are discussed subsequently in decreasing order of precedence.
-
 // Expressions:
 //   exprs+=Expression (',' exprs+=Expression)*;
 
 // Logical rule은 많은 rule을 내포하고 있다.
 // 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
 // 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, Ref를 포함한다.
-
 Expression:
   LogicalNot
   | Logical
@@ -99,22 +122,22 @@ Expression:
   | MatchExpression
   | AnonymousCall
   | ArrayLiteral
-  | InfixExpr
-  ;
+  | InfixExpr;
 
-InfixExpr:
-  e1=PlainId name=PlainId e2=Literal;
+SimpleExpr infers Expression:
+  Literal
+  | Group
+  | Ref;
 
-SimpleExpr:
-  FunCallChain | Literal | Group | Ref;
-
-ArrayLiteral:
-  '[' items+=Literal (',' items+=Literal )* ']';
+// PrimitiveExpr:
+//   UnaryExpression
+//   | Literal;
 
 // Literals
 // There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
 // The syntax of these literals is in each case as in Java.
 Literal:
+  // value?='true' | 'false'
   value=BooleanLiteral
   | value=NumberLiteral
   | value=StringLiteral
@@ -129,9 +152,11 @@ Group:
 Ref:
   // value=[Def:Id];
   // value=[Param:Id];
-  value=Id;
+  value=PlainId;
 
 // Unary operators
+// UnaryExpression:
+//   operator=('!' | '-' | '+') value=Expression;
 LogicalNot infers UnaryExpression:
   operator=('not' | '!') value=SimpleExpr;
 
@@ -154,13 +179,30 @@ Multiplication infers Expression:
   Exponentiation ({infer BinaryExpression.left=current} operator=('*' | '/' | '%') right=Exponentiation)*;
 
 Exponentiation infers Expression:
-  SimpleExpr     ({infer BinaryExpression.left=current} operator=('**') right=SimpleExpr)*;
+  CallChain      ({infer BinaryExpression.left=current} operator=('**') right=CallChain)*;
+
+// Member call and Chaining of Member calls
+// 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수도 있다.
+// 즉 다음과 같은 것들을 파싱할 수 있다. ()안에는 인수들이 있을 수도 있다.
+// a, a(), a.b, a().b, a.b(), a().b(), ... 
+CallChain infers Expression:
+  SimpleExpr ({infer CallChain.previous=current} 
+    // ( (explicitCall?='(' Arguments? ')') | "." element=[NamedElement:PlainId] (explicitCall?='(' Arguments? ')')? )
+    ( (explicitCall?='(' Arguments? ')') | "." element=PlainId (explicitCall?='(' Arguments? ')')? )
+  )*;
+fragment Arguments:
+  args+=Expression (',' args+=Expression)*;
+
+// FeatureCall infers Expression: {infer CallChain}
+// 	(element=[NamedElement:ID] | element=[NamedElement:'this'] | element=[NamedElement:'super'])
+//   // Optional function call after referencing an element
+//   (explicitCall?='(' Arguments? ')')?;
+
 
 // Conditional Expressions
 // ConditionClause는 if, while, do-while등에서 사용되는데 single expression 이면 괄호를 생략할 수 있다.
 // Single expression으로 취급할 수 있는 것들이 FunCall, Literal, Group, Ref가 있으며 이들을 이용한 연산도
 // 마찬가지이다. 이 모든 것이 Logical Rule 하나에 들어가 있다.
-
 IfExpression:
   'if' ConditionClause
     'then'? then=Block
@@ -174,6 +216,7 @@ fragment ConditionClause:
 IfElseExpression:
   'elif' ConditionClause elif=Block?;
 
+// Match expression
 MatchExpression:
   name=PlainId 'match' '{' cases+=(CaseClause | Bypass)+ '}';
 
@@ -183,21 +226,18 @@ CaseClause:
 CaseDefalut returns string: '_';
 CasePattern: Literal;
 
-// Bypass & Comment
-Bypass: (bypass=BYPASS | comment=ML_COMMENT | comment=SL_COMMENT);
-terminal BYPASS     returns string: /%%[\s\S]*?%%/;
-terminal ML_COMMENT returns string: /\/\*[\s\S]*?\*\//;
-terminal SL_COMMENT returns string: /\/\/[^\n\r]*/;
+// Anonymous Functions
+AnonymousCall:
+  ('(' Bindings? ')' | bindings+=Binding) (':' returnType=Type)? '=>' body=Block;
+fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
+Binding: name=PlainId (':' type=Type)?;
 
+// Array expression
+ArrayLiteral:
+  '[' items+=Literal (',' items+=Literal )* ']';
 
-// Entity:
-//     'entity' name=ID ('extends' superType=[Entity:QualifiedName])? '{'
-//         (features+=Feature)*
-//     '}';
-
-// Feature:
-//     (many?='many')? name=ID ':' type=[Type:QualifiedName];
-
+InfixExpr:
+  e1=PlainId name=PlainId e2=Literal;
 
 // Parentheses
 // terminal Paren: '(' | ')' | '[' | ']' | '{' | '}';
@@ -230,6 +270,7 @@ terminal ExponentPart: ('E' | 'e') ('+' | '-')? (Digit)+;
 
 // Integer Literals
 // DecNumeral는 BinNumeral, OctNumeral, HexNumeral보다 뒤에 있어야 한다.
+// terminal NUMBER returns number: /[0-9]+(\.[0-9]+)?/;
 terminal IntegerLiteral returns number: (BinNumeral | OctNumeral | HexNumeral | DecNumeral );
 terminal BinNumeral     returns number: '0' ('b' | 'B') BinDigit+;
 terminal OctNumeral     returns number: '0' ('o' | 'O') OctDigit+;
@@ -246,6 +287,7 @@ terminal Digit          returns number: /[0-9]/;
 // terminal CharEscapeSeq: '\b' | '\t' | '\n' | '\f' | '\r' | '\"' | '\'' | '\\';
 
 // String Literals
+// terminal STRING: /"[^"]*"/;
 terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
 // terminal StringLiteral: '"' (StringElement)+ '"';
 // terminal StringElement: PrintableChar |  CharEscapeSeq;
@@ -270,18 +312,6 @@ terminal PlainId returns string: ID;
 Id returns string:
   PlainId (('.'|'::') PlainId)* // QualifiedName returns string:
   | '`' StringLiteral '`';
-
-fragment Ids: names+=PlainId (',' names+=PlainId)*;
-
-// Type
-Type:
-  FunSigType
-  | ArrayType
-  | type=Id;
-FunSigType:
-  '(' (args+=FunArgType (',' args+=FunArgType)*)? ')' '=>' returnType=Type;
-FunArgType: Variable;
-ArrayType: type=Id '[]';
 
 // Whitespace and Comments
 hidden terminal WS: /\s+/;

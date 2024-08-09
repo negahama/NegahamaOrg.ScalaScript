@@ -9,14 +9,14 @@ import {
   isAssignment,
   isBinaryExpression,
   isBypass,
+  isCallChain,
   isDoStatement,
   isExpression,
   isForOf,
   isForStatement,
   isForTo,
-  isFunCallChain,
-  isFunSigType,
-  isFunctionDefinition,
+  isLambdaType,
+  isFunctionDeclaration,
   isGroup,
   isIfExpression,
   isInfixExpr,
@@ -26,18 +26,17 @@ import {
   isStatement,
   isUnaryExpression,
   isVariableDeclaration,
-  isVariableDefinition,
   isWhileStatement,
   Statement,
   Type,
-  type Model,
+  type Program,
 } from "../language/generated/ast.js";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { extractDestinationAndName } from "./cli-util.js";
 
-export function generateTypeScript(model: Model, filePath: string, destination: string | undefined): string {
+export function generateTypeScript(program: Program, filePath: string, destination: string | undefined): string {
   const data = extractDestinationAndName(filePath, destination);
   const generatedFilePath = `${path.join(data.destination, data.name)}.ts`;
 
@@ -45,7 +44,7 @@ export function generateTypeScript(model: Model, filePath: string, destination: 
     // This is transpiled by ScalaScript
     "use strict";
 
-    ${joinToNode(model.codes, (code) => generateCode(code), {
+    ${joinToNode(program.codes, (code) => generateCode(code), {
       appendNewLineIfNotEmpty: true,
     })}
   `.appendNewLineIfNotEmpty();
@@ -62,29 +61,31 @@ function generateCode(code: Code): string {
   if (isStatement(code)) result += generateStatement(code, 0);
   else if (isExpression(code)) result += generateExpression(code, 0);
   else {
-    console.log(code);
+    console.log("ERROR:", code);
   }
   return result;
 }
 
 function generateStatement(stmt: Statement, indent: number): string {
   let result = "";
-  if (isVariableDeclaration(stmt) || isVariableDefinition(stmt)) {
+  if (isVariableDeclaration(stmt)) {
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
     stmt.names.forEach((name, idx) => {
       result += (idx != 0 ? ", " : "") + name + generateType(stmt.type);
-      if (isVariableDefinition(stmt)) {
-        result += stmt.value ? " = " + generateExpression(stmt.value, indent) : "";
+      if (stmt.assignment && stmt.value) {
+        result += " = " + generateExpression(stmt.value, indent);
       }
     });
     result += ";";
-  } else if (isFunctionDefinition(stmt)) {
-    const params = stmt.params.map((param, index) => {
+  } else if (isFunctionDeclaration(stmt)) {
+    const params = stmt.parameters.map((param, index) => {
       return (index != 0 ? " " : "") + param.name + generateType(param.type);
     });
     result += `function ${stmt.name}(${params})${generateType(stmt.returnType)} `;
-    result += generateBlock(stmt.body, indent, true);
+    if (stmt.assignment && stmt.body) {
+      result += generateBlock(stmt.body, indent, true);
+    }
   } else if (isDoStatement(stmt)) {
     result = `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition)}`;
   } else if (isWhileStatement(stmt)) {
@@ -113,7 +114,7 @@ function generateStatement(stmt: Statement, indent: number): string {
   } else if (isBypass(stmt)) {
     result += generateBypass(stmt);
   } else {
-    console.log(stmt.$type);
+    console.log("ERROR:", stmt.$type);
   }
   return result;
 }
@@ -155,6 +156,16 @@ function generateExpression(expr: Expression, indent: number): string {
       }
     }
     result += `${generateExpression(expr.left, indent)} ${op} ${generateExpression(expr.right, indent)}`;
+  } else if (isCallChain(expr)) {
+    result += generateExpression(expr.previous, indent);
+    result += expr.element ? "." + expr.element : "";
+    if (expr.explicitCall) {
+      result += "(";
+      expr.args.forEach((arg, index) => {
+        result += (index != 0 ? ", " : "") + generateExpression(arg, indent);
+      });
+      result += ")";
+    }
   } else if (isIfExpression(expr)) {
     result += "if " + generateCondition(expr.condition) + " ";
     if (expr.then) {
@@ -169,14 +180,6 @@ function generateExpression(expr: Expression, indent: number): string {
     if (expr.else) {
       result += "\n" + applyIndent(indent, "else " + generateBlock(expr.else, indent));
     }
-  } else if (isFunCallChain(expr)) {
-    expr.calls.forEach((call, idx) => {
-      result += (idx != 0 ? "." : "") + call.def + "(";
-      call.args.forEach((arg, index) => {
-        result += (index != 0 ? ", " : "") + generateExpression(arg, indent);
-      });
-      result += ")";
-    });
   } else if (isMatchExpression(expr)) {
     result += `switch (${expr.name}) {\n`;
     expr.cases.forEach((mc) => {
@@ -200,12 +203,6 @@ function generateExpression(expr: Expression, indent: number): string {
     });
     result += ")" + generateType(expr.returnType);
     result += " => " + generateBlock(expr.body, indent);
-  } else if (isArrayLiteral(expr)) {
-    result += "[";
-    result += expr.items.map((item) => {
-      return item.value;
-    });
-    result += "]";
   } else if (isLiteral(expr)) {
     result += expr.value;
   } else if (isGroup(expr)) {
@@ -213,10 +210,16 @@ function generateExpression(expr: Expression, indent: number): string {
   } else if (isRef(expr)) {
     // result += `${expr.value.ref?.name}`;
     result += `${expr.value}`;
+  } else if (isArrayLiteral(expr)) {
+    result += "[";
+    result += expr.items.map((item) => {
+      return item.value;
+    });
+    result += "]";
   } else if (isInfixExpr(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
   } else {
-    console.log(expr);
+    console.log("ERROR:", expr);
   }
   return result;
 }
@@ -276,7 +279,7 @@ function generateCondition(condition: Expression): string {
 function generateType(type: Type | undefined): string {
   let result = "";
   if (type == undefined) return result;
-  if (isFunSigType(type)) {
+  if (isLambdaType(type)) {
     result += ": (";
     type.args.forEach((arg, idx) => {
       result += (idx != 0 ? ", " : "") + arg.name + generateType(arg.type);
