@@ -25,13 +25,13 @@ Statement:
 // VariableName: name=PlainId;
 VariableKind returns string: 'val' | 'var';
 VariableDeclaration:
-  kind=VariableKind Ids (':' type=Type)? (assignment?='=' value=Expression)?;
+  kind=VariableKind Ids (':' type=Type)? ('=' value=Expression)?;
 fragment Ids: names+=PlainId (',' names+=PlainId)*;
 
 // Function Declarations and Definitions
 FunctionDeclaration: 'def' FunSigniture;
 fragment FunSigniture:
-  name=PlainId '(' Parameters? ')' (':' returnType=Type)? (assignment?='=' body=Block)?;
+  name=PlainId '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
 fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
 Parameter: Variable;

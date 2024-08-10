@@ -28,6 +28,11 @@ import {
   Statement,
   Type,
   type Program,
+  isClass,
+  isFieldMember,
+  isMethodMember,
+  FunctionDeclaration,
+  MethodMember,
 } from "../language/generated/ast.js";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as fs from "node:fs";
@@ -64,26 +69,30 @@ function generateCode(code: Code): string {
   return result;
 }
 
-function generateStatement(stmt: Statement, indent: number): string {
+function generateStatement(stmt: Statement | undefined, indent: number): string {
   let result = "";
+  if (stmt == undefined) return result;
   if (isVariableDeclaration(stmt)) {
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
     stmt.names.forEach((name, idx) => {
-      result += (idx != 0 ? ", " : "") + name + generateType(stmt.type);
-      if (stmt.assignment && stmt.value) {
-        result += " = " + generateExpression(stmt.value, indent);
-      }
+      result += (idx != 0 ? ", " : "") + generateVariable(name, stmt.type, stmt.value, indent);
     });
     result += ";";
   } else if (isFunctionDeclaration(stmt)) {
-    const params = stmt.parameters.map((param, index) => {
-      return (index != 0 ? " " : "") + param.name + generateType(param.type);
+    result += generateFunction(stmt, indent);
+  } else if (isClass(stmt)) {
+    result += `class ${stmt.name} `;
+    result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
+    stmt.members.forEach((m) => {
+      if (isMethodMember(m)) {
+        result += applyIndent(indent + 1, generateFunction(m, indent + 1));
+      } else if (isFieldMember(m)) {
+        result += applyIndent(indent + 1, generateVariable(m.name, m.type, m.value, indent) + ";");
+      }
+      result += "\n";
     });
-    result += `function ${stmt.name}(${params})${generateType(stmt.returnType)} `;
-    if (stmt.assignment && stmt.body) {
-      result += generateBlock(stmt.body, indent, true);
-    }
+    result += "}";
   } else if (isDoStatement(stmt)) {
     result = `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition)}`;
   } else if (isForStatement(stmt)) {
@@ -117,8 +126,9 @@ function generateStatement(stmt: Statement, indent: number): string {
   return result;
 }
 
-function generateExpression(expr: Expression, indent: number): string {
+function generateExpression(expr: Expression | undefined, indent: number): string {
   let result = "";
+  if (expr == undefined) return result;
   if (isAssignment(expr)) {
     result += `${expr.assign} ${expr.operator} ${generateExpression(expr.value, indent)}`;
     result += isAssignment(expr.value) ? "" : ";";
@@ -267,6 +277,21 @@ function generateBlock(body: Block, indent: number, isFunctionBody: boolean = fa
     });
     result += applyIndent(indent, "}");
   }
+  return result;
+}
+
+function generateVariable(name: string, type: Type | undefined, value: Expression | undefined, indent: number): string {
+  return name + generateType(type) + (value ? " = " + generateExpression(value, indent) : "");
+}
+
+function generateFunction(fun: FunctionDeclaration | MethodMember, indent: number): string {
+  let result = "";
+  const params = fun.parameters.map((param, index) => {
+    return (index != 0 ? " " : "") + param.name + generateType(param.type);
+  });
+  if (isFunctionDeclaration(fun)) result += "function ";
+  result += `${fun.name}(${params})${generateType(fun.returnType)} `;
+  result += fun.body ? generateBlock(fun.body, indent, true) : "";
   return result;
 }
 

@@ -11,6 +11,29 @@ c = (1 + 2) * 3 % 2 ** 3;
 const s: string = "abc" + 'def' + 's';
 const array1 = ['a','b','c'];
 /*
+  Class
+*/
+class Person {
+  name: string = 'no name';
+  gender: number;
+  age: number;
+  display() {
+    return console.log(this.name, this.gender, this.age)
+  }
+  sum(a: number, b: number): number {
+    return a + b
+  }
+}
+class Student extends Person {
+  grade: number;
+  registerClass(what: Class) {
+    return console.log("register class", what)
+  }
+}
+class Class {
+  name: string;
+}
+/*
   함수 호출
 */
 s.startsWith("\r\n")
