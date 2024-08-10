@@ -301,19 +301,25 @@ function generateCondition(condition: Expression): string {
 }
 
 function generateType(type: Type | undefined): string {
+  const typeonly = (t: Type | undefined) => {
+    if (t == undefined) return "";
+    if (t.reference) {
+      return t.reference.$refText + (t.isArray ? "[]" : "");
+    } else if (t.primitive) {
+      return t.primitive + (t.isArray ? "[]" : "");
+    }
+    return "";
+  };
+
   let result = "";
   if (type == undefined) return result;
   if (isLambdaType(type)) {
     result += ": (";
     type.args.forEach((arg, idx) => {
-      result += (idx != 0 ? ", " : "") + arg.name + generateType(arg.type);
+      result += (idx != 0 ? ", " : "") + arg.name + ": " + typeonly(arg.type);
     });
-    result += ")" + (type.returnType ? ` => ${type.returnType.type}` : "");
-  } else if (type.isArray) {
-    result += ": " + type.type + "[]";
-  } else {
-    result += ": " + type.type;
-  }
+    result += ")" + (type.returnType ? ` => ${typeonly(type.returnType)}` : "");
+  } else result += ": " + typeonly(type);
   return result;
 }
 

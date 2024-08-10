@@ -70,10 +70,13 @@ WhileStatement:
   'while' ConditionClause loop=Block;
 
 // Throw Statement
-ThrowStatement: 'throw' throw=Expression;
+ThrowStatement:
+  'throw' throw=Expression;
 
 // Try Statement
-CatchStatement: 'try' body=Block ('catch' '{' cases+=(CaseClause | Bypass)+ '}')?
+CatchStatement:
+  'try' body=Block
+  ('catch' '{' cases+=(CaseClause | Bypass)+ '}')?
   ('finally' finally=Expression)?;
 
 // Bypass & Comment
@@ -103,9 +106,8 @@ type NamedElement = VariableDeclaration
 // Type
 Type:
   LambdaType
-  | type=("string" | "number" | "boolean" | "void") (isArray?='[]')?
-  // | reference=[Class:ID]
-  | type=Id (isArray?='[]')?;
+  | primitive=("string" | "number" | "boolean" | "void") (isArray?='[]')?
+  | reference=[Class:PlainId] (isArray?='[]')?;
 LambdaType:
   '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
 
@@ -203,16 +205,16 @@ fragment Arguments:
 // 마찬가지이다. 이 모든 것이 Logical Rule 하나에 들어가 있다.
 IfExpression:
   'if' ConditionClause
-    'then'? then=Block
-    (elif+=IfElseExpression)*
-    ('else' else=Block)?;
+  'then'? then=Block
+  (elif+=IfElseExpression)*
+  ('else' else=Block)?;
 
 fragment ConditionClause:
   // '(' condition=(Logical | LogicalNot) ')';
   condition=(Logical | LogicalNot);
 
 IfElseExpression:
-  'elif' ConditionClause elif=Block?;
+  ('elif' | 'else if') ConditionClause elif=Block?;
 
 // Match expression
 MatchExpression:

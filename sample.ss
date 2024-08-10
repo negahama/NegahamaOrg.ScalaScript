@@ -69,7 +69,7 @@ for (a <- 1 to 10; b <- 1 to 10; c <- 1 to 10) {
   console.log(a)
   if a == b
   then console.log('a == b')
-  elif (a < b) console.log("a < b")
+  else if (a < b) console.log("a < b")
   elif (a > b) console.log("a > b")
   else {
     console.log("error")
