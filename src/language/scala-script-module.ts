@@ -9,6 +9,7 @@ import {
 } from "langium/lsp";
 import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "./generated/module.js";
 import { ScalaScriptValidator, registerValidationChecks } from "./scala-script-validator.js";
+import { ScalaScriptScopeProvider } from "./scala-script-scope.js";
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -33,6 +34,9 @@ export type ScalaScriptServices = LangiumServices & ScalaScriptAddedServices;
 export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServices & ScalaScriptAddedServices> = {
   validation: {
     ScalaScriptValidator: () => new ScalaScriptValidator(),
+  },
+  references: {
+    ScopeProvider: (services) => new ScalaScriptScopeProvider(services),
   },
 };
 

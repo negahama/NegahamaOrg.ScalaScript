@@ -17,8 +17,12 @@ Statement:
   | CatchStatement;
 
 // Value and Variable Declarations and Definitions
-// VariableDeclaration returns NamedElement:
-//   {infer VariableDeclaration} kind=VariableKind Ids (':' type=Type)? (assignment?='=' value=Expression)?;
+// 다중 대입문을 지원하기 위해서 아래와 같이 되어져 있다.
+// 하지만 이 방식은 어떻게 해도 names 속으로 name이 숨기 때문에 cross-reference가 되지 않는다.
+// 아래와 같이 VariableName을 별도로 두어도 이것의 AstNode상의 위치가 VariableDeclaration의 자식 노드가 되기 때문에
+// 일반적인 Scope 규칙으로 보면 VariableDeclaration의 외부에서는 접근할 수 없는 것이다.
+// VariableDeclaration: kind=VariableKind names+=VariableName (',' names+=VariableName)* (':' type=Type)? ...
+// VariableName: name=PlainId;
 VariableKind returns string: 'val' | 'var';
 VariableDeclaration:
   kind=VariableKind Ids (':' type=Type)? (assignment?='=' value=Expression)?;
@@ -144,7 +148,7 @@ Group:
   '(' value=Expression ')';
 
 FeatureCall infers Expression: {infer MemberCall}
-	// (element=[NamedElement:ID] | element=[NamedElement:'this'] | element=[NamedElement:'super'])
+	// (element=[NamedElement:PlainId] | element=[NamedElement:'this'] | element=[NamedElement:'super'])
 	(element=PlainId | element='this' | element='super')
   // Optional function call after referencing an element
   (explicitCall?='(' Arguments? ')')?;
@@ -160,7 +164,8 @@ LogicalNot infers UnaryExpression:
 // Assignment infers Expression:
 //     Logical      ({infer BinaryExpression.left=current} operator=('=') right=Addition)*;
 Assignment:
-  name=Id operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
+  assign=Id operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
+  // assign=[VariableName:PlainId] operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
 Logical infers Expression:
   Comparison     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '&&' | '||') right=Comparison)*;
@@ -181,9 +186,11 @@ Exponentiation infers Expression:
 // 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수도 있다.
 // 즉 다음과 같은 것들을 파싱할 수 있다. ()안에는 인수들이 있을 수도 있다.
 // a, a(), a.b, a().b, a.b(), a().b(), ... 
+//
+// element=PlainId 대신 element=[NamedElement:PlainId]를 사용해야 하는데
+// 이렇게 되면 각종 라이브러리들의 모든 메서드들이 등록되어져야 하므로 현재로는 무리다.
 MemberCall infers Expression:
   SimpleExpr ({infer MemberCall.previous=current} 
-    // ( (explicitCall?='(' Arguments? ')') | "." element=[NamedElement:PlainId] (explicitCall?='(' Arguments? ')')? )
     ( (explicitCall?='(' Arguments? ')') | "." element=PlainId (explicitCall?='(' Arguments? ')')? )
   )*;
 fragment Arguments:

@@ -120,7 +120,7 @@ function generateStatement(stmt: Statement, indent: number): string {
 function generateExpression(expr: Expression, indent: number): string {
   let result = "";
   if (isAssignment(expr)) {
-    result += `${expr.name} ${expr.operator} ${generateExpression(expr.value, indent)}`;
+    result += `${expr.assign} ${expr.operator} ${generateExpression(expr.value, indent)}`;
     result += isAssignment(expr.value) ? "" : ";";
   } else if (isMemberCall(expr)) {
     if (expr.previous) {

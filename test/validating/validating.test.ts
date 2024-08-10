@@ -4,15 +4,15 @@ import { expandToString as s } from "langium/generate";
 import { parseHelper } from "langium/test";
 import type { Diagnostic } from "vscode-languageserver-types";
 import { createScalaScriptServices } from "../../src/language/scala-script-module.js";
-import { Model, isModel } from "../../src/language/generated/ast.js";
+import { Program, isProgram } from "../../src/language/generated/ast.js";
 
 let services: ReturnType<typeof createScalaScriptServices>;
-let parse: ReturnType<typeof parseHelper<Model>>;
-let document: LangiumDocument<Model> | undefined;
+let parse: ReturnType<typeof parseHelper<Program>>;
+let document: LangiumDocument<Program> | undefined;
 
 beforeAll(async () => {
   services = createScalaScriptServices(EmptyFileSystem);
-  const doParse = parseHelper<Model>(services.ScalaScript);
+  const doParse = parseHelper<Program>(services.ScalaScript);
   parse = (input: string) => doParse(input, { validation: true });
 
   // activate the following if your linking test requires elements from a built-in library, for example
@@ -22,8 +22,8 @@ beforeAll(async () => {
 describe("Validating", () => {
   test("check no errors", async () => {
     document = await parse(`
-            person Langium
-        `);
+      var a, b, c : number = 0xff
+    `);
 
     expect(
       // here we first check for validity of the parsed document object by means of the reusable function
@@ -36,8 +36,8 @@ describe("Validating", () => {
 
   test("check capital letter validation", async () => {
     document = await parse(`
-            person langium
-        `);
+      var a, b, c : number = 0xff
+    `);
 
     expect(checkDocumentValid(document) || document?.diagnostics?.map(diagnosticToString)?.join("\n")).toEqual(
       // 'expect.stringContaining()' makes our test robust against future additions of further validation rules
@@ -56,8 +56,8 @@ function checkDocumentValid(document: LangiumDocument): string | undefined {
           ${document.parseResult.parserErrors.map((e) => e.message).join("\n  ")}
     `) ||
     (document.parseResult.value === undefined && `ParseResult is 'undefined'.`) ||
-    (!isModel(document.parseResult.value) &&
-      `Root AST object is a ${document.parseResult.value.$type}, expected a '${Model}'.`) ||
+    (!isProgram(document.parseResult.value) &&
+      `Root AST object is a ${document.parseResult.value.$type}, expected a '${Program}'.`) ||
     undefined
   );
 }

@@ -3,15 +3,15 @@ import { EmptyFileSystem, type LangiumDocument } from "langium";
 import { expandToString as s } from "langium/generate";
 import { parseHelper } from "langium/test";
 import { createScalaScriptServices } from "../../src/language/scala-script-module.js";
-import { Model, isModel } from "../../src/language/generated/ast.js";
+import { Program, isProgram } from "../../src/language/generated/ast.js";
 
 let services: ReturnType<typeof createScalaScriptServices>;
-let parse: ReturnType<typeof parseHelper<Model>>;
-let document: LangiumDocument<Model> | undefined;
+let parse: ReturnType<typeof parseHelper<Program>>;
+let document: LangiumDocument<Program> | undefined;
 
 beforeAll(async () => {
   services = createScalaScriptServices(EmptyFileSystem);
-  parse = parseHelper<Model>(services.ScalaScript);
+  parse = parseHelper<Program>(services.ScalaScript);
 
   // activate the following if your linking test requires elements from a built-in library, for example
   // await services.shared.workspace.WorkspaceManager.initializeWorkspace([]);
@@ -20,8 +20,7 @@ beforeAll(async () => {
 describe("Parsing tests", () => {
   test("parse simple model", async () => {
     document = await parse(`
-      person Langium
-      Hello Langium!
+      var a, b, c : number = 0xff
     `);
 
     // check for absensce of parser errors the classic way:
@@ -35,16 +34,10 @@ describe("Parsing tests", () => {
       //  by means of the reusable function 'checkDocumentValid()' to sort out (critical) typos first;
       checkDocumentValid(document) ||
         s`
-          Persons:
-            ${document.parseResult.value?.persons?.map((p) => p.name)?.join("\n  ")}
-          Greetings to:
-            ${document.parseResult.value?.greetings?.map((g) => g.person.$refText)?.join("\n  ")}
+          ${document.parseResult.value?.codes.map((code) => code.$type)?.join("\n")}
         `
     ).toBe(s`
-      Persons:
-        Langium
-      Greetings to:
-        Langium
+      VariableDeclaration
     `);
   });
 });
@@ -57,8 +50,8 @@ function checkDocumentValid(document: LangiumDocument): string | undefined {
           ${document.parseResult.parserErrors.map((e) => e.message).join("\n  ")}
     `) ||
     (document.parseResult.value === undefined && `ParseResult is 'undefined'.`) ||
-    (!isModel(document.parseResult.value) &&
-      `Root AST object is a ${document.parseResult.value.$type}, expected a '${Model}'.`) ||
+    (!isProgram(document.parseResult.value) &&
+      `Root AST object is a ${document.parseResult.value.$type}, expected a '${Program}'.`) ||
     undefined
   );
 }
