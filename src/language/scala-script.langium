@@ -18,20 +18,19 @@ Statement:
 
 // Value and Variable Declarations and Definitions
 // 다중 대입문을 지원하기 위해서 아래와 같이 되어져 있다.
-// 하지만 이 방식은 어떻게 해도 names 속으로 name이 숨기 때문에 cross-reference가 되지 않는다.
-// 아래와 같이 VariableName을 별도로 두어도 이것의 AstNode상의 위치가 VariableDeclaration의 자식 노드가 되기 때문에
+// 하지만 이 방식은 어떻게 해도 names에 name들이 위치하기 때문에 cross-reference가 되지 않는다.
+// 다중 대입문의 변수들은 이것의 AstNode상의 위치가 VariableDeclaration의 자식 노드가 되기 때문에
 // 일반적인 Scope 규칙으로 보면 VariableDeclaration의 외부에서는 접근할 수 없는 것이다.
-// VariableDeclaration: kind=VariableKind names+=VariableName (',' names+=VariableName)* (':' type=Type)? ...
-// VariableName: name=PlainId;
 VariableKind returns string: 'val' | 'var';
 VariableDeclaration:
   kind=VariableKind Ids (':' type=Type)? ('=' value=Expression)?;
-fragment Ids: names+=PlainId (',' names+=PlainId)*;
+  // kind=VariableKind name=Id (':' type=Type)? ('=' value=Expression)?;
+fragment Ids: names+=Id (',' names+=Id)*;
 
 // Function Declarations and Definitions
 FunctionDeclaration: 'def' FunSigniture;
 fragment FunSigniture:
-  name=PlainId '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
+  name=Id '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
 fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
 Parameter: Variable;
@@ -44,7 +43,7 @@ Block:
 //   display(msg: string = "hello")
 //   message
 // }
-Class: 'class' name=PlainId ('extends' superClass=[Class:PlainId])? '{' members+=ClassMember* '}';
+Class: 'class' name=Id ('extends' superClass=[Class:Id])? '{' members+=ClassMember* '}';
 ClassMember: MethodMember | FieldMember;
 MethodMember: FunSigniture;
 FieldMember: Variable;
@@ -61,9 +60,9 @@ ForStatement:
 
 Iterator: ForOf | ForTo | ForUntil;
 
-ForOf   : name=PlainId '<-' of=SimpleExpr;
-ForTo   : name=PlainId '<-' e1=SimpleExpr 'to'    e2=SimpleExpr;
-ForUntil: name=PlainId '<-' e1=SimpleExpr 'until' e2=SimpleExpr;
+ForOf   : name=Id '<-' of=SimpleExpression;
+ForTo   : name=Id '<-' e1=SimpleExpression 'to'    e2=SimpleExpression;
+ForUntil: name=Id '<-' e1=SimpleExpression 'until' e2=SimpleExpression;
 
 // While Loop
 WhileStatement:
@@ -94,20 +93,21 @@ terminal SL_COMMENT returns string: /\/\/[^\n\r]*/;
 // var, val 은 변수를 선언하는 것이지만 엄밀하게 말하면 변수의 성격을 결정하는 것으로써
 // var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
 // 그래서 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다. 
-fragment Variable: name=PlainId (':' type=Type)? ('=' value=Expression)?;
+fragment Variable: name=Id (':' type=Type)? ('=' value=Expression)?;
 
 type NamedElement = VariableDeclaration
   | FunctionDeclaration
   | Class
   | MethodMember
   | FieldMember
-  | Parameter;
+  | Parameter
+  | Binding;
 
 // Type
 Type:
   LambdaType
   | primitive=("string" | "number" | "boolean" | "void") (isArray?='[]')?
-  | reference=[Class:PlainId] (isArray?='[]')?;
+  | reference=[Class:Id] (isArray?='[]')?;
 LambdaType:
   '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
 
@@ -117,7 +117,7 @@ LambdaType:
 
 // Logical rule은 많은 rule을 내포하고 있다.
 // 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
-// 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, Ref를 포함한다.
+// 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, FeatureCall를 포함한다.
 Expression:
   LogicalNot
   | Logical
@@ -128,7 +128,7 @@ Expression:
   | ArrayLiteral
   | InfixExpr;
 
-SimpleExpr infers Expression:
+SimpleExpression infers Expression:
   UnaryExpression
   | Literal
   | Group
@@ -149,9 +149,15 @@ Literal:
 Group:
   '(' value=Expression ')';
 
-FeatureCall infers Expression: {infer MemberCall}
-	// (element=[NamedElement:PlainId] | element=[NamedElement:'this'] | element=[NamedElement:'super'])
-	(element=PlainId | element='this' | element='super')
+// 이것을 cross-reference로 처리하면 MemberCall과 마찬가지로 전역적으로 사용하는 각종 함수들
+// 예를들면 console.log의 console이 정의되지 않아 중간에 에러가 된다. 그래도 억지로 할 순 있는데 그 경우에도...
+// this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
+// this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
+// 프로퍼티 이름이 this로 설정되어져 있는데 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
+FeatureCall: // infers Expression: {infer MemberCall}
+	(element=Id | element='this' | element='super')
+	// (element=[NamedElement:Id] | this='this' | this='super')
+	// (element=[NamedElement:Id] | element=[NamedElement:'this'] | element=[NamedElement:'super'])
   // Optional function call after referencing an element
   (explicitCall?='(' Arguments? ')')?;
 
@@ -164,10 +170,15 @@ LogicalNot infers UnaryExpression:
 
 // Binary Operators
 // Assignment infers Expression:
-//     Logical      ({infer BinaryExpression.left=current} operator=('=') right=Addition)*;
+//   Logical ({infer BinaryExpression.left=current} operator=('=') right=Logical)*;
+// Assignment를 위와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.
+// 우선 대입 연산의 순서가 왼쪽에서 오른쪽으로 가기 때문에 a = b = 0 은 a = b가 먼저 처리된다.
+// 또 다른 문제는 이 좌결합성 때문에 다중 대입에서 세미콜론을 제대로 표시할 수 없다.
+// 아래와 같이 하는데 a.b = 0와 같은 것이 처리되기 위해서는 assign으로 QualifiedName가 와야한다.
+// 현재는 cross-reference가 처리되지 않기 때문에 [NamedElement:QualifiedName]를 사용할 수 없다.
+// 하지만 원래 같은 의미인 MemberCall이 현재 상호참조를 하고 있지 않기 때문에 이걸 사용한다.
 Assignment:
-  assign=Id operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
-  // assign=[VariableName:PlainId] operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
+  assign=MemberCall operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
 Logical infers Expression:
   Comparison     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '&&' | '||') right=Comparison)*;
@@ -189,15 +200,14 @@ Exponentiation infers Expression:
 // 즉 다음과 같은 것들을 파싱할 수 있다. ()안에는 인수들이 있을 수도 있다.
 // a, a(), a.b, a().b, a.b(), a().b(), ... 
 //
-// element=PlainId 대신 element=[NamedElement:PlainId]를 사용해야 하는데
+// element=Id 대신 element=[NamedElement:Id]를 사용해야 하는데
 // 이렇게 되면 각종 라이브러리들의 모든 메서드들이 등록되어져야 하므로 현재로는 무리다.
 MemberCall infers Expression:
-  SimpleExpr ({infer MemberCall.previous=current} 
-    ( (explicitCall?='(' Arguments? ')') | "." element=PlainId (explicitCall?='(' Arguments? ')')? )
+  SimpleExpression ({infer MemberCall.previous=current} 
+    ( (explicitCall?='(' Arguments? ')') | "." element=Id (explicitCall?='(' Arguments? ')')? )
   )*;
 fragment Arguments:
   args+=Expression (',' args+=Expression)*;
-
 
 // Conditional Expressions
 // ConditionClause는 if, while, do-while등에서 사용되는데 single expression 이면 괄호를 생략할 수 있다.
@@ -218,7 +228,7 @@ IfElseExpression:
 
 // Match expression
 MatchExpression:
-  name=PlainId 'match' '{' cases+=(CaseClause | Bypass)+ '}';
+  name=Id 'match' '{' cases+=(CaseClause | Bypass)+ '}';
 
 CaseClause:
   'case' pattern=(CaseDefalut | CasePattern) '=>' body=Block;
@@ -230,14 +240,14 @@ CasePattern: Literal;
 AnonymousCall:
   ('(' Bindings? ')' | bindings+=Binding) (':' returnType=Type)? '=>' body=Block;
 fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
-Binding: name=PlainId (':' type=Type)?;
+Binding: name=Id (':' type=Type)?;
 
 // Array expression
 ArrayLiteral:
   '[' items+=Literal (',' items+=Literal )* ']';
 
 InfixExpr:
-  e1=PlainId name=PlainId e2=Literal;
+  e1=Id name=Id e2=Literal;
 
 // Parentheses
 // terminal Paren: '(' | ')' | '[' | ']' | '{' | '}';
@@ -305,13 +315,13 @@ terminal ID: /[_a-zA-Z][\w_]*/;
 // terminal Lower  : /[a-z]/;       // and Unicode category Ll
 // terminal Letter : Upper | Lower; // and Unicode categories Lo, Lt, Nl
 // terminal VarId  : Lower (Letter | Digit)*;
-// terminal PlainId: Upper (Letter | Digit)* | VarId;
+// terminal Id     : Upper (Letter | Digit)* | VarId;
 
 // Identifiers
-terminal PlainId returns string: ID;
-Id returns string:
-  PlainId (('.'|'::') PlainId)* // QualifiedName returns string:
-  | '`' StringLiteral '`';
+terminal Id returns string: ID;
+// QualifiedName returns string:
+//   Id (('.'|'::') Id)*
+//   | '`' StringLiteral '`';
 
 // Whitespace and Comments
 hidden terminal WS: /\s+/;

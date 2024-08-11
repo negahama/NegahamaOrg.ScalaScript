@@ -33,6 +33,7 @@ import {
   isMethodMember,
   FunctionDeclaration,
   MethodMember,
+  isFeatureCall,
 } from "../language/generated/ast.js";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as fs from "node:fs";
@@ -75,6 +76,8 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
   if (isVariableDeclaration(stmt)) {
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
+    // 단일 대입문인 경우
+    // result += generateVariable(stmt.name, stmt.type, stmt.value, indent) + ";";
     stmt.names.forEach((name, idx) => {
       result += (idx != 0 ? ", " : "") + generateVariable(name, stmt.type, stmt.value, indent);
     });
@@ -130,7 +133,8 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
   let result = "";
   if (expr == undefined) return result;
   if (isAssignment(expr)) {
-    result += `${expr.assign} ${expr.operator} ${generateExpression(expr.value, indent)}`;
+    const name = generateExpression(expr.assign, indent);
+    result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`;
     result += isAssignment(expr.value) ? "" : ";";
   } else if (isMemberCall(expr)) {
     if (expr.previous) {
@@ -139,6 +143,18 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
     } else {
       result += expr.element ? expr.element : "";
     }
+    if (expr.explicitCall) {
+      result += "(";
+      expr.args.forEach((arg, index) => {
+        result += (index != 0 ? ", " : "") + generateExpression(arg, indent);
+      });
+      result += ")";
+    }
+  } else if (isFeatureCall(expr)) {
+    // cross-reference인 경우
+    // if (expr.this) result += expr.this;
+    // else result += expr.element ? expr.element.$refText : "";
+    result += expr.element ? expr.element : "";
     if (expr.explicitCall) {
       result += "(";
       expr.args.forEach((arg, index) => {
