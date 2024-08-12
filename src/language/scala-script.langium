@@ -60,9 +60,9 @@ ForStatement:
 
 Iterator: ForOf | ForTo | ForUntil;
 
-ForOf   : name=Id '<-' of=SimpleExpression;
-ForTo   : name=Id '<-' e1=SimpleExpression 'to'    e2=SimpleExpression;
-ForUntil: name=Id '<-' e1=SimpleExpression 'until' e2=SimpleExpression;
+ForOf   : name=Id '<-' of=Expression;
+ForTo   : name=Id '<-' e1=Expression 'to'    e2=Expression;
+ForUntil: name=Id '<-' e1=Expression 'until' e2=Expression;
 
 // While Loop
 WhileStatement:
@@ -106,10 +106,16 @@ type NamedElement = VariableDeclaration
 // Type
 Type:
   LambdaType
+  | ArrayType
+  | TupleType
+  | ObjectType
   | primitive=("string" | "number" | "boolean" | "void") (isArray?='[]')?
   | reference=[Class:Id] (isArray?='[]')?;
 LambdaType:
   '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
+ArrayType: type=Id '[' ']';
+TupleType: '[' items+=Type (',' items+=Type)* ']';
+ObjectType: '{' ids+=TypedId (',' ids+=TypedId)* '}';
 
 // Expressions
 // Expressions:
@@ -126,13 +132,27 @@ Expression:
   | MatchExpression
   | AnonymousCall
   | ArrayLiteral
+  | ObjectLiteral
   | InfixExpr;
 
 SimpleExpression infers Expression:
   UnaryExpression
-  | Literal
+  | ArrayExpr
   | Group
+  | Literal
   | FeatureCall;
+
+// Unary operators
+UnaryExpression:
+  operator=('-' | '+') value=Expression;
+
+// Array Expression
+ArrayExpr:
+  name=Id '[' index=Expression ']';
+
+// grouped expression with parentheses
+Group:
+  '(' value=Expression ')';
 
 // Literals
 // There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
@@ -145,10 +165,6 @@ Literal:
   // | value=CharLiteral
   | 'null';
 
-// grouped expression with parentheses
-Group:
-  '(' value=Expression ')';
-
 // 이것을 cross-reference로 처리하면 MemberCall과 마찬가지로 전역적으로 사용하는 각종 함수들
 // 예를들면 console.log의 console이 정의되지 않아 중간에 에러가 된다. 그래도 억지로 할 순 있는데 그 경우에도...
 // this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
@@ -160,10 +176,6 @@ FeatureCall: // infers Expression: {infer MemberCall}
 	// (element=[NamedElement:Id] | element=[NamedElement:'this'] | element=[NamedElement:'super'])
   // Optional function call after referencing an element
   (explicitCall?='(' Arguments? ')')?;
-
-// Unary operators
-UnaryExpression:
-  operator=('-' | '+') value=Expression;
 
 LogicalNot infers UnaryExpression:
   operator=('not' | '!') value=Expression;
@@ -211,7 +223,7 @@ fragment Arguments:
 
 // Conditional Expressions
 // ConditionClause는 if, while, do-while등에서 사용되는데 single expression 이면 괄호를 생략할 수 있다.
-// Single expression으로 취급할 수 있는 것들이 FunCall, Literal, Group, Ref가 있으며 이들을 이용한 연산도
+// Single expression으로 취급할 수 있는 것들이 Liter, Group, FeatureCall가 있으며 이들을 이용한 연산도
 // 마찬가지이다. 이 모든 것이 Logical Rule 하나에 들어가 있다.
 IfExpression:
   'if' ConditionClause
@@ -242,9 +254,14 @@ AnonymousCall:
 fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
 Binding: name=Id (':' type=Type)?;
 
-// Array expression
+// Array literal
 ArrayLiteral:
   '[' items+=Literal (',' items+=Literal )* ']';
+
+// Object literal
+ObjectLiteral:
+  '{' items+=ObjectBinding (',' items+=ObjectBinding )* '}';
+ObjectBinding: name=Id (':' value=Expression)?;
 
 InfixExpr:
   e1=Id name=Id e2=Literal;
@@ -322,6 +339,7 @@ terminal Id returns string: ID;
 // QualifiedName returns string:
 //   Id (('.'|'::') Id)*
 //   | '`' StringLiteral '`';
+TypedId: name=Id ':' type=Type;
 
 // Whitespace and Comments
 hidden terminal WS: /\s+/;

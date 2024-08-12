@@ -4,6 +4,7 @@ import {
   Code,
   Expression,
   isAnonymousCall,
+  isArrayExpr,
   isArrayLiteral,
   isAssignment,
   isBinaryExpression,
@@ -34,6 +35,10 @@ import {
   FunctionDeclaration,
   MethodMember,
   isFeatureCall,
+  isArrayType,
+  isTupleType,
+  isObjectType,
+  isObjectLiteral,
 } from "../language/generated/ast.js";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as fs from "node:fs";
@@ -241,6 +246,17 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
       return item.value;
     });
     result += "]";
+  } else if (isObjectLiteral(expr)) {
+    result += "{\n";
+    expr.items.forEach((item) => {
+      result += applyIndent(
+        indent + 1,
+        item.name + ": " + (item.value ? generateExpression(item.value, indent) : "") + ",\n"
+      );
+    });
+    result += "}";
+  } else if (isArrayExpr(expr)) {
+    result += expr.name + `[${generateExpression(expr.index, indent)}]`;
   } else if (isInfixExpr(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
   } else {
@@ -335,6 +351,20 @@ function generateType(type: Type | undefined): string {
       result += (idx != 0 ? ", " : "") + arg.name + ": " + typeonly(arg.type);
     });
     result += ")" + (type.returnType ? ` => ${typeonly(type.returnType)}` : "");
+  } else if (isArrayType(type)) {
+    result += ": " + type.type + "[]";
+  } else if (isTupleType(type)) {
+    result += ": [";
+    type.items.forEach((item, idx) => {
+      result += (idx != 0 ? ", " : "") + typeonly(item);
+    });
+    result += "]";
+  } else if (isObjectType(type)) {
+    result += ": {";
+    type.ids.forEach((id, idx) => {
+      result += (idx != 0 ? ", " : "") + id.name + ": " + typeonly(id.type);
+    });
+    result += "}";
   } else result += ": " + typeonly(type);
   return result;
 }

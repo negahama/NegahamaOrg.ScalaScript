@@ -9,7 +9,13 @@ a = b = c = 100000;
 b = 3 + 9 + 17 + 11.1 + 11;
 c = (1 + 2) * 3 % 2 ** 3;
 const s: string = "abc" + 'def' + 's';
-const array1 = ['a','b','c'];
+const array1: string[] = ['a','b','c'];
+const tuple: [string, number, boolean] = ['Hello',42,true];
+const s1 = array1[a + b] + array1[1];
+const obj: {name: string, age: number} = {
+  name: "samuel",
+  age: 50,
+};
 /*
   Class
 */

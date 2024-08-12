@@ -6,8 +6,16 @@ a = b = c = 1e5
 b = 0b11 + 0o11 + 0x11 + 11.1 + 1.1e+1
 c = (1 + 2) * 3 % 2 ** 3
 val s:string = "abc" .. 'def' + 's'
-val array1 = ['a', 'b', 'c']
-
+val array1: string[] = ['a', 'b', 'c']
+val tuple: [string, number, boolean] = ['Hello', 42, true]
+val s1 = array1[a+b] + array1[1]
+val obj: {
+  name: string,
+  age: number
+} = {
+  name: "samuel",
+  age: 50
+}
 /*
   Class
 */
