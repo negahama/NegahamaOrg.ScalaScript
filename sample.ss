@@ -9,6 +9,16 @@ val s:string = "abc" .. 'def' + 's'
 val array1: string[] = ['a', 'b', 'c']
 val tuple: [string, number, boolean] = ['Hello', 42, true]
 val s1 = array1[a+b] + array1[1]
+
+type BasicInfo = { name: string, parts: string[] }
+val car: BasicInfo = {
+	name: 'car',
+	parts: [
+		'engine',
+		'wheel',
+		'body'
+	]
+}
 val obj: {
   name: string,
   age: number
@@ -52,6 +62,12 @@ var list2 = s.concat("2" + 'def').trim().split(",")
 def sum(a: number, b: number): number = {
   a + b
 }
+
+val lambda1 = () => 1
+val lambda2 = arg: number => arg
+val lambda3 = (arg: number) => arg
+val lambda4 = (arg1: number, arg2: number) => arg1 + arg2
+val lambda5 = (arg1: number, arg2: number): number => arg1 + arg2
 
 val oncePerSecond = (callback: (p:string) => void): void => {
 //def oncePerSecond(callback: (p: string) => void): void = {

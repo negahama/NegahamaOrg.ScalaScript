@@ -12,6 +12,11 @@ const s: string = "abc" + 'def' + 's';
 const array1: string[] = ['a','b','c'];
 const tuple: [string, number, boolean] = ['Hello',42,true];
 const s1 = array1[a + b] + array1[1];
+interface BasicInfo {name: string, parts: string[]}
+const car: BasicInfo = {
+  name: 'car',
+  parts: ['engine','wheel','body'],
+};
 const obj: {name: string, age: number} = {
   name: "samuel",
   age: 50,
@@ -51,6 +56,11 @@ let list2 = s.concat("2" + 'def').trim().split(",");
 function sum(a: number, b: number): number {
   return a + b
 }
+const lambda1 = () => { 1 };
+const lambda2 = (arg: number) => { arg };
+const lambda3 = (arg: number) => { arg };
+const lambda4 = (arg1: number, arg2: number) => { arg1 + arg2 };
+const lambda5 = (arg1: number, arg2: number): number => { arg1 + arg2 };
 const oncePerSecond = (callback: (p: string) => void): void => {
   //def oncePerSecond(callback: (p: string) => void): void = {
   while (true) {

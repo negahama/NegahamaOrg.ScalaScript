@@ -39,6 +39,7 @@ import {
   isTupleType,
   isObjectType,
   isObjectLiteral,
+  isTypeDeclaration,
 } from "../language/generated/ast.js";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as fs from "node:fs";
@@ -78,7 +79,9 @@ function generateCode(code: Code): string {
 function generateStatement(stmt: Statement | undefined, indent: number): string {
   let result = "";
   if (stmt == undefined) return result;
-  if (isVariableDeclaration(stmt)) {
+  if (isTypeDeclaration(stmt)) {
+    result += `interface ${stmt.name} ${generateType(stmt.value, false)}`;
+  } else if (isVariableDeclaration(stmt)) {
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
     // 단일 대입문인 경우
@@ -332,7 +335,7 @@ function generateCondition(condition: Expression): string {
   return isGroup(condition) ? e : "(" + e + ")";
 }
 
-function generateType(type: Type | undefined): string {
+function generateType(type: Type | undefined, includeColon: boolean = true): string {
   const typeonly = (t: Type | undefined) => {
     if (t == undefined) return "";
     if (t.reference) {
@@ -346,21 +349,21 @@ function generateType(type: Type | undefined): string {
   let result = "";
   if (type == undefined) return result;
   if (isLambdaType(type)) {
-    result += ": (";
+    result += (includeColon ? ": " : "") + "(";
     type.args.forEach((arg, idx) => {
       result += (idx != 0 ? ", " : "") + arg.name + ": " + typeonly(arg.type);
     });
     result += ")" + (type.returnType ? ` => ${typeonly(type.returnType)}` : "");
   } else if (isArrayType(type)) {
-    result += ": " + type.type + "[]";
+    result += (includeColon ? ": " : "") + type.type + "[]";
   } else if (isTupleType(type)) {
-    result += ": [";
+    result += (includeColon ? ": " : "") + "[";
     type.items.forEach((item, idx) => {
       result += (idx != 0 ? ", " : "") + typeonly(item);
     });
     result += "]";
   } else if (isObjectType(type)) {
-    result += ": {";
+    result += (includeColon ? ": " : "") + "{";
     type.ids.forEach((id, idx) => {
       result += (idx != 0 ? ", " : "") + id.name + ": " + typeonly(id.type);
     });

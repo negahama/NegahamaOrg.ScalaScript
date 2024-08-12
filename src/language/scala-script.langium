@@ -7,6 +7,7 @@ Code: Statement | Expression;
 // Statements
 Statement:
   Bypass
+  | TypeDeclaration
   | VariableDeclaration
   | FunctionDeclaration
   | Class
@@ -15,6 +16,10 @@ Statement:
   | WhileStatement
   | ThrowStatement
   | CatchStatement;
+
+// Type Declarations
+TypeDeclaration:
+  'type' name=Id '=' value=ObjectType;
 
 // Value and Variable Declarations and Definitions
 // 다중 대입문을 지원하기 위해서 아래와 같이 되어져 있다.
@@ -97,6 +102,7 @@ fragment Variable: name=Id (':' type=Type)? ('=' value=Expression)?;
 
 type NamedElement = VariableDeclaration
   | FunctionDeclaration
+  | TypeDeclaration
   | Class
   | MethodMember
   | FieldMember
@@ -110,12 +116,13 @@ Type:
   | TupleType
   | ObjectType
   | primitive=("string" | "number" | "boolean" | "void") (isArray?='[]')?
-  | reference=[Class:Id] (isArray?='[]')?;
+  | reference=[UserDefType:Id] (isArray?='[]')?;
 LambdaType:
   '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
 ArrayType: type=Id '[' ']';
 TupleType: '[' items+=Type (',' items+=Type)* ']';
 ObjectType: '{' ids+=TypedId (',' ids+=TypedId)* '}';
+UserDefType: Class | TypeDeclaration;
 
 // Expressions
 // Expressions:
