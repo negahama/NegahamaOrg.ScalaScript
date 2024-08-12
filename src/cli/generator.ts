@@ -15,7 +15,6 @@ import {
   isForStatement,
   isForTo,
   isLambdaType,
-  isFunctionDeclaration,
   isGroup,
   isIfExpression,
   isInfixExpr,
@@ -30,16 +29,18 @@ import {
   Type,
   type Program,
   isClass,
-  isFieldMember,
-  isMethodMember,
-  FunctionDeclaration,
-  MethodMember,
+  isField,
+  isMethod,
+  Method,
   isFeatureCall,
   isArrayType,
   isTupleType,
   isObjectType,
   isObjectLiteral,
   isTypeDeclaration,
+  isReturnExpr,
+  isContinue,
+  isBreak,
 } from "../language/generated/ast.js";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as fs from "node:fs";
@@ -71,7 +72,7 @@ function generateCode(code: Code): string {
   if (isStatement(code)) result += generateStatement(code, 0);
   else if (isExpression(code)) result += generateExpression(code, 0);
   else {
-    console.log("ERROR:", code);
+    console.log("ERROR in Code:", code);
   }
   return result;
 }
@@ -90,15 +91,15 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
       result += (idx != 0 ? ", " : "") + generateVariable(name, stmt.type, stmt.value, indent);
     });
     result += ";";
-  } else if (isFunctionDeclaration(stmt)) {
+  } else if (isMethod(stmt)) {
     result += generateFunction(stmt, indent);
   } else if (isClass(stmt)) {
     result += `class ${stmt.name} `;
     result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
     stmt.members.forEach((m) => {
-      if (isMethodMember(m)) {
-        result += applyIndent(indent + 1, generateFunction(m, indent + 1));
-      } else if (isFieldMember(m)) {
+      if (isMethod(m)) {
+        result += applyIndent(indent + 1, generateFunction(m, indent + 1, true));
+      } else if (isField(m)) {
         result += applyIndent(indent + 1, generateVariable(m.name, m.type, m.value, indent) + ";");
       }
       result += "\n";
@@ -131,8 +132,12 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
     result = `while ${generateCondition(stmt.condition)} ${generateBlock(stmt.loop, indent)}`;
   } else if (isBypass(stmt)) {
     result += generateBypass(stmt);
+  } else if (isContinue(stmt)) {
+    result += "continue;";
+  } else if (isBreak(stmt)) {
+    result += "break;";
   } else {
-    console.log("ERROR:", stmt.$type);
+    console.log("ERROR in Statement:", stmt.$type);
   }
   return result;
 }
@@ -228,7 +233,12 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
         } else {
           result += applyIndent(indent + 1, `default: `);
         }
-        result += generateBlock(mc.body, indent) + "\n";
+        result +=
+          generateBlock(mc.body, indent + 1, (lastCode, indent) => {
+            if (isStatement(lastCode)) return generateStatement(lastCode, indent); // + "break;";
+            else if (isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
+            else return "";
+          }) + "\n";
       }
     });
     result += applyIndent(indent, "}");
@@ -238,7 +248,13 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
       result += (idx != 0 ? ", " : "") + bind.name + generateType(bind.type);
     });
     result += ")" + generateType(expr.returnType);
-    result += " => " + generateBlock(expr.body, indent);
+    result +=
+      " => " +
+      generateBlock(expr.body, indent, (lastCode: Code, indent: number) => {
+        if (isStatement(lastCode)) return generateStatement(lastCode, indent);
+        else if (isExpression(lastCode)) return generateExpression(lastCode, indent);
+        else return "";
+      });
   } else if (isLiteral(expr)) {
     result += expr.value;
   } else if (isGroup(expr)) {
@@ -262,8 +278,10 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
     result += expr.name + `[${generateExpression(expr.index, indent)}]`;
   } else if (isInfixExpr(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
+  } else if (isReturnExpr(expr)) {
+    result = `return ${generateExpression(expr.value, indent)};`;
   } else {
-    console.log("ERROR:", expr);
+    console.log("ERROR in Expression:", expr);
   }
   return result;
 }
@@ -288,27 +306,44 @@ function generateBypass(bypass: Bypass): string {
   return result;
 }
 
-function generateBlock(body: Block, indent: number, isFunctionBody: boolean = false): string {
+function generateBlock(
+  body: Block,
+  indent: number,
+  doItForLastCode?: (lastCode: Code, indent: number) => string
+): string {
+  const defaultDoIt = (lastCode: Code, indent: number) => {
+    if (isStatement(lastCode)) return generateStatement(lastCode, indent);
+    else if (isExpression(lastCode)) return generateExpression(lastCode, indent);
+    else return "";
+  };
+
   let result = "";
   if (body.expression) {
-    result += isFunctionBody
-      ? `{ return ${generateExpression(body.expression, indent)} }`
-      : `{ ${generateExpression(body.expression, indent)} }`;
-    // result += "{\n";
-    // result += applyIndent(indent + 1, generateExpressionElement(body));
-    // result += "\n" + applyIndent(indent, "}");
+    // block이 단일 expression이면 해당 expression을 대상으로 doItForLastCode를 수행한다.
+    // 이때 match는 expression이지만 TypeScript의 switch로 변환될때는 statement이므로 이를 고려해야 한다.
+    result += "{\n";
+    let element = "";
+    if (isMatchExpression(body.expression)) {
+      element += generateExpression(body.expression, indent + 1);
+    } else {
+      if (doItForLastCode == undefined) element += defaultDoIt(body.expression, indent + 1);
+      else element += doItForLastCode(body.expression, indent + 1);
+    }
+    result += applyIndent(indent + 1, element);
+    result += "\n" + applyIndent(indent, "}");
   } else {
     result += "{\n";
     body.codes.forEach((code, index) => {
       let element = "";
-      if (isStatement(code)) element += generateStatement(code, indent + 1) + "\n";
-      else if (isExpression(code)) {
-        if (isFunctionBody && index == body.codes.length - 1) element += "return ";
-        element += generateExpression(code, indent + 1) + "\n";
+      if (index == body.codes.length - 1) {
+        if (doItForLastCode == undefined) element += defaultDoIt(code, indent + 1);
+        else element += doItForLastCode(code, indent + 1);
       } else {
-        console.log("ERROR:", code);
+        if (isStatement(code)) element += generateStatement(code, indent + 1);
+        else if (isExpression(code)) element += generateExpression(code, indent + 1);
+        else console.log("ERROR in Block:", code);
       }
-      result += applyIndent(indent + 1, element);
+      result += applyIndent(indent + 1, element + "\n");
     });
     result += applyIndent(indent, "}");
   }
@@ -319,14 +354,20 @@ function generateVariable(name: string, type: Type | undefined, value: Expressio
   return name + generateType(type) + (value ? " = " + generateExpression(value, indent) : "");
 }
 
-function generateFunction(fun: FunctionDeclaration | MethodMember, indent: number): string {
+function generateFunction(fun: Method, indent: number, isClassMethod: boolean = false): string {
   let result = "";
   const params = fun.parameters.map((param, index) => {
     return (index != 0 ? " " : "") + param.name + generateType(param.type);
   });
-  if (isFunctionDeclaration(fun)) result += "function ";
+  if (!isClassMethod) result += "function ";
   result += `${fun.name}(${params})${generateType(fun.returnType)} `;
-  result += fun.body ? generateBlock(fun.body, indent, true) : "";
+  result += fun.body
+    ? generateBlock(fun.body, indent, (lastCode: Code, indent: number) => {
+        if (isStatement(lastCode)) return generateStatement(lastCode, indent + 1);
+        else if (isExpression(lastCode)) return generateExpression(lastCode, indent + 1);
+        else return "";
+      })
+    : "";
   return result;
 }
 

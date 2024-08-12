@@ -10,12 +10,14 @@ Statement:
   | TypeDeclaration
   | VariableDeclaration
   | FunctionDeclaration
-  | Class
+  | ClassDeclaration
   | DoStatement
   | ForStatement
   | WhileStatement
   | ThrowStatement
-  | CatchStatement;
+  | CatchStatement
+  | Continue
+  | Break;
 
 // Type Declarations
 TypeDeclaration:
@@ -26,14 +28,12 @@ TypeDeclaration:
 // 하지만 이 방식은 어떻게 해도 names에 name들이 위치하기 때문에 cross-reference가 되지 않는다.
 // 다중 대입문의 변수들은 이것의 AstNode상의 위치가 VariableDeclaration의 자식 노드가 되기 때문에
 // 일반적인 Scope 규칙으로 보면 VariableDeclaration의 외부에서는 접근할 수 없는 것이다.
-VariableKind returns string: 'val' | 'var';
 VariableDeclaration:
-  kind=VariableKind Ids (':' type=Type)? ('=' value=Expression)?;
+  kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=Type)? ('=' value=Expression)?;
   // kind=VariableKind name=Id (':' type=Type)? ('=' value=Expression)?;
-fragment Ids: names+=Id (',' names+=Id)*;
 
 // Function Declarations and Definitions
-FunctionDeclaration: 'def' FunSigniture;
+FunctionDeclaration infers Method: 'def' FunSigniture;
 fragment FunSigniture:
   name=Id '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
 fragment Parameters:
@@ -48,10 +48,12 @@ Block:
 //   display(msg: string = "hello")
 //   message
 // }
-Class: 'class' name=Id ('extends' superClass=[Class:Id])? '{' members+=ClassMember* '}';
-ClassMember: MethodMember | FieldMember;
-MethodMember: FunSigniture;
-FieldMember: Variable;
+ClassDeclaration infers Class:
+  'class' name=Id
+  ('extends' superClass=[Class:Id])?
+  '{' members+=(Field | Method)* '}';
+Field: Variable;
+Method: FunSigniture;
 
 // Do Loop
 DoStatement:
@@ -83,6 +85,9 @@ CatchStatement:
   ('catch' '{' cases+=(CaseClause | Bypass)+ '}')?
   ('finally' finally=Expression)?;
 
+Continue: dummy?='continue';
+Break: dummy?='break';
+
 // Bypass & Comment
 Bypass: (bypass=BYPASS | comment=ML_COMMENT | comment=SL_COMMENT);
 terminal BYPASS     returns string: /%%[\s\S]*?%%/;
@@ -100,12 +105,11 @@ terminal SL_COMMENT returns string: /\/\/[^\n\r]*/;
 // 그래서 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다. 
 fragment Variable: name=Id (':' type=Type)? ('=' value=Expression)?;
 
-type NamedElement = VariableDeclaration
-  | FunctionDeclaration
-  | TypeDeclaration
+type NamedElement = TypeDeclaration
+  | VariableDeclaration
   | Class
-  | MethodMember
-  | FieldMember
+  | Field
+  | Method
   | Parameter
   | Binding;
 
@@ -122,7 +126,7 @@ LambdaType:
 ArrayType: type=Id '[' ']';
 TupleType: '[' items+=Type (',' items+=Type)* ']';
 ObjectType: '{' ids+=TypedId (',' ids+=TypedId)* '}';
-UserDefType: Class | TypeDeclaration;
+UserDefType: ClassDeclaration | TypeDeclaration;
 
 // Expressions
 // Expressions:
@@ -140,7 +144,8 @@ Expression:
   | AnonymousCall
   | ArrayLiteral
   | ObjectLiteral
-  | InfixExpr;
+  | InfixExpr
+  | ReturnExpr;
 
 SimpleExpression infers Expression:
   UnaryExpression
@@ -165,11 +170,9 @@ Group:
 // There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
 // The syntax of these literals is in each case as in Java.
 Literal:
-  // value?='true' | 'false'
   value=BooleanLiteral
   | value=NumberLiteral
   | value=StringLiteral
-  // | value=CharLiteral
   | 'null';
 
 // 이것을 cross-reference로 처리하면 MemberCall과 마찬가지로 전역적으로 사용하는 각종 함수들
@@ -272,6 +275,9 @@ ObjectBinding: name=Id (':' value=Expression)?;
 
 InfixExpr:
   e1=Id name=Id e2=Literal;
+
+ReturnExpr:
+  'return' (value=Expression)?;
 
 // Parentheses
 // terminal Paren: '(' | ')' | '[' | ']' | '{' | '}';
