@@ -13,7 +13,7 @@ c = (1 + 2) * 3 % 2 ** 3;
 interface BasicInfo {name: string, parts: string[]}
 const car: BasicInfo = {
   name: 'car',
-  parts: ['engine','wheel','body'],
+  parts: ['engine', 'wheel', 'body'],
 };
 const obj: {name: string, age: number} = {
   name: "samuel",
@@ -48,9 +48,9 @@ const lambda5 = (arg: number): number => {
   return arg;
 };
 // array and tuple type
-const array: string[] = ['a','b','c'];
+const array: string[] = ['a', 'b', 'c'];
+const tuple: [string, number, boolean] = ['Hello', 42, true];
 const s1 = array[a + b] + array[1];
-const tuple: [string, number, boolean] = ['Hello',42,true];
 /*
   Class
 */

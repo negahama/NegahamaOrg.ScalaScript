@@ -87,10 +87,7 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
     if (stmt.kind == "val") result += "const ";
     // 단일 대입문인 경우
     // result += generateVariable(stmt.name, stmt.type, stmt.value, indent) + ";";
-    stmt.names.forEach((name, idx) => {
-      result += (idx != 0 ? ", " : "") + generateVariable(name, stmt.type, stmt.value, indent);
-    });
-    result += ";";
+    result += stmt.names.map((name) => generateVariable(name, stmt.type, stmt.value, indent)).join(", ") + ";";
   } else if (isMethod(stmt)) {
     result += generateFunction(stmt, indent);
   } else if (isClass(stmt)) {
@@ -157,11 +154,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
       result += expr.element ? expr.element : "";
     }
     if (expr.explicitCall) {
-      result += "(";
-      expr.args.forEach((arg, index) => {
-        result += (index != 0 ? ", " : "") + generateExpression(arg, indent);
-      });
-      result += ")";
+      result += "(" + expr.args.map((arg) => generateExpression(arg, indent)).join(", ") + ")";
     }
   } else if (isFeatureCall(expr)) {
     // cross-reference인 경우
@@ -169,11 +162,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
     // else result += expr.element ? expr.element.$refText : "";
     result += expr.element ? expr.element : "";
     if (expr.explicitCall) {
-      result += "(";
-      expr.args.forEach((arg, index) => {
-        result += (index != 0 ? ", " : "") + generateExpression(arg, indent);
-      });
-      result += ")";
+      result += "(" + expr.args.map((arg) => generateExpression(arg, indent)).join(", ") + ")";
     }
   } else if (isUnaryExpression(expr)) {
     let op = "";
@@ -235,7 +224,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
         }
         result +=
           generateBlock(mc.body, indent + 1, (lastCode, indent) => {
-            if (isStatement(lastCode)) return generateStatement(lastCode, indent); // + "break;";
+            if (isStatement(lastCode)) return generateStatement(lastCode, indent);
             else if (isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
             else return "";
           }) + "\n";
@@ -243,28 +232,19 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
     });
     result += applyIndent(indent, "}");
   } else if (isAnonymousCall(expr)) {
-    result += "(";
-    expr.bindings.forEach((bind, idx) => {
-      result += (idx != 0 ? ", " : "") + bind.name + generateType(bind.type);
+    result += "(" + expr.bindings.map((bind) => bind.name + generateType(bind.type)).join(", ");
+    result += ")" + generateType(expr.returnType) + " => ";
+    result += generateBlock(expr.body, indent, (lastCode: Code, indent: number) => {
+      if (isStatement(lastCode)) return generateStatement(lastCode, indent);
+      else if (isExpression(lastCode)) return generateExpression(lastCode, indent);
+      else return "";
     });
-    result += ")" + generateType(expr.returnType);
-    result +=
-      " => " +
-      generateBlock(expr.body, indent, (lastCode: Code, indent: number) => {
-        if (isStatement(lastCode)) return generateStatement(lastCode, indent);
-        else if (isExpression(lastCode)) return generateExpression(lastCode, indent);
-        else return "";
-      });
   } else if (isLiteral(expr)) {
     result += expr.value;
   } else if (isGroup(expr)) {
     result += "(" + generateExpression(expr.value, indent) + ")";
   } else if (isArrayLiteral(expr)) {
-    result += "[";
-    result += expr.items.map((item) => {
-      return item.value;
-    });
-    result += "]";
+    result += "[" + expr.items.map((item) => item.value).join(", ") + "]";
   } else if (isObjectLiteral(expr)) {
     result += "{\n";
     expr.items.forEach((item) => {
@@ -275,7 +255,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
     });
     result += "}";
   } else if (isArrayExpr(expr)) {
-    result += expr.name + `[${generateExpression(expr.index, indent)}]`;
+    result += `${expr.name}[${generateExpression(expr.index, indent)}]`;
   } else if (isInfixExpr(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
   } else if (isReturnExpr(expr)) {
@@ -317,36 +297,22 @@ function generateBlock(
     else return "";
   };
 
-  let result = "";
-  if (body.expression) {
-    // block이 단일 expression이면 해당 expression을 대상으로 doItForLastCode를 수행한다.
-    // 이때 match는 expression이지만 TypeScript의 switch로 변환될때는 statement이므로 이를 고려해야 한다.
-    result += "{\n";
+  // 단일 expression으로 되어져 있어도 괄호로 둘러싸인 형태로 변환된다.
+  // 괄호 내부의 모든 코드는 indent가 하나 증가되어진 상태로 처리되어야 한다.
+  let result = "{\n";
+  body.codes.forEach((code, index) => {
     let element = "";
-    if (isMatchExpression(body.expression)) {
-      element += generateExpression(body.expression, indent + 1);
+    if (index == body.codes.length - 1) {
+      if (doItForLastCode == undefined) element += defaultDoIt(code, indent + 1);
+      else element += doItForLastCode(code, indent + 1);
     } else {
-      if (doItForLastCode == undefined) element += defaultDoIt(body.expression, indent + 1);
-      else element += doItForLastCode(body.expression, indent + 1);
+      if (isStatement(code)) element += generateStatement(code, indent + 1);
+      else if (isExpression(code)) element += generateExpression(code, indent + 1);
+      else console.log("ERROR in Block:", code);
     }
-    result += applyIndent(indent + 1, element);
-    result += "\n" + applyIndent(indent, "}");
-  } else {
-    result += "{\n";
-    body.codes.forEach((code, index) => {
-      let element = "";
-      if (index == body.codes.length - 1) {
-        if (doItForLastCode == undefined) element += defaultDoIt(code, indent + 1);
-        else element += doItForLastCode(code, indent + 1);
-      } else {
-        if (isStatement(code)) element += generateStatement(code, indent + 1);
-        else if (isExpression(code)) element += generateExpression(code, indent + 1);
-        else console.log("ERROR in Block:", code);
-      }
-      result += applyIndent(indent + 1, element + "\n");
-    });
-    result += applyIndent(indent, "}");
-  }
+    result += applyIndent(indent + 1, element + "\n");
+  });
+  result += applyIndent(indent, "}");
   return result;
 }
 
@@ -355,16 +321,16 @@ function generateVariable(name: string, type: Type | undefined, value: Expressio
 }
 
 function generateFunction(fun: Method, indent: number, isClassMethod: boolean = false): string {
+  const params = fun.parameters.map((param) => param.name + generateType(param.type)).join(", ");
   let result = "";
-  const params = fun.parameters.map((param, index) => {
-    return (index != 0 ? " " : "") + param.name + generateType(param.type);
-  });
   if (!isClassMethod) result += "function ";
   result += `${fun.name}(${params})${generateType(fun.returnType)} `;
+  // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
+  // 그래서 익명 함수가 받는 indent는 +1되어진 것이다.
   result += fun.body
     ? generateBlock(fun.body, indent, (lastCode: Code, indent: number) => {
-        if (isStatement(lastCode)) return generateStatement(lastCode, indent + 1);
-        else if (isExpression(lastCode)) return generateExpression(lastCode, indent + 1);
+        if (isStatement(lastCode)) return generateStatement(lastCode, indent);
+        else if (isExpression(lastCode)) return generateExpression(lastCode, indent);
         else return "";
       })
     : "";
@@ -389,27 +355,19 @@ function generateType(type: Type | undefined, includeColon: boolean = true): str
 
   let result = "";
   if (type == undefined) return result;
+  result += includeColon ? ": " : "";
   if (isLambdaType(type)) {
-    result += (includeColon ? ": " : "") + "(";
-    type.args.forEach((arg, idx) => {
-      result += (idx != 0 ? ", " : "") + arg.name + ": " + typeonly(arg.type);
-    });
-    result += ")" + (type.returnType ? ` => ${typeonly(type.returnType)}` : "");
+    const list = type.args.map((arg) => arg.name + ": " + typeonly(arg.type)).join(", ");
+    result += `(${list})` + (type.returnType ? ` => ${typeonly(type.returnType)}` : "");
   } else if (isArrayType(type)) {
-    result += (includeColon ? ": " : "") + type.type + "[]";
+    result += type.type + "[]";
   } else if (isTupleType(type)) {
-    result += (includeColon ? ": " : "") + "[";
-    type.items.forEach((item, idx) => {
-      result += (idx != 0 ? ", " : "") + typeonly(item);
-    });
-    result += "]";
+    const list = type.types.map((t) => typeonly(t)).join(", ");
+    result += `[${list}]`;
   } else if (isObjectType(type)) {
-    result += (includeColon ? ": " : "") + "{";
-    type.ids.forEach((id, idx) => {
-      result += (idx != 0 ? ", " : "") + id.name + ": " + typeonly(id.type);
-    });
-    result += "}";
-  } else result += ": " + typeonly(type);
+    const list = type.elements.map((e) => e.name + ": " + typeonly(e.type)).join(", ");
+    result += `{${list}}`;
+  } else result += typeonly(type);
   return result;
 }
 

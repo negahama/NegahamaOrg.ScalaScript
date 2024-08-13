@@ -40,7 +40,7 @@ fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
 Parameter: Variable;
 Block:
-  ('{' codes+=Code* '}') | expression=Expression;
+  ('{' codes+=Code* '}') | codes+=Expression;
 
 // Class Declarations
 // 아래 규칙은 MethodMember의 파라메터로 초기값을 가질 수 있고 FieldMember로 타입이 없을 수도 있다.
@@ -121,11 +121,11 @@ Type:
   | ObjectType
   | primitive=("string" | "number" | "boolean" | "void") (isArray?='[]')?
   | reference=[UserDefType:Id] (isArray?='[]')?;
-LambdaType:
-  '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
-ArrayType: type=Id '[' ']';
-TupleType: '[' items+=Type (',' items+=Type)* ']';
-ObjectType: '{' ids+=TypedId (',' ids+=TypedId)* '}';
+
+LambdaType : '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
+ArrayType  : type=Id '[' ']';
+TupleType  : '[' types+=Type (',' types+=Type)* ']';
+ObjectType : '{' elements+=TypedId (',' elements+=TypedId)* '}';
 UserDefType: ClassDeclaration | TypeDeclaration;
 
 // Expressions
