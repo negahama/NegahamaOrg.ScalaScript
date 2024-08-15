@@ -32,7 +32,7 @@ import {
   isField,
   isMethod,
   Method,
-  isFeatureCall,
+  // isFeatureCall,
   isArrayType,
   isTupleType,
   isObjectType,
@@ -149,18 +149,10 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
   } else if (isMemberCall(expr)) {
     if (expr.previous) {
       result += generateExpression(expr.previous, indent);
-      result += expr.element ? "." + expr.element : "";
+      result += expr.element ? "." + expr.element.$refText : "";
     } else {
-      result += expr.element ? expr.element : "";
+      result += expr.element ? expr.element.$refText : "";
     }
-    if (expr.explicitCall) {
-      result += "(" + expr.args.map((arg) => generateExpression(arg, indent)).join(", ") + ")";
-    }
-  } else if (isFeatureCall(expr)) {
-    // cross-reference인 경우
-    // if (expr.this) result += expr.this;
-    // else result += expr.element ? expr.element.$refText : "";
-    result += expr.element ? expr.element : "";
     if (expr.explicitCall) {
       result += "(" + expr.args.map((arg) => generateExpression(arg, indent)).join(", ") + ")";
     }

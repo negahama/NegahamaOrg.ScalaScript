@@ -3,6 +3,12 @@
 */
 // primitive types
 var a, b, c : number = 0xff
+class Console {
+  log() = {
+    // do nothing..
+  }
+}
+var console: Console
 val s:string = "abc" .. 'def' + 's'
 a = b = c = 0b11 + 0o11 + 0x11 + 11.1 + 1.1e+1
 c = (1 + 2) * 3 % 2 ** 3
@@ -58,7 +64,7 @@ class Person {
   gender: number
   age: number
   display() = {
-    console.log(this.name, this.gender, this.age)
+    //todo console.log(this.name, this.gender, this.age)
   }
   sum(a: number, b: number): number = {
     return a + b
@@ -84,9 +90,9 @@ def sum(a: number, b: number): number = {
 val oncePerSecond = (callback: (p:string) => void): void => {
 //def oncePerSecond(callback: (p: string) => void): void = {
   while (true) { callback('1초 지남!') /*Thread sleep 1000*/ }
-  setTimeout(() => {
-    callback('1초 지남!')
-  }, 1000)
+  // setTimeout(() => {
+  //   callback('1초 지남!')
+  // }, 1000)
 }
 
 val timeFlies = (msg: string) => {
@@ -101,8 +107,8 @@ val timeFlies = (msg: string) => {
 /*
   함수 호출
 */
-s.startsWith("\r\n")
-var list2 = s.concat("2" + 'def').trim().split(",")
+//todo s.startsWith("\r\n")
+//todo var list2 = s.concat("2" + 'def').trim().split(",")
 //var list = if s.startsWith("* ") then s.trim() else s
 
 /*
@@ -133,8 +139,8 @@ for (a <- 1 to 10; b <- 1 to 10; c <-  1 to 10) {
 
 if not a console log 'a is not true'
 for (a <- array; b <- array) { console.log(a, b) }
-while a < array.length and sum(a, b) == 2 b += 1
-do console.log(a) while a < array.length and sum(a, b) == 2
+//todo while a < array.length and sum(a, b) == 2 b += 1
+//todo do console.log(a) while a < array.length and sum(a, b) == 2
 do {
   console.log(a)
   a += 1
@@ -145,12 +151,13 @@ do {
 */
 def generateBypassElement(bypass: string[]): string = {
   var result = ""
-  bypass.forEach(s:string => {
-    // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
-    var ns = s
-    if (s.startsWith("\r\n")) ns = ns.slice(2)
-    ns = ns.trimEnd()
-    result += ns
-  })
+  //todo
+  // bypass.forEach(s:string => {
+  //   // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
+  //   var ns = s
+  //   if (s.startsWith("\r\n")) ns = ns.slice(2)
+  //   ns = ns.trimEnd()
+  //   result += ns
+  // })
   return result
 }

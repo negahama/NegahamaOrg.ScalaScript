@@ -5,7 +5,15 @@
   자료형 및 선언과 정의, 다중 대입
 */
 // primitive types
-let a: number = 255, b: number = 255, c: number = 255;
+let a: number = 255;
+let b: number = 255;
+let c: number = 255;
+class Console {
+  log() {
+    // do nothing..
+  }
+}
+let console: Console;
 const s: string = "abc" + 'def' + 's';
 a = b = c = 3 + 9 + 17 + 11.1 + 11;
 c = (1 + 2) * 3 % 2 ** 3;
@@ -86,9 +94,9 @@ const oncePerSecond = (callback: (p: string) => void): void => {
     callback('1초 지남!')
     /*Thread sleep 1000*/
   }
-  setTimeout(() => {
-    callback('1초 지남!')
-  }, 1000)
+  // setTimeout(() => {
+  //   callback('1초 지남!')
+  // }, 1000)
 };
 const timeFlies = (msg: string) => {
   //def timeFlies(msg: string): void = {

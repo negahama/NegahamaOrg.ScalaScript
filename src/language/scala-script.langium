@@ -30,7 +30,6 @@ TypeDeclaration:
 // 일반적인 Scope 규칙으로 보면 VariableDeclaration의 외부에서는 접근할 수 없는 것이다.
 VariableDeclaration:
   kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=Type)? ('=' value=Expression)?;
-  // kind=VariableKind name=Id (':' type=Type)? ('=' value=Expression)?;
 
 // Function Declarations and Definitions
 FunctionDeclaration infers Method: 'def' FunSigniture;
@@ -180,11 +179,8 @@ Literal:
 // this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
 // this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
 // 프로퍼티 이름이 this로 설정되어져 있는데 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
-FeatureCall: // infers Expression: {infer MemberCall}
-	(element=Id | element='this' | element='super')
-	// (element=[NamedElement:Id] | this='this' | this='super')
-	// (element=[NamedElement:Id] | element=[NamedElement:'this'] | element=[NamedElement:'super'])
-  // Optional function call after referencing an element
+FeatureCall infers Expression: {infer MemberCall}
+	(element=[NamedElement:Id] | this='this' | this='super')
   (explicitCall?='(' Arguments? ')')?;
 
 LogicalNot infers UnaryExpression:
@@ -226,7 +222,7 @@ Exponentiation infers Expression:
 // 이렇게 되면 각종 라이브러리들의 모든 메서드들이 등록되어져야 하므로 현재로는 무리다.
 MemberCall infers Expression:
   SimpleExpression ({infer MemberCall.previous=current} 
-    ( (explicitCall?='(' Arguments? ')') | "." element=Id (explicitCall?='(' Arguments? ')')? )
+    ( (explicitCall?='(' Arguments? ')') | "." element=[NamedElement:Id] (explicitCall?='(' Arguments? ')')? )
   )*;
 fragment Arguments:
   args+=Expression (',' args+=Expression)*;
