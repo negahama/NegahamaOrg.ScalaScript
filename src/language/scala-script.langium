@@ -81,17 +81,15 @@ ThrowStatement:
 // Try Statement
 CatchStatement:
   'try' body=Block
-  ('catch' '{' cases+=(CaseClause | Bypass)+ '}')?
+  ('catch' '{' cases+=CaseClause+ '}')?
   ('finally' finally=Expression)?;
 
 Continue: dummy?='continue';
 Break: dummy?='break';
 
 // Bypass & Comment
-Bypass: (bypass=BYPASS | comment=ML_COMMENT | comment=SL_COMMENT);
-terminal BYPASS     returns string: /%%[\s\S]*?%%/;
-terminal ML_COMMENT returns string: /\/\*[\s\S]*?\*\//;
-terminal SL_COMMENT returns string: /\/\/[^\n\r]*/;
+Bypass: bypass=BYPASS;
+terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
 
 // 모든 변수는 다음의 규칙을 가지고 있다.
 // 이름 : 타입 = 값
@@ -246,7 +244,7 @@ IfElseExpression:
 
 // Match expression
 MatchExpression:
-  name=Id 'match' '{' cases+=(CaseClause | Bypass)+ '}';
+  name=Id 'match' '{' cases+=CaseClause+ '}';
 
 CaseClause:
   'case' pattern=(CaseDefalut | CasePattern) '=>' body=Block;
@@ -352,3 +350,5 @@ TypedId: name=Id ':' type=Type;
 
 // Whitespace and Comments
 hidden terminal WS: /\s+/;
+hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
+hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;

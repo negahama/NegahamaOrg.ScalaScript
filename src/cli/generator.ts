@@ -261,19 +261,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
 function generateBypass(bypass: Bypass): string {
   let result = "";
   if (bypass.bypass) {
-    bypass.bypass
-      .split("%%")
-      .filter((s) => s != "")
-      .forEach((s) => {
-        // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
-        let ns = s;
-        if (s.startsWith("\r\n")) ns = ns.slice(2);
-        ns = ns.trimEnd();
-        result += ns;
-      });
-  }
-  if (bypass.comment) {
-    result += bypass.comment;
+    return bypass.bypass.replaceAll("%%\r\n", "").replaceAll("\r\n%%", "").replaceAll("%%//", "").replaceAll("%%", "");
   }
   return result;
 }

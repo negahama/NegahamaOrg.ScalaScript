@@ -5,9 +5,7 @@
   자료형 및 선언과 정의, 다중 대입
 */
 // primitive types
-let a: number = 255;
-let b: number = 255;
-let c: number = 255;
+let a: number = 255, b: number = 255, c: number = 255;
 class Console {
   log() {
     // do nothing..
@@ -67,7 +65,7 @@ class Person {
   gender: number;
   age: number;
   display() {
-    console.log(this.name, this.gender, this.age)
+    //todo console.log(this.name, this.gender, this.age)
   }
   sum(a: number, b: number): number {
     return a + b;
@@ -108,8 +106,8 @@ const timeFlies = (msg: string) => {
 /*
   함수 호출
 */
-s.startsWith("\r\n")
-let list2 = s.concat("2" + 'def').trim().split(",");
+//todo s.startsWith("\r\n")
+//todo var list2 = s.concat("2" + 'def').trim().split(",")
 //var list = if s.startsWith("* ") then s.trim() else s
 /*
   조건문, 반복문 관련
@@ -171,12 +169,8 @@ for (const a of array) {
     console.log(a, b)
   }
 }
-while (a < array.length && sum(a, b) == 2) {
-  b += 1;
-}
-do {
-  console.log(a)
-} while (a < array.length && sum(a, b) == 2)
+//todo while a < array.length and sum(a, b) == 2 b += 1
+//todo do console.log(a) while a < array.length and sum(a, b) == 2
 do {
   console.log(a)
   a += 1;
@@ -186,14 +180,14 @@ do {
 */
 function generateBypassElement(bypass: string[]): string {
   let result = "";
-  bypass.forEach((s: string) => {
-    // %%의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
-    let ns = s;
-    if (s.startsWith("\r\n")) {
-      ns = ns.slice(2);
-    }
-    ns = ns.trimEnd();
-    result += ns;
-  })
-  return result;
+  //todo
+    // bypass.forEach(s:string => {
+  //   // 의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
+  //   var ns = s
+  //   if (s.startsWith("\r\n")) ns = ns.slice(2)
+  //   ns = ns.trimEnd()
+  //   result += ns
+  // })
+  //return result
+  
 }
