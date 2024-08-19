@@ -189,6 +189,22 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
     }
     result += `${generateExpression(expr.left, indent)} ${op} ${generateExpression(expr.right, indent)}`;
   } else if (isIfExpression(expr)) {
+    // 삼항 연산자 처리
+    if (
+      expr.then != undefined &&
+      expr.then.codes.length == 1 &&
+      isExpression(expr.then.codes[0]) &&
+      expr.else != undefined &&
+      expr.else.codes.length == 1 &&
+      isExpression(expr.else.codes[0]) &&
+      (expr.elif == undefined || expr.elif.length == 0)
+    ) {
+      result += `${generateCondition(expr.condition)} ? `;
+      result += generateExpression(expr.then.codes[0], indent) + " : ";
+      result += generateExpression(expr.else.codes[0], indent);
+      return result;
+    }
+
     result += "if " + generateCondition(expr.condition) + " ";
     if (expr.then) {
       result += generateBlock(expr.then, indent);

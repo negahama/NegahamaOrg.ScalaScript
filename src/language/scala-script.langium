@@ -34,7 +34,7 @@ VariableDeclaration:
 // Function Declarations and Definitions
 FunctionDeclaration infers Method: 'def' FunSigniture;
 fragment FunSigniture:
-  name=Id '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
+  (extension=Type '.')? name=Id '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
 fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
 Parameter: Variable;
@@ -87,7 +87,7 @@ CatchStatement:
 Continue: dummy?='continue';
 Break: dummy?='break';
 
-// Bypass & Comment
+// Bypass
 Bypass: bypass=BYPASS;
 terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
 
@@ -107,6 +107,7 @@ type NamedElement = TypeDeclaration
   | Class
   | Field
   | Method
+  | Iterator
   | Parameter
   | Binding;
 
@@ -179,7 +180,8 @@ Literal:
 // 프로퍼티 이름이 this로 설정되어져 있는데 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 FeatureCall infers Expression: {infer MemberCall}
 	(element=[NamedElement:Id] | this='this' | this='super')
-  (explicitCall?='(' Arguments? ')')?;
+  // (explicitCall?='(' Arguments? ')')?;
+  (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
 
 LogicalNot infers UnaryExpression:
   operator=('not' | '!') value=Expression;
@@ -218,9 +220,12 @@ Exponentiation infers Expression:
 //
 // element=Id 대신 element=[NamedElement:Id]를 사용해야 하는데
 // 이렇게 되면 각종 라이브러리들의 모든 메서드들이 등록되어져야 하므로 현재로는 무리다.
+// Arguments를 사용하는 버전은 함수 체이닝시 함수의 인수가 있으면 AST node has no document 에러를 유발한다.
 MemberCall infers Expression:
   SimpleExpression ({infer MemberCall.previous=current} 
-    ( (explicitCall?='(' Arguments? ')') | "." element=[NamedElement:Id] (explicitCall?='(' Arguments? ')')? )
+    // ( (explicitCall?='(' Arguments? ')') | "." element=[NamedElement:Id] (explicitCall?='(' Arguments? ')')? )
+    // "." element=[NamedElement:Id] (explicitCall?='(' Arguments? ')')?
+    "." element=[NamedElement:Id] (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?
   )*;
 fragment Arguments:
   args+=Expression (',' args+=Expression)*;

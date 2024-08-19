@@ -1,30 +1,26 @@
 // This is transpiled by ScalaScript
 "use strict";
 
-class Console {
-  log() {
-    // do nothing
-  }
+function concat(arg: string): string {
+  return "";
 }
-const console1: Console;
-const console2 = Console();
-console1.log()
-console2.log()
-class A {
-  b: B;
+function startsWith(arg: string): string {
+  return "";
 }
-class B {
-  c: string;
+function split(arg: string): string {
+  return "";
 }
-const a = A;
-const s = a.b.c;
-let a1 = 0, b1 = 0;
-a1 = 1;
-class Person {
-  name: string = 'no name';
-  gender: number;
-  age: number;
-  display() {
-    console1.log(name, gender, .age)
-  }
+function slice(arg: number): string {
+  return "";
 }
+function trim(): string {
+  return "";
+}
+/*
+  함수 호출
+*/
+let s: string = "this is sample";
+let list2 = s.concat("2" + 'def').trim().split(",");
+/*
+  주석은 그대로 변환되어야 한다.
+*/

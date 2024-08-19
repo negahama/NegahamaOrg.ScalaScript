@@ -1,20 +1,23 @@
 // This is transpiled by ScalaScript
 "use strict";
 
+class Console {
+  log() 
+}
+let console: Console;
 /*
   자료형 및 선언과 정의, 다중 대입
 */
-// primitive types
+// 다중 선언
 let a: number = 255, b: number = 255, c: number = 255;
-class Console {
-  log() {
-    // do nothing..
-  }
-}
-let console: Console;
-const s: string = "abc" + 'def' + 's';
+// 다중 대입
 a = b = c = 3 + 9 + 17 + 11.1 + 11;
+// 각종 산술 연산자
 c = (1 + 2) * 3 % 2 ** 3;
+// 문자열 접합 연산자
+const s: string = "abc" + 'def' + 's';
+// 삼항 연산자
+let gender = (a == 1) ? 'male' : 'female';
 // object type
 interface BasicInfo {name: string, parts: string[]}
 const car: BasicInfo = {
@@ -25,6 +28,60 @@ const obj: {name: string, age: number} = {
   name: "samuel",
   age: 50,
 };
+// array and tuple type
+const array: string[] = ['a', 'b', 'c'];
+const tuple: [string, number, boolean] = ['Hello', 42, true];
+const s1 = array[a + b] + array[1];
+/*
+  Class
+*/
+class Person {
+  name: string = 'no name';
+  gender: number;
+  age: number;
+  display() {
+    //todo console.log(this.name, this.gender, this.age)
+  }
+}
+class Student extends Person {
+  grade: number;
+  registerClass(what: Class) {
+    console.log("register class", what)
+  }
+}
+class Class {
+  name: string;
+}
+let person: Person;
+person = new Person()
+person.display()
+/*
+  함수 정의
+*/
+function factorial(N: number): number {
+  let sum: number = 0;
+    for (let d = 1; d <= N; d++) {
+    sum += d;
+  }
+  return sum;
+}
+const oncePerSecond = (callback: (p: string) => void): void => {
+  //def oncePerSecond(callback: (p: string) => void): void = {
+  while (true) {
+    callback('1초 지남!')
+    /*Thread sleep 1000*/
+  }
+  // setTimeout(() => {
+  //   callback('1초 지남!')
+  // }, 1000)
+};
+const timeFlies = (msg: string) => {
+  //def timeFlies(msg: string): void = {
+  console.log("time flies like an arrow... ", msg)
+};
+//def main(args: Array[String]): Unit = {
+//  oncePerSecond(timeFlies)
+//}
 // function types and anonymous function call
 // 스칼라는 인수의 이름을 명시할 필요없이 인수의 타입만 열거해서 표현한다.
 // 인수가 하나이면 괄호를 생략할 수 있고 인수가 없으면 빈 괄호로 표현한다.
@@ -53,65 +110,12 @@ const lambda4 = (arg: number) => {
 const lambda5 = (arg: number): number => {
   return arg;
 };
-// array and tuple type
-const array: string[] = ['a', 'b', 'c'];
-const tuple: [string, number, boolean] = ['Hello', 42, true];
-const s1 = array[a + b] + array[1];
 /*
-  Class
+  조건문
 */
-class Person {
-  name: string = 'no name';
-  gender: number;
-  age: number;
-  display() {
-    //todo console.log(this.name, this.gender, this.age)
-  }
-  sum(a: number, b: number): number {
-    return a + b;
-  }
+if (! a) {
+  console.log('a is not true')
 }
-class Student extends Person {
-  grade: number;
-  registerClass(what: Class) {
-    console.log("register class", what)
-  }
-}
-class Class {
-  name: string;
-}
-/*
-  함수 정의
-*/
-function sum(a: number, b: number): number {
-  return a + b;
-}
-const oncePerSecond = (callback: (p: string) => void): void => {
-  //def oncePerSecond(callback: (p: string) => void): void = {
-  while (true) {
-    callback('1초 지남!')
-    /*Thread sleep 1000*/
-  }
-  // setTimeout(() => {
-  //   callback('1초 지남!')
-  // }, 1000)
-};
-const timeFlies = (msg: string) => {
-  //def timeFlies(msg: string): void = {
-  console.log("time flies like an arrow... ", msg)
-};
-//def main(args: Array[String]): Unit = {
-//  oncePerSecond(timeFlies)
-//}
-/*
-  함수 호출
-*/
-//todo s.startsWith("\r\n")
-//todo var list2 = s.concat("2" + 'def').trim().split(",")
-//var list = if s.startsWith("* ") then s.trim() else s
-/*
-  조건문, 반복문 관련
-*/
 function matchTest(x: number): string {
   switch (x) {
     case 1: {
@@ -125,6 +129,20 @@ function matchTest(x: number): string {
     }
   }
 }
+/*
+  반복문 관련
+*/
+for (const a of array) {
+  for (const b of array) {
+    console.log(a, b)
+  }
+}
+//todo while a < array.length and sum(a, b) == 2 b += 1
+//todo do console.log(a) while a < array.length and sum(a, b) == 2
+do {
+  console.log(a)
+  a += 1;
+} while (a <= 10)
 for (let a = 1; a <= 10; a++) {
   for (let b = 1; b <= 10; b++) {
     for (let c = 1; c <= 10; c++) {
@@ -160,34 +178,4 @@ for (let a = 1; a <= 10; a++) {
       }
     }
   }
-}
-if (! a) {
-  console.log('a is not true')
-}
-for (const a of array) {
-  for (const b of array) {
-    console.log(a, b)
-  }
-}
-//todo while a < array.length and sum(a, b) == 2 b += 1
-//todo do console.log(a) while a < array.length and sum(a, b) == 2
-do {
-  console.log(a)
-  a += 1;
-} while (a <= 10)
-/*
-  주석은 그대로 변환되어야 한다.
-*/
-function generateBypassElement(bypass: string[]): string {
-  let result = "";
-  //todo
-    // bypass.forEach(s:string => {
-  //   // 의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
-  //   var ns = s
-  //   if (s.startsWith("\r\n")) ns = ns.slice(2)
-  //   ns = ns.trimEnd()
-  //   result += ns
-  // })
-  //return result
-  
 }

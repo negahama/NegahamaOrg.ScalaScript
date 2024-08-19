@@ -1,19 +1,25 @@
+class Console { log() }
+var console: Console
+
 %%
 /*
   자료형 및 선언과 정의, 다중 대입
 */
 %%
-%%//// primitive types
+%%//// 다중 선언
 var a, b, c : number = 0xff
-class Console {
-  log() = {
-    %%//// do nothing..
-  }
-}
-var console: Console
-val s:string = "abc" .. 'def' + 's'
+
+%%//// 다중 대입
 a = b = c = 0b11 + 0o11 + 0x11 + 11.1 + 1.1e+1
+
+%%//// 각종 산술 연산자
 c = (1 + 2) * 3 % 2 ** 3
+
+%%//// 문자열 접합 연산자
+val s:string = "abc" .. 'def' + 's'
+
+%%//// 삼항 연산자
+var gender = if a == 1 then 'male' else 'female'
 
 %%//// object type
 type BasicInfo = { name: string, parts: string[] }
@@ -32,6 +38,65 @@ val obj: {
   name: "samuel",
   age: 50
 }
+
+%%//// array and tuple type
+val array: string[] = ['a', 'b', 'c']
+val tuple: [string, number, boolean] = ['Hello', 42, true]
+val s1 = array[a+b] + array[1]
+
+%%/*
+  Class
+*/%%
+class Person {
+  name: string = 'no name'
+  gender: number
+  age: number
+  display() = {
+    %%////todo console.log(this.name, this.gender, this.age)
+  }
+}
+class Student extends Person {
+  grade: number
+  registerClass(what:Class) = {
+    console.log("register class", what)
+  }
+}
+class Class {
+  name: string
+}
+
+var person: Person
+%%//person = new Person()
+person.display()
+
+%%/*
+  함수 정의
+*/%%
+def factorial(N: number): number = {
+  var sum: number = 0
+  for (d <- 1 to N) {
+    sum += d
+  }
+  return sum
+}
+
+val oncePerSecond = (callback: (p:string) => void): void => {
+%%////def oncePerSecond(callback: (p: string) => void): void = {
+  while (true) { callback('1초 지남!')
+  %%/*Thread sleep 1000*/%% }
+  %%//// setTimeout(() => {
+  %%////   callback('1초 지남!')
+  %%//// }, 1000)
+}
+
+val timeFlies = (msg: string) => {
+%%////def timeFlies(msg: string): void = {
+  console.log("time flies like an arrow... ", msg)
+}
+
+%%////def main(args: Array[String]): Unit = {
+%%////  oncePerSecond(timeFlies)
+%%////}
 
 %%//// function types and anonymous function call
 %%//// 스칼라는 인수의 이름을 명시할 필요없이 인수의 타입만 열거해서 표현한다.
@@ -53,75 +118,28 @@ val lambda3 = arg: number => return arg
 val lambda4 = (arg: number) => return arg
 val lambda5 = (arg: number): number => return arg
 
-%%//// array and tuple type
-val array: string[] = ['a', 'b', 'c']
-val tuple: [string, number, boolean] = ['Hello', 42, true]
-val s1 = array[a+b] + array[1]
-
 %%/*
-  Class
+  조건문
 */%%
-class Person {
-  name: string = 'no name'
-  gender: number
-  age: number
-  display() = {
-    %%////todo console.log(this.name, this.gender, this.age)
-  }
-  sum(a: number, b: number): number = {
-    return a + b
-  }
-}
-class Student extends Person {
-  grade: number
-  registerClass(what:Class) = {
-    console.log("register class", what)
-  }
-}
-class Class {
-  name: string
-}
+if not a console log 'a is not true'
 
-%%/*
-  함수 정의
-*/%%
-def sum(a: number, b: number): number = {
-  return a + b
-}
-
-val oncePerSecond = (callback: (p:string) => void): void => {
-%%////def oncePerSecond(callback: (p: string) => void): void = {
-  while (true) { callback('1초 지남!')
-  %%/*Thread sleep 1000*/%% }
-  %%//// setTimeout(() => {
-  %%////   callback('1초 지남!')
-  %%//// }, 1000)
-}
-
-val timeFlies = (msg: string) => {
-%%////def timeFlies(msg: string): void = {
-  console.log("time flies like an arrow... ", msg)
-}
-
-%%////def main(args: Array[String]): Unit = {
-%%////  oncePerSecond(timeFlies)
-%%////}
-
-%%/*
-  함수 호출
-*/%%
-%%////todo s.startsWith("\r\n")
-%%////todo var list2 = s.concat("2" + 'def').trim().split(",")
-%%////var list = if s.startsWith("* ") then s.trim() else s
-
-%%/*
-  조건문, 반복문 관련
-*/%%
 def matchTest(x: number): string = x match {
   case 1 => return "one"
   case 2 => return "two"
   case _ => return "other"
 }
+
+%%/*
+  반복문 관련
+*/%%
+for (a <- array; b <- array) { console.log(a, b) }
+%%////todo while a < array.length and sum(a, b) == 2 b += 1
+%%////todo do console.log(a) while a < array.length and sum(a, b) == 2
+do {
+  console.log(a)
+  a += 1
+} while (a <= 10)
+
 for (a <- 1 to 10; b <- 1 to 10; c <-  1 to 10) {
   console.log(a)
   if a == b
@@ -138,31 +156,4 @@ for (a <- 1 to 10; b <- 1 to 10; c <-  1 to 10) {
       case _ => "other"
     }
   }
-}
-
-if not a console log 'a is not true'
-for (a <- array; b <- array) { console.log(a, b) }
-%%////todo while a < array.length and sum(a, b) == 2 b += 1
-%%////todo do console.log(a) while a < array.length and sum(a, b) == 2
-do {
-  console.log(a)
-  a += 1
-} while (a <= 10)
-
-%%/*
-  주석은 그대로 변환되어야 한다.
-*/%%
-def generateBypassElement(bypass: string[]): string = {
-  var result = ""
-  %%////todo
-  %%
-  // bypass.forEach(s:string => {
-  //   // 의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
-  //   var ns = s
-  //   if (s.startsWith("\r\n")) ns = ns.slice(2)
-  //   ns = ns.trimEnd()
-  //   result += ns
-  // })
-  //return result
-  %%
 }
