@@ -1,21 +1,6 @@
 // This is transpiled by ScalaScript
 "use strict";
 
-function concat(arg: string): string {
-  return "";
-}
-function startsWith(arg: string): string {
-  return "";
-}
-function split(arg: string): string {
-  return "";
-}
-function slice(arg: number): string {
-  return "";
-}
-function trim(): string {
-  return "";
-}
 /*
   함수 호출
 */

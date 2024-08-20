@@ -1,5 +1,5 @@
-class Console { log() }
-var console: Console
+@NotTrans class Console { log() }
+@NotTrans var console: Console
 
 %%
 /*
@@ -16,7 +16,7 @@ a = b = c = 0b11 + 0o11 + 0x11 + 11.1 + 1.1e+1
 c = (1 + 2) * 3 % 2 ** 3
 
 %%//// 문자열 접합 연산자
-val s:string = "abc" .. 'def' + 's'
+val ts:string = "abc" .. 'def' + 's'
 
 %%//// 삼항 연산자
 var gender = if a == 1 then 'male' else 'female'

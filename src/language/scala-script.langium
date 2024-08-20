@@ -29,10 +29,13 @@ TypeDeclaration:
 // 다중 대입문의 변수들은 이것의 AstNode상의 위치가 VariableDeclaration의 자식 노드가 되기 때문에
 // 일반적인 Scope 규칙으로 보면 VariableDeclaration의 외부에서는 접근할 수 없는 것이다.
 VariableDeclaration:
-  kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=Type)? ('=' value=Expression)?;
+  (Annotation)? kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=Type)? ('=' value=Expression)?;
+fragment Annotation:
+  '@' annotate=Id;
 
 // Function Declarations and Definitions
-FunctionDeclaration infers Method: 'def' FunSigniture;
+FunctionDeclaration infers Method:
+  (Annotation)? 'def' FunSigniture;
 fragment FunSigniture:
   (extension=Type '.')? name=Id '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
 fragment Parameters:
@@ -48,7 +51,7 @@ Block:
 //   message
 // }
 ClassDeclaration infers Class:
-  'class' name=Id
+  (Annotation)? 'class' name=Id
   ('extends' superClass=[Class:Id])?
   '{' members+=(Field | Method)* '}';
 Field: Variable;

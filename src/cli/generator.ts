@@ -83,6 +83,7 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
   if (isTypeDeclaration(stmt)) {
     result += `interface ${stmt.name} ${generateType(stmt.value, false)}`;
   } else if (isVariableDeclaration(stmt)) {
+    if (stmt.annotate == "NotTrans") return result;
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
     // 단일 대입문인 경우
@@ -91,6 +92,7 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
   } else if (isMethod(stmt)) {
     result += generateFunction(stmt, indent);
   } else if (isClass(stmt)) {
+    if (stmt.annotate == "NotTrans") return result;
     result += `class ${stmt.name} `;
     result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
     stmt.members.forEach((m) => {
@@ -319,6 +321,7 @@ function generateVariable(name: string, type: Type | undefined, value: Expressio
 function generateFunction(fun: Method, indent: number, isClassMethod: boolean = false): string {
   const params = fun.parameters.map((param) => param.name + generateType(param.type)).join(", ");
   let result = "";
+  if (fun.annotate == "NotTrans") return result;
   if (!isClassMethod) result += "function ";
   result += `${fun.name}(${params})${generateType(fun.returnType)} `;
   // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.

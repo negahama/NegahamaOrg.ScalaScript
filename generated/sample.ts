@@ -1,10 +1,6 @@
 // This is transpiled by ScalaScript
 "use strict";
 
-class Console {
-  log() 
-}
-let console: Console;
 /*
   자료형 및 선언과 정의, 다중 대입
 */
@@ -15,7 +11,7 @@ a = b = c = 3 + 9 + 17 + 11.1 + 11;
 // 각종 산술 연산자
 c = (1 + 2) * 3 % 2 ** 3;
 // 문자열 접합 연산자
-const s: string = "abc" + 'def' + 's';
+const ts: string = "abc" + 'def' + 's';
 // 삼항 연산자
 let gender = (a == 1) ? 'male' : 'female';
 // object type

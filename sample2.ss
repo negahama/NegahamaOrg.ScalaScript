@@ -32,11 +32,11 @@
 //   b = 1
 // }
 
-def string.concat(arg: string): string = { return "" }
-def string.startsWith(arg: string): string = { return "" }
-def string.split(arg: string): string = { return "" }
-def string.slice(arg: number): string = { return "" }
-def string.trim(): string = { return "" }
+@NotTrans def string.concat(arg: string): string
+@NotTrans def string.startsWith(arg: string): string
+@NotTrans def string.split(arg: string): string
+@NotTrans def string.slice(arg: number): string
+@NotTrans def string.trim(): string
 
 %%/*
   함수 호출
