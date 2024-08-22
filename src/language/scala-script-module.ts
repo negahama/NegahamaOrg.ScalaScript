@@ -1,4 +1,4 @@
-import { type Module, inject } from "langium";
+import { DeepPartial, type Module, inject } from "langium";
 import {
   createDefaultModule,
   createDefaultSharedModule,
@@ -8,8 +8,9 @@ import {
   type PartialLangiumServices,
 } from "langium/lsp";
 import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "./generated/module.js";
-import { ScalaScriptValidator, registerValidationChecks } from "./scala-script-validator.js";
 import { ScalaScriptScopeProvider, ScalaScriptScopeComputation } from "./scala-script-scope.js";
+import { ScalaScriptValidator, registerValidationChecks } from "./scala-script-validator.js";
+import { ScalaScriptWorkspaceManager } from "./scala-script-workspace.js";
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -25,6 +26,16 @@ export type ScalaScriptAddedServices = {
  * of custom service classes.
  */
 export type ScalaScriptServices = LangiumServices & ScalaScriptAddedServices;
+
+/**
+ *
+ */
+export type ScalaScriptSharedServices = LangiumSharedServices;
+export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPartial<ScalaScriptSharedServices>> = {
+  workspace: {
+    WorkspaceManager: (services) => new ScalaScriptWorkspaceManager(services),
+  },
+};
 
 /**
  * Dependency injection module that overrides Langium default services and contributes the
@@ -60,7 +71,7 @@ export function createScalaScriptServices(context: DefaultSharedModuleContext): 
   shared: LangiumSharedServices;
   ScalaScript: ScalaScriptServices;
 } {
-  const shared = inject(createDefaultSharedModule(context), ScalaScriptGeneratedSharedModule);
+  const shared = inject(createDefaultSharedModule(context), ScalaScriptGeneratedSharedModule, ScalaScriptSharedModule);
   const ScalaScript = inject(createDefaultModule({ shared }), ScalaScriptGeneratedModule, ScalaScriptModule);
   shared.ServiceRegistry.register(ScalaScript);
   registerValidationChecks(ScalaScript);

@@ -32,8 +32,6 @@ import {
   isField,
   isMethod,
   Method,
-  // isFeatureCall,
-  isArrayType,
   isTupleType,
   isObjectType,
   isObjectLiteral,
@@ -358,8 +356,6 @@ function generateType(type: Type | undefined, includeColon: boolean = true): str
   if (isLambdaType(type)) {
     const list = type.args.map((arg) => arg.name + ": " + typeonly(arg.type)).join(", ");
     result += `(${list})` + (type.returnType ? ` => ${typeonly(type.returnType)}` : "");
-  } else if (isArrayType(type)) {
-    result += type.type + "[]";
   } else if (isTupleType(type)) {
     const list = type.types.map((t) => typeonly(t)).join(", ");
     result += `[${list}]`;

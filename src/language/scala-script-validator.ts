@@ -1,5 +1,11 @@
-import type { ValidationChecks } from "langium";
-import type { ScalaScriptAstType } from "./generated/ast.js";
+import { type ValidationAcceptor, type ValidationChecks } from "langium";
+import {
+  // isLiteral,
+  // isMemberCall,
+  VariableDeclaration,
+  type Assignment,
+  type ScalaScriptAstType,
+} from "./generated/ast.js";
 import type { ScalaScriptServices } from "./scala-script-module.js";
 
 /**
@@ -9,7 +15,8 @@ export function registerValidationChecks(services: ScalaScriptServices) {
   const registry = services.validation.ValidationRegistry;
   const validator = services.validation.ScalaScriptValidator;
   const checks: ValidationChecks<ScalaScriptAstType> = {
-    // Person: validator.checkPersonStartsWithCapital,
+    VariableDeclaration: validator.checkVariableDeclaration,
+    Assignment: validator.checkAssignment,
   };
   registry.register(checks, validator);
 }
@@ -18,12 +25,42 @@ export function registerValidationChecks(services: ScalaScriptServices) {
  * Implementation of custom validations.
  */
 export class ScalaScriptValidator {
-  // checkPersonStartsWithCapital(person: Person, accept: ValidationAcceptor): void {
-  //   if (person.name) {
-  //     const firstChar = person.name.substring(0, 1);
-  //     if (firstChar.toUpperCase() !== firstChar) {
-  //       accept("warning", "Person name should start with a capital.", { node: person, property: "name" });
-  //     }
-  //   }
-  // }
+  checkVariableDeclaration(expr: VariableDeclaration, accept: ValidationAcceptor): void {
+    // console.log("checkVariableDeclaration");
+    // const text = AstUtils.getDocument(expr).parseResult.value.$cstNode?.text;
+    // // const text = (AstUtils.getDocument(expr).parseResult.value.$cstNode as RootCstNode).fullText;
+    // console.log(text);
+    // const thenKeyword = GrammarUtils.findNodeForKeyword(expr.$cstNode, "=");
+    // if (thenKeyword) {
+    //   console.log("find =");
+    //   // const index = thenKeyword.offset;
+    //   // const previousChar = text.charAt(index - 1);
+    //   // if (previousChar !== ' ') {
+    //   //   acceptor('error', ...);
+    //   // }
+    // }
+    // console.log("expr.names:", expr.names);
+    // console.log("expr.type:", expr.type);
+    // if (expr.type == undefined) {
+    //   if (isLiteral(expr.value)) {
+    //     console.log("expr.value:", expr.value.$type, expr.value.value, typeof expr.value.value);
+    //     //accept("error", "Person name should start with a capital.", { node: expr, property: "value" });
+    //   }
+    // }
+  }
+
+  checkAssignment(expr: Assignment, accept: ValidationAcceptor): void {
+    // console.log("checkAssignment");
+    // const left = expr.assign;
+    // if (isMemberCall(left)) {
+    //   //const element = left.element?.ref
+    //   console.log("left:", left.element?.$refText, left.$type, left.$container);
+    // }
+    // const right = expr.value;
+    // if (isLiteral(right)) {
+    //   console.log(right.$container.$type);
+    //   console.log("    right.value:", right.value, right.$type, typeof right.value);
+    //   accept("warning", "Person name should start with a capital.", { node: expr, property: "value" });
+    // }
+  }
 }

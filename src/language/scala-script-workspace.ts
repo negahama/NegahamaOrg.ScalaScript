@@ -1,37 +1,14 @@
-// def fn(param: number): number
-// fn().c
+import {
+  AstNode,
+  DefaultWorkspaceManager,
+  LangiumDocument,
+  LangiumDocumentFactory,
+  LangiumSharedCoreServices,
+} from "langium";
+import { WorkspaceFolder } from "vscode-languageserver";
+import { URI } from "vscode-uri";
 
-// class Console {
-//   log() = {
-//     // do nothing
-//   }
-// }
-// val console1: Console
-// val console2 = Console()
-
-// console1.log()
-// console2.log()
-
-
-// class A {
-//   b: B
-//   getB(param: string): B = {
-//     %%//return this.b
-//   }
-// }
-// class B {
-//   c: string
-// }
-// var a: A
-// %%//a = new A
-// val s1 = a.b.c
-// val s2 = a.getB("dummy").c
-
-// def fun(a: number) = {
-//   var b = 0
-//   b = 1
-// }
-
+const ScalaScriptBuiltinLibrary = `
 @NotTrans def string.charAt(index: number): string
 @NotTrans def string.charCodeAt(index: number): number
 @NotTrans def string.codePointAt(pos: number): number
@@ -63,54 +40,24 @@
 @NotTrans def string.trimStart(): string
 @NotTrans def string.trimEnd(): string
 @NotTrans def string.valueOf(): string
+`.trim();
 
-%%/*
-  함수 호출
-*/%%
-var s: string = "this is sample"
-var list2 = s.concat("2" + 'def').trim().split(",")
+export class ScalaScriptWorkspaceManager extends DefaultWorkspaceManager {
+  private documentFactory: LangiumDocumentFactory;
 
-%%/*
-  주석은 그대로 변환되어야 한다.
-*/%%
-// @NotTrans class Console { log(arg: string): void = {} }
-// @NotTrans var console: Console
+  constructor(services: LangiumSharedCoreServices) {
+    super(services);
+    this.documentFactory = services.workspace.LangiumDocumentFactory;
+  }
 
-// def main() = {
-//   hanoi(3, "a", "b", "c")
-//   var ary: string[] = ['a', 'b', 'c']
-//   concatenate(ary)
-// }
-
-// def hanoi(n: number, from: string, to1: string, mid: string): void = {
-//   def move(from: string, to1: string) = {
-//     console.log(`${from} ${to1}`)
-//   }
-
-//   if (n == 1)
-//   then move(from, to1)
-//   else {
-//     hanoi(n - 1, from, mid, to1)
-//     move(from, to1)
-//     hanoi(n - 1, mid, to1, from)
-//   }
-// }
-
-// def concatenate(ary: string[]): string = {
-//   var result = ""
-//   for (e <- ary)
-//     result += e
-//   return result
-// }
-
-// def generateBypassElement(bypass: string[]): string = {
-//   var result = ""
-//   // bypass.forEach(s:String => {
-//     // 의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
-//     var ns: string1 = s
-//     // if (s.startsWith("\r\n")) ns = ns.slice(2)
-//     ns = ns.trim()
-//     result += ns
-//   // })
-//   return result
-// }
+  protected override async loadAdditionalDocuments(
+    folders: WorkspaceFolder[],
+    collector: (document: LangiumDocument<AstNode>) => void
+  ): Promise<void> {
+    console.log("before loadAdditionalDocuments", folders);
+    await super.loadAdditionalDocuments(folders, collector);
+    console.log("after loadAdditionalDocuments");
+    // Load our library using the `builtin` URI schema
+    collector(this.documentFactory.fromString(ScalaScriptBuiltinLibrary, URI.parse("builtin:///library.hello")));
+  }
+}

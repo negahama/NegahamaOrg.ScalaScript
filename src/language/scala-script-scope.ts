@@ -17,7 +17,6 @@ import {
 } from "langium";
 import {
   Class,
-  isArrayType,
   isClass,
   isField,
   isMemberCall,
@@ -301,8 +300,6 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       }
     } else if (isLambdaType(node)) {
       return { $type: "lambda" };
-    } else if (isArrayType(node)) {
-      return { $type: "array" };
     } else if (isTupleType(node)) {
       return { $type: "tuple" };
     } else if (isObjectType(node)) {
@@ -391,6 +388,17 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
    * e.g. by increasing the visibility to a higher level in the AST.
    */
   override processNode(node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes): void {
+    const defaultProcess = (node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes) => {
+      const container = node.$container;
+      if (container) {
+        const name = this.nameProvider.getName(node);
+        console.log("  node:", node.$type, name);
+        if (name) {
+          scopes.add(container, this.descriptions.createDescription(node, name, document));
+        }
+      }
+    };
+
     const container = node.$container;
     if (container) {
       if (isVariableDeclaration(node)) {
@@ -403,13 +411,11 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
         if (node.extension?.primitive) {
           console.log("extension function:", node.extension.primitive, node.name);
           extensionFunctions.push({ type: node.extension.primitive, name: node.name, node: node });
+        } else {
+          defaultProcess(node, document, scopes);
         }
       } else {
-        const name = this.nameProvider.getName(node);
-        console.log("  node:", node.$type, name);
-        if (name) {
-          scopes.add(container, this.descriptions.createDescription(node, name, document));
-        }
+        defaultProcess(node, document, scopes);
       }
     }
   }

@@ -25,9 +25,11 @@ TypeDeclaration:
 
 // Value and Variable Declarations and Definitions
 // 다중 대입문을 지원하기 위해서 아래와 같이 되어져 있다.
-// 하지만 이 방식은 어떻게 해도 names에 name들이 위치하기 때문에 cross-reference가 되지 않는다.
-// 다중 대입문의 변수들은 이것의 AstNode상의 위치가 VariableDeclaration의 자식 노드가 되기 때문에
-// 일반적인 Scope 규칙으로 보면 VariableDeclaration의 외부에서는 접근할 수 없는 것이다.
+// 하지만 이 방식은 어떻게 해도 Langium의 default 처리로는 cross-reference가 처리되지 않는다.
+// 이를 처리하기 위해서 DefaultScopeComputation의 processNode()를 override해서
+// 새로운 AstNodeDescription을 precomputedScope에 추가해 준다.
+// FunctionDeclaration과 Class의 Method가 동일한 것처럼
+// VariableDeclaration과 Class의 Field는 동일하지만 다중 대입문 때문에 이건 따로 취급한다.
 VariableDeclaration:
   (Annotation)? kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=Type)? ('=' value=Expression)?;
 fragment Annotation:
@@ -117,17 +119,16 @@ type NamedElement = TypeDeclaration
 // Type
 Type:
   LambdaType
-  | ArrayType
   | TupleType
   | ObjectType
   | primitive=("string" | "number" | "boolean" | "void") (isArray?='[]')?
   | reference=[UserDefType:Id] (isArray?='[]')?;
 
 LambdaType : '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
-ArrayType  : type=Id '[' ']';
-TupleType  : '[' types+=Type (',' types+=Type)* ']';
-ObjectType : '{' elements+=TypedId (',' elements+=TypedId)* '}';
-UserDefType: ClassDeclaration | TypeDeclaration;
+TupleType  : '[' types+=Type (',' types+=Type)* ']' (isArray?='[]')?;
+ObjectType : '{' elements+=TypedId (',' elements+=TypedId)* '}' (isArray?='[]')?;
+
+type UserDefType = Class | TypeDeclaration;
 
 // Expressions
 // Expressions:
@@ -176,15 +177,31 @@ Literal:
   | value=StringLiteral
   | 'null';
 
-// 이것을 cross-reference로 처리하면 MemberCall과 마찬가지로 전역적으로 사용하는 각종 함수들
-// 예를들면 console.log의 console이 정의되지 않아 중간에 에러가 된다. 그래도 억지로 할 순 있는데 그 경우에도...
+// 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
+// ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은
+// 예를들면 console.log의 console은 정의되지 않았기 때문에 에러가 된다. 그래서 타입스크립트의 라이브러리를
+// 사용할때는 cross-reference를 처리하기 위해 다음과 같은 추가적인 코드가 필요하다.
+// 1) Console.log 의 경우
+// @NotTrans class Console { log(arg: string): void = {} }
+// @NotTrans var console: Console
+// 2) 문자열 관련 함수들의 경우
+// @NotTrans def string.repeat(count: number): string
+// @NotTrans def string.replace(searchFor: string, replaceWith: string): string
+// @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
+// 
 // this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
 // this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
-// 프로퍼티 이름이 this로 설정되어져 있는데 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
+// 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
+// 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
+//
+// (explicitCall?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 args+=Expression ... 과 동일할 것 같은데
+// 실제로는 Arguments는 타입은 존재하진 않아도 args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해
+// 함수의 인수가 있는 경우 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고  
 FeatureCall infers Expression: {infer MemberCall}
 	(element=[NamedElement:Id] | this='this' | this='super')
-  // (explicitCall?='(' Arguments? ')')?;
   (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
+// fragment Arguments:
+//   args+=Expression (',' args+=Expression)*;
 
 LogicalNot infers UnaryExpression:
   operator=('not' | '!') value=Expression;
@@ -194,10 +211,8 @@ LogicalNot infers UnaryExpression:
 //   Logical ({infer BinaryExpression.left=current} operator=('=') right=Logical)*;
 // Assignment를 위와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.
 // 우선 대입 연산의 순서가 왼쪽에서 오른쪽으로 가기 때문에 a = b = 0 은 a = b가 먼저 처리된다.
-// 또 다른 문제는 이 좌결합성 때문에 다중 대입에서 세미콜론을 제대로 표시할 수 없다.
-// 아래와 같이 하는데 a.b = 0와 같은 것이 처리되기 위해서는 assign으로 QualifiedName가 와야한다.
-// 현재는 cross-reference가 처리되지 않기 때문에 [NamedElement:QualifiedName]를 사용할 수 없다.
-// 하지만 원래 같은 의미인 MemberCall이 현재 상호참조를 하고 있지 않기 때문에 이걸 사용한다.
+// 또 다른 문제는 이 좌결합성 때문에 다중 대입문에서 세미콜론을 제대로 표시할 수 없다.
+// 따라서 assignment는 따로 정의되며 좌변에 MemberCall을 사용해 a.b = 0를 처리한다.
 Assignment:
   assign=MemberCall operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
@@ -220,18 +235,10 @@ Exponentiation infers Expression:
 // 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수도 있다.
 // 즉 다음과 같은 것들을 파싱할 수 있다. ()안에는 인수들이 있을 수도 있다.
 // a, a(), a.b, a().b, a.b(), a().b(), ... 
-//
-// element=Id 대신 element=[NamedElement:Id]를 사용해야 하는데
-// 이렇게 되면 각종 라이브러리들의 모든 메서드들이 등록되어져야 하므로 현재로는 무리다.
-// Arguments를 사용하는 버전은 함수 체이닝시 함수의 인수가 있으면 AST node has no document 에러를 유발한다.
 MemberCall infers Expression:
   SimpleExpression ({infer MemberCall.previous=current} 
-    // ( (explicitCall?='(' Arguments? ')') | "." element=[NamedElement:Id] (explicitCall?='(' Arguments? ')')? )
-    // "." element=[NamedElement:Id] (explicitCall?='(' Arguments? ')')?
-    "." element=[NamedElement:Id] (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?
+  "." element=[NamedElement:Id] (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?
   )*;
-fragment Arguments:
-  args+=Expression (',' args+=Expression)*;
 
 // Conditional Expressions
 // ConditionClause는 if, while, do-while등에서 사용되는데 single expression 이면 괄호를 생략할 수 있다.
@@ -351,9 +358,6 @@ terminal ID: /[_a-zA-Z][\w_]*/;
 
 // Identifiers
 terminal Id returns string: ID;
-// QualifiedName returns string:
-//   Id (('.'|'::') Id)*
-//   | '`' StringLiteral '`';
 TypedId: name=Id ':' type=Type;
 
 // Whitespace and Comments
