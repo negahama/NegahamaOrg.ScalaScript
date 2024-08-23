@@ -62,7 +62,7 @@ function factorial(N: number): number {
   return sum;
 }
 const oncePerSecond = (callback: (p: string) => void): void => {
-  //def oncePerSecond(callback: (p: string) => void): void = {
+  //def oncePerSecond(callback: (p: string) -> void) -> void => {
   while (true) {
     callback('1초 지남!')
     /*Thread sleep 1000*/
@@ -75,7 +75,7 @@ const timeFlies = (msg: string) => {
   //def timeFlies(msg: string): void = {
   console.log("time flies like an arrow... ", msg)
 };
-//def main(args: Array[String]): Unit = {
+//def main(args: Array[String]) -> Unit => {
 //  oncePerSecond(timeFlies)
 //}
 // function types and anonymous function call

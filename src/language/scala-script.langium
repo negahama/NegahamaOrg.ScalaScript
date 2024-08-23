@@ -40,15 +40,15 @@ fragment Annotation:
 FunctionDeclaration infers Method:
   (Annotation)? 'def' (extension=Type '.')? FunSigniture;
 fragment FunSigniture:
-  name=Id '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
+  name=Id '(' Parameters? ')' ('->' returnType=Type)? ('=>' body=Block)?;
 fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
 Parameter: VarSigniture;
 Block:
   ('{' codes+=Code* '}') | codes+=Expression;
 
-LambdaType: '(' Bindings? ')' '=>' returnType=Type;
-LambdaCall: ('(' Bindings? ')' (':' returnType=Type)? | bindings+=Binding) '=>' body=Block;
+LambdaType: '(' Bindings? ')' '->' returnType=Type;
+LambdaCall: ('(' Bindings? ')' ('->' returnType=Type)? | bindings+=Binding) '=>' body=Block;
 fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
 Binding: name=Id (':' type=Type)?;
 
