@@ -27,7 +27,7 @@ const obj: {name: string, age: number} = {
 // array and tuple type
 const array: string[] = ['a', 'b', 'c'];
 const tuple: [string, number, boolean] = ['Hello', 42, true];
-const s1 = array[a + b] + array[1];
+const s1 = array[(a + b) - 1] + array[(1) - 1];
 /*
   Class
 */

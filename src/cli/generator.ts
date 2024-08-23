@@ -3,7 +3,7 @@ import {
   Bypass,
   Code,
   Expression,
-  isAnonymousCall,
+  isLambdaCall,
   isArrayExpr,
   isArrayLiteral,
   isAssignment,
@@ -20,10 +20,10 @@ import {
   isInfixExpr,
   isLiteral,
   isMatchExpression,
-  isMemberCall,
+  isMethodCall,
   isStatement,
   isUnaryExpression,
-  isVariableDeclaration,
+  isVariable,
   isWhileStatement,
   Statement,
   Type,
@@ -80,7 +80,7 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
   if (stmt == undefined) return result;
   if (isTypeDeclaration(stmt)) {
     result += `interface ${stmt.name} ${generateType(stmt.value, false)}`;
-  } else if (isVariableDeclaration(stmt)) {
+  } else if (isVariable(stmt)) {
     if (stmt.annotate == "NotTrans") return result;
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
@@ -146,7 +146,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
     const name = generateExpression(expr.assign, indent);
     result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`;
     result += isAssignment(expr.value) ? "" : ";";
-  } else if (isMemberCall(expr)) {
+  } else if (isMethodCall(expr)) {
     if (expr.previous) {
       result += generateExpression(expr.previous, indent);
       result += expr.element ? "." + expr.element.$refText : "";
@@ -239,7 +239,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
       }
     });
     result += applyIndent(indent, "}");
-  } else if (isAnonymousCall(expr)) {
+  } else if (isLambdaCall(expr)) {
     result += "(" + expr.bindings.map((bind) => bind.name + generateType(bind.type)).join(", ");
     result += ")" + generateType(expr.returnType) + " => ";
     result += generateBlock(expr.body, indent, (lastCode: Code, indent: number) => {
@@ -263,7 +263,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
     });
     result += "}";
   } else if (isArrayExpr(expr)) {
-    result += `${expr.name}[${generateExpression(expr.index, indent)}]`;
+    result += `${expr.name}[(${generateExpression(expr.index, indent)}) - 1]`;
   } else if (isInfixExpr(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
   } else if (isReturnExpr(expr)) {
@@ -354,7 +354,7 @@ function generateType(type: Type | undefined, includeColon: boolean = true): str
   if (type == undefined) return result;
   result += includeColon ? ": " : "";
   if (isLambdaType(type)) {
-    const list = type.args.map((arg) => arg.name + ": " + typeonly(arg.type)).join(", ");
+    const list = type.bindings.map((bind) => bind.name + ": " + typeonly(bind.type)).join(", ");
     result += `(${list})` + (type.returnType ? ` => ${typeonly(type.returnType)}` : "");
   } else if (isTupleType(type)) {
     const list = type.types.map((t) => typeonly(t)).join(", ");

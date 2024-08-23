@@ -19,15 +19,15 @@ import {
   Class,
   isClass,
   isField,
-  isMemberCall,
+  isMethodCall,
   isMethod,
   isType,
   isLambdaType,
   isObjectType,
   isTupleType,
   isTypeDeclaration,
-  isVariableDeclaration,
-  MemberCall,
+  isVariable,
+  MethodCall,
   ObjectType,
   Type,
   Method,
@@ -119,22 +119,22 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       //     return EMPTY_SCOPE;
       //   }
       // }
-      const memberCall = context.container as MemberCall;
-      if (memberCall.args == undefined) {
-        console.log("    memberCall.args is undefined");
+      const methodCall = context.container as MethodCall;
+      if (methodCall.args == undefined) {
+        console.log("    MethodCall.args is undefined");
       }
 
-      const previous = memberCall.previous;
+      const previous = methodCall.previous;
       if (!previous) {
-        console.log("    previous is null");
+        console.log("    MethodCall.previous is undefined");
         const scope = super.getScope(context);
         console.log(`Exit1 getScope: ${scopeId}`);
         return scope;
       }
 
-      console.log(`    previous is ${previous.$type}`);
-      // if (isMemberCall(previous)) {
-      //   console.log("    previous's this:", previous.this);
+      console.log(`    MethodCall.previous is ${previous.$type}`);
+      // if (isMethodCall(previous)) {
+      //   console.log("    MethodCall.previous is this:", previous.this);
       //   if (previous.this == "this") {
       //     const classItem = AstUtils.getContainerOfType(context.container, isClass); //previous면 안됨
       //     if (classItem) {
@@ -190,18 +190,18 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // Prevent recursive inference errors
     cache.set(node, createErrorType("Recursive definition", node));
 
-    if (isMemberCall(node)) {
-      console.log(space2 + "MemberCall name:", node.element?.$refText);
-      type = this.inferMemberCall(node, cache, indent + 1);
+    if (isMethodCall(node)) {
+      console.log(space2 + "MethodCall name:", node.element?.$refText);
+      type = this.inferMethodCall(node, cache, indent + 1);
       if (node.explicitCall) {
-        console.log(space2 + "membercall is explicitCall");
+        console.log(space2 + "Methodcall is explicitCall");
         if (type.$type == "method") {
           type = type.returnType;
-          console.log(space2 + "membercall is mehod:", type?.$type);
+          console.log(space2 + "Methodcall is mehod:", type?.$type);
         }
       }
-      console.log(space2 + "MemberCall END:", node.element?.$refText);
-    } else if (isVariableDeclaration(node)) {
+      console.log(space2 + "MethodCall END:", node.element?.$refText);
+    } else if (isVariable(node)) {
       console.log(space2 + "VariableDeclaration name:", node.names);
       if (node.type) {
         type = this.inferType(node.type, cache, indent + 1);
@@ -252,27 +252,27 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     return type;
   }
 
-  private inferMemberCall(node: MemberCall, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const inferMemberCallId = node.element?.$refText;
+  private inferMethodCall(node: MethodCall, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    const inferMethodCallId = node.element?.$refText;
     const space = "    ".repeat(indent);
-    console.log(space + `Enter inferMemberCall: ${inferMemberCallId}`);
-    console.log(space + "ref 참조전:", inferMemberCallId);
+    console.log(space + `Enter inferMethodCall: ${inferMethodCallId}`);
+    console.log(space + "ref 참조전:", inferMethodCallId);
     const element = node.element?.ref;
-    console.log(space + "ref 참조후:", inferMemberCallId);
+    console.log(space + "ref 참조후:", inferMethodCallId);
     if (element) {
       return this.inferType(element, cache, indent + 1);
     } else if (node.explicitCall && node.previous) {
       const previousType = this.inferType(node.previous, cache, indent + 1);
       if (previousType.$type == "method") {
         if (previousType.returnType) {
-          console.log(space + "Exit1 inferMemberCall:", inferMemberCallId);
+          console.log(space + "Exit1 inferMethodCall:", inferMethodCallId);
           return previousType.returnType;
         }
       }
-      console.log(space + "Exit2 inferMemberCall:", inferMemberCallId);
+      console.log(space + "Exit2 inferMethodCall:", inferMethodCallId);
       return createErrorType("Cannot call operation on non-function type", node);
     }
-    console.log(space + "Exit3 inferMemberCall:", inferMemberCallId);
+    console.log(space + "Exit3 inferMethodCall:", inferMethodCallId);
     return createErrorType("Could not infer type for element " + node.element?.$refText, node);
   }
 
@@ -401,7 +401,7 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
 
     const container = node.$container;
     if (container) {
-      if (isVariableDeclaration(node)) {
+      if (isVariable(node)) {
         console.log("  node:", node.$type);
         node.names.forEach((name) => {
           console.log("    ", name);

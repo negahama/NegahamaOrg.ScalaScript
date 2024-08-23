@@ -1,11 +1,5 @@
 import { type ValidationAcceptor, type ValidationChecks } from "langium";
-import {
-  // isLiteral,
-  // isMemberCall,
-  VariableDeclaration,
-  type Assignment,
-  type ScalaScriptAstType,
-} from "./generated/ast.js";
+import { Variable, type Assignment, type ScalaScriptAstType } from "./generated/ast.js";
 import type { ScalaScriptServices } from "./scala-script-module.js";
 
 /**
@@ -15,7 +9,7 @@ export function registerValidationChecks(services: ScalaScriptServices) {
   const registry = services.validation.ValidationRegistry;
   const validator = services.validation.ScalaScriptValidator;
   const checks: ValidationChecks<ScalaScriptAstType> = {
-    VariableDeclaration: validator.checkVariableDeclaration,
+    Variable: validator.checkVariable,
     Assignment: validator.checkAssignment,
   };
   registry.register(checks, validator);
@@ -25,8 +19,8 @@ export function registerValidationChecks(services: ScalaScriptServices) {
  * Implementation of custom validations.
  */
 export class ScalaScriptValidator {
-  checkVariableDeclaration(expr: VariableDeclaration, accept: ValidationAcceptor): void {
-    // console.log("checkVariableDeclaration");
+  checkVariable(expr: Variable, accept: ValidationAcceptor): void {
+    // console.log("checkVariable");
     // const text = AstUtils.getDocument(expr).parseResult.value.$cstNode?.text;
     // // const text = (AstUtils.getDocument(expr).parseResult.value.$cstNode as RootCstNode).fullText;
     // console.log(text);
@@ -52,7 +46,7 @@ export class ScalaScriptValidator {
   checkAssignment(expr: Assignment, accept: ValidationAcceptor): void {
     // console.log("checkAssignment");
     // const left = expr.assign;
-    // if (isMemberCall(left)) {
+    // if (isMethodCall(left)) {
     //   //const element = left.element?.ref
     //   console.log("left:", left.element?.$refText, left.$type, left.$container);
     // }

@@ -30,21 +30,27 @@ TypeDeclaration:
 // 새로운 AstNodeDescription을 precomputedScope에 추가해 준다.
 // FunctionDeclaration과 Class의 Method가 동일한 것처럼
 // VariableDeclaration과 Class의 Field는 동일하지만 다중 대입문 때문에 이건 따로 취급한다.
-VariableDeclaration:
+VariableDeclaration infers Variable:
   (Annotation)? kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=Type)? ('=' value=Expression)?;
 fragment Annotation:
   '@' annotate=Id;
 
 // Function Declarations and Definitions
+// parametre는 초기값을 가질 수 있으나 argument는 그렇지 않다.
 FunctionDeclaration infers Method:
-  (Annotation)? 'def' FunSigniture;
+  (Annotation)? 'def' (extension=Type '.')? FunSigniture;
 fragment FunSigniture:
-  (extension=Type '.')? name=Id '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
+  name=Id '(' Parameters? ')' (':' returnType=Type)? ('=' body=Block)?;
 fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
-Parameter: Variable;
+Parameter: VarSigniture;
 Block:
   ('{' codes+=Code* '}') | codes+=Expression;
+
+LambdaType: '(' Bindings? ')' '=>' returnType=Type;
+LambdaCall: ('(' Bindings? ')' (':' returnType=Type)? | bindings+=Binding) '=>' body=Block;
+fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
+Binding: name=Id (':' type=Type)?;
 
 // Class Declarations
 // 아래 규칙은 MethodMember의 파라메터로 초기값을 가질 수 있고 FieldMember로 타입이 없을 수도 있다.
@@ -56,7 +62,7 @@ ClassDeclaration infers Class:
   (Annotation)? 'class' name=Id
   ('extends' superClass=[Class:Id])?
   '{' members+=(Field | Method)* '}';
-Field: Variable;
+Field: VarSigniture;
 Method: FunSigniture;
 
 // Do Loop
@@ -105,10 +111,10 @@ terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
 // var, val 은 변수를 선언하는 것이지만 엄밀하게 말하면 변수의 성격을 결정하는 것으로써
 // var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
 // 그래서 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다. 
-fragment Variable: name=Id (':' type=Type)? ('=' value=Expression)?;
+fragment VarSigniture: name=Id (':' type=Type)? ('=' value=Expression)?;
 
 type NamedElement = TypeDeclaration
-  | VariableDeclaration
+  | Variable
   | Class
   | Field
   | Method
@@ -124,7 +130,6 @@ Type:
   | primitive=("string" | "number" | "boolean" | "void") (isArray?='[]')?
   | reference=[UserDefType:Id] (isArray?='[]')?;
 
-LambdaType : '(' (args+=Binding (',' args+=Binding)*)? ')' '=>' returnType=Type;
 TupleType  : '[' types+=Type (',' types+=Type)* ']' (isArray?='[]')?;
 ObjectType : '{' elements+=TypedId (',' elements+=TypedId)* '}' (isArray?='[]')?;
 
@@ -143,7 +148,7 @@ Expression:
   | Assignment
   | IfExpression
   | MatchExpression
-  | AnonymousCall
+  | LambdaCall
   | ArrayLiteral
   | ObjectLiteral
   | InfixExpr
@@ -197,7 +202,7 @@ Literal:
 // (explicitCall?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 args+=Expression ... 과 동일할 것 같은데
 // 실제로는 Arguments는 타입은 존재하진 않아도 args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해
 // 함수의 인수가 있는 경우 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고  
-FeatureCall infers Expression: {infer MemberCall}
+FeatureCall infers Expression: {infer MethodCall}
 	(element=[NamedElement:Id] | this='this' | this='super')
   (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
 // fragment Arguments:
@@ -212,9 +217,9 @@ LogicalNot infers UnaryExpression:
 // Assignment를 위와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.
 // 우선 대입 연산의 순서가 왼쪽에서 오른쪽으로 가기 때문에 a = b = 0 은 a = b가 먼저 처리된다.
 // 또 다른 문제는 이 좌결합성 때문에 다중 대입문에서 세미콜론을 제대로 표시할 수 없다.
-// 따라서 assignment는 따로 정의되며 좌변에 MemberCall을 사용해 a.b = 0를 처리한다.
+// 따라서 assignment는 따로 정의되며 좌변에 MethodCall을 사용해 a.b = 0를 처리한다.
 Assignment:
-  assign=MemberCall operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
+  assign=MethodCall operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
 Logical infers Expression:
   Comparison     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '&&' | '||') right=Comparison)*;
@@ -229,14 +234,14 @@ Multiplication infers Expression:
   Exponentiation ({infer BinaryExpression.left=current} operator=('*' | '/' | '%') right=Exponentiation)*;
 
 Exponentiation infers Expression:
-  MemberCall     ({infer BinaryExpression.left=current} operator=('**') right=MemberCall)*;
+  MethodCall     ({infer BinaryExpression.left=current} operator=('**') right=MethodCall)*;
 
 // Member call and Chaining of Member calls
 // 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수도 있다.
 // 즉 다음과 같은 것들을 파싱할 수 있다. ()안에는 인수들이 있을 수도 있다.
 // a, a(), a.b, a().b, a.b(), a().b(), ... 
-MemberCall infers Expression:
-  SimpleExpression ({infer MemberCall.previous=current} 
+MethodCall infers Expression:
+  SimpleExpression ({infer MethodCall.previous=current} 
   "." element=[NamedElement:Id] (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?
   )*;
 
@@ -266,12 +271,6 @@ CaseClause:
 
 CaseDefalut returns string: '_';
 CasePattern: Literal;
-
-// Anonymous Functions
-AnonymousCall:
-  ('(' Bindings? ')' | bindings+=Binding) (':' returnType=Type)? '=>' body=Block;
-fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
-Binding: name=Id (':' type=Type)?;
 
 // Array literal
 ArrayLiteral:
