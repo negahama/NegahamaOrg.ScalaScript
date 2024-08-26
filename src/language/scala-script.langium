@@ -29,7 +29,7 @@ TypeDeclaration:
 // 타입이나 값을 통해서 변수의 타입을 정할 수 있어야 한다.
 // Rule 자체는 타입과 값이 모두 없을 수 있지만 둘 다 있거나 적어도 하나는 있어야 한다.
 // 타입과 값은 모두 있으면 값은 명시된 타입으로 변환되며 이 변환이 실패하면 에러가 된다.
-fragment VarSigniture: name=Id (':' type=Type)? ('=' value=Expression)?;
+fragment VarSignature: name=Id (':' type=Type)? ('=' value=Expression)?;
 
 // Value and Variable Declarations and Definitions
 // 다중 대입문을 지원하기 위해서 아래와 같이 되어져 있다.
@@ -50,12 +50,12 @@ fragment Annotation:
 // 이건 ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
 // parameter는 초기값을 가질 수 있으나 argument는 그렇지 않다.
 FunctionDeclaration infers Method:
-  (Annotation)? 'def' (extension=Type '.')? FunSigniture;
-fragment FunSigniture:
+  (Annotation)? 'def' (extension=Type '.')? FunSignature;
+fragment FunSignature:
   name=Id '(' Parameters? ')' ('->' returnType=Type)? ('=>' body=Block)?;
 fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
-Parameter: VarSigniture;
+Parameter: VarSignature;
 Block:
   ('{' codes+=Code* '}') | codes+=Expression;
 
@@ -76,8 +76,8 @@ ClassDeclaration infers Class:
   (Annotation)? 'class' name=Id
   ('extends' superClass=[Class:Id])?
   '{' members+=(Field | Method)* '}';
-Field: VarSigniture;
-Method: FunSigniture;
+Field: VarSignature;
+Method: FunSignature;
 
 // Do Loop
 DoStatement:
@@ -204,6 +204,7 @@ VoidExpression: value='void';
 // 
 // this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
 // this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
+// 설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
 // 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
 // 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 //
@@ -310,7 +311,7 @@ ReturnExpr:
 // Boolean Literals
 // It has to place before ID or Identifier
 // Otherwise `true` and `false` is identified for Indentifier
-terminal BooleanLiteral returns boolean: 'true' | 'false';
+// terminal BooleanLiteral returns boolean: 'true' | 'false';
 
 NumberLiteral returns number:
   ('-')? FloatingPointLiteral

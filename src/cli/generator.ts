@@ -151,6 +151,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
       result += generateExpression(expr.previous, indent);
       result += expr.element ? "." + expr.element.$refText : "";
     } else {
+      result += expr.this ? expr.this : "";
       result += expr.element ? expr.element.$refText : "";
     }
     if (expr.explicitCall) {

@@ -80,7 +80,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     if (context.reference.$refText === "this" || context.reference.$refText === "super") {
       const classItem = AstUtils.getContainerOfType(context.container, isClass);
       if (classItem) {
-        console.error("this or super");
+        traceLog(1, "this or super");
         return this.scopeClassMembers(classItem);
       } else {
         console.error("this or super: empty");
@@ -100,18 +100,6 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       exitLog(scopeLog.replace("Exit", "Exit1"));
       return scope;
     }
-
-    // if (isMethodCall(previous)) {
-    //   console.log("    MethodCall.previous is this:", previous.this);
-    //   if (previous.this == "this") {
-    //     const classItem = AstUtils.getContainerOfType(context.container, isClass); //previous면 안됨
-    //     if (classItem) {
-    //       return this.scopeClassMembers(classItem);
-    //     } else {
-    //       return EMPTY_SCOPE;
-    //     }
-    //   }
-    // }
 
     const prevTypeDesc = inferType(previous, new Map(), 1);
     if (isClassType(prevTypeDesc)) {
