@@ -1,109 +1,78 @@
-// @NotTrans class Console { log() }
-// @NotTrans var console: Console
+@NotTrans class Console { log() }
+@NotTrans var console: Console
 
-// class A {
-//   b: B
-//   getB(param: string): B = {
-//     %%//return this.b
-//   }
-// }
-// class B {
-//   c: string
-// }
-// var a: A
-// %%//a = new A
-// val s1 = a.b.c
-// val s2 = a.getB("dummy").c
+@NotTrans def string.charAt(index: number)-> string
+@NotTrans def string.charCodeAt(index: number)-> number
+@NotTrans def string.codePointAt(pos: number)-> number
+@NotTrans def string.concat(str: string)-> string
+@NotTrans def string.includes(searchString: string, position: number)-> boolean
+@NotTrans def string.endsWith(searchString: string, endPosition: number)-> boolean
+@NotTrans def string.indexOf(searchValue: string, fromIndex: number)-> number
+@NotTrans def string.lastIndexOf(searchValue: string, fromIndex: number)-> number
+@NotTrans def string.localeCompare(compareString: string)-> number
+//@NotTrans def string.match(regexp: string)-> string
+@NotTrans def string.matchAll(regexp: string)-> string[]
+@NotTrans def string.normalize(form: string)-> string
+@NotTrans def string.padEnd(targetLength: number, padString: string)-> string
+@NotTrans def string.padStart(targetLength: number, padString: string)-> string
+@NotTrans def string.repeat(count: number)-> string
+@NotTrans def string.replace(searchFor: string, replaceWith: string)-> string
+@NotTrans def string.replaceAll(searchFor: string, replaceWith: string)-> string
+@NotTrans def string.search(regexp: string)-> string
+@NotTrans def string.slice(beginIndex: number, endIndex: number)-> string
+@NotTrans def string.split(sep: string, limit: number)-> string[]
+@NotTrans def string.startsWith(searchString: string, position: number)-> boolean
+@NotTrans def string.substring(indexStart: number, indexEnd: number)-> string
+@NotTrans def string.toLocaleLowerCase(locale: string)-> string
+@NotTrans def string.toLocaleUpperCase(locale: string)-> string
+@NotTrans def string.toLowerCase()-> string
+@NotTrans def string.toUpperCase()-> string
+@NotTrans def string.toString()-> string
+@NotTrans def string.trim()-> string
+@NotTrans def string.trimStart()-> string
+@NotTrans def string.trimEnd()-> string
+@NotTrans def string.valueOf()-> string
 
-// def fun(a: number) = {
-//   var b = 0
-//   b = 1
-// }
+%%/*
+  함수 호출
+*/%%
+var s: string = "this is sample"
+var list2 = s.concat("2" + 'def').trim().split(",")
 
-// @NotTrans def string.charAt(index: number): string
-// @NotTrans def string.charCodeAt(index: number): number
-// @NotTrans def string.codePointAt(pos: number): number
-// @NotTrans def string.concat(str: string): string
-// @NotTrans def string.includes(searchString: string, position: number): boolean
-// @NotTrans def string.endsWith(searchString: string, length: number): boolean
-// @NotTrans def string.indexOf(searchValue: string, fromIndex: number): number
-// @NotTrans def string.lastIndexOf(searchValue: string, fromIndex: number): number
-// @NotTrans def string.localeCompare(compareString: string): number
-// //@NotTrans def string.match(regexp: string): string
-// @NotTrans def string.matchAll(regexp: string): string[]
-// @NotTrans def string.normalize(form: string): string
-// @NotTrans def string.padEnd(targetLength: number, padString: string): string
-// @NotTrans def string.padStart(targetLength: number, padString: string): string
-// @NotTrans def string.repeat(count: number): string
-// @NotTrans def string.replace(searchFor: string, replaceWith: string): string
-// @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
-// @NotTrans def string.search(regexp: string): string
-// @NotTrans def string.slice(beginIndex: number, endIndex: number): string
-// @NotTrans def string.split(sep: string, limit: number): string[]
-// @NotTrans def string.startsWith(searchString: string, length: number): boolean
-// @NotTrans def string.substring(indexStart: number, indexEnd: number): string
-// @NotTrans def string.toLocaleLowerCase(locale: string): string
-// @NotTrans def string.toLocaleUpperCase(locale: string): string
-// @NotTrans def string.toLowerCase(): string
-// @NotTrans def string.toUpperCase(): string
-// @NotTrans def string.toString(): string
-// @NotTrans def string.trim(): string
-// @NotTrans def string.trimStart(): string
-// @NotTrans def string.trimEnd(): string
-// @NotTrans def string.valueOf(): string
+%%/*
+  배열의 인덱스는 1 부터
+*/%%
+var s4 = s.includes("is", 1)
 
-// %%/*
-//   함수 호출
-// */%%
-// var s: string = "this is sample"
-// var list2 = s.concat("2" + 'def').trim().split(",")
+%%/*
+  주석은 그대로 변환되어야 한다.
+*/%%
+@NotTrans class Console { log(arg: string)-> void => {} }
+@NotTrans var console: Console
 
-// %%/*
-//   배열의 인덱스는 1 부터
-// */%%
-// var s4 = s.charAt(1) 
+def main() => {
+  hanoi(3, "a", "b", "c")
+  var ary: string[] = ['a', 'b', 'c']
+  concatenate(ary)
+}
 
-// %%/*
-//   주석은 그대로 변환되어야 한다.
-// */%%
-// @NotTrans class Console { log(arg: string): void = {} }
-// @NotTrans var console: Console
+def hanoi(n: number, from: string, to1: string, mid: string)-> void => {
+  def move(from: string, to1: string) => {
+    console.log(`${from} ${to1}`)
+  }
 
-// def main() = {
-//   hanoi(3, "a", "b", "c")
-//   var ary: string[] = ['a', 'b', 'c']
-//   concatenate(ary)
-// }
+  if (n == 1)
+  then move(from, to1)
+  else {
+    hanoi(n - 1, from, mid, to1)
+    move(from, to1)
+    hanoi(n - 1, mid, to1, from)
+  }
+}
 
-// def hanoi(n: number, from: string, to1: string, mid: string): void = {
-//   def move(from: string, to1: string) = {
-//     console.log(`${from} ${to1}`)
-//   }
-
-//   if (n == 1)
-//   then move(from, to1)
-//   else {
-//     hanoi(n - 1, from, mid, to1)
-//     move(from, to1)
-//     hanoi(n - 1, mid, to1, from)
-//   }
-// }
-
-// def concatenate(ary: string[]): string = {
-//   var result = ""
-//   for (e <- ary)
-//     result += e
-//   return result
-// }
-
-// def generateBypassElement(bypass: string[]): string = {
-//   var result = ""
-//   // bypass.forEach(s:String => {
-//     // 의 다음 줄부터 본문이 입력하기 때문에 s의 처음과 끝에 new line 문자가 존재하는데 이를 제거한다.
-//     var ns: string = s
-//     // if (s.startsWith("\r\n")) ns = ns.slice(2)
-//     ns = ns.trim()
-//     result += ns
-//   // })
-//   return result
-// }
+def concatenate(ary: string[])-> string => {
+  var result = ""
+  for (e <- ary)
+    result += e
+  return result
+}

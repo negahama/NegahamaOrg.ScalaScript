@@ -45,34 +45,9 @@ val tuple: [string, number, boolean] = ['Hello', 42, true]
 val s1 = array[a+b] + array[1]
 
 %%/*
-  Class
-*/%%
-class Person {
-  name: string = 'no name'
-  gender: number
-  age: number
-  display() => {
-    %%////todo console.log(this.name, this.gender, this.age)
-  }
-}
-class Student extends Person {
-  grade: number
-  registerClass(what:Class) => {
-    console.log("register class", what)
-  }
-}
-class Class {
-  name: string
-}
-
-var person: Person
-%%//person = new Person()
-person.display()
-
-%%/*
   함수 정의
 */%%
-def factorial(N: number) -> number => {
+def factorial(N: number)-> number => {
   var sum: number = 0
   for (d <- 1 to N) {
     sum += d
@@ -80,23 +55,12 @@ def factorial(N: number) -> number => {
   return sum
 }
 
-val oncePerSecond = (callback: (p:string) -> void) -> void => {
-%%////def oncePerSecond(callback: (p: string) -> void) -> void => {
-  while (true) { callback('1초 지남!')
-  %%/*Thread sleep 1000*/%% }
-  %%//// setTimeout(() => {
-  %%////   callback('1초 지남!')
-  %%//// }, 1000)
-}
-
-val timeFlies = (msg: string) => {
-%%////def timeFlies(msg: string): void = {
+val timeFlies1 = (msg: string)-> void => {
   console.log("time flies like an arrow... ", msg)
 }
-
-%%////def main(args: Array[String]) -> Unit => {
-%%////  oncePerSecond(timeFlies)
-%%////}
+def timeFlies2(msg: string)-> void => {
+  console.log("time flies like an arrow... ", msg)
+}
 
 %%//// function types and anonymous function call
 %%//// 스칼라는 인수의 이름을 명시할 필요없이 인수의 타입만 열거해서 표현한다.
@@ -104,8 +68,8 @@ val timeFlies = (msg: string) => {
 %%//// 반면 타입스크립트는 형식적인 인수명이 있어야 한다.
 %%//// 그리고 인수가 하나만 있는 경우라도 괄호가 반드시 필요하다.
 %%//// 스칼라스크립트는 타입스크립트와 동일하다.
-var t1: () -> number
-var t2: (arg: number) -> number
+var t1: ()-> number
+var t2: (arg: number)-> number
 
 %%//// 스칼라는 익명 함수를 표현할때 그냥 인수(또는 `_`) 하나만 달랑 쓰거나 아니면
 %%//// 인수의 타입을 명시해야 하거나 인수가 여러 개이면 괄호로 묶어야 하고
@@ -116,14 +80,14 @@ val lambda1 = () => return 1
 val lambda2 = arg => return arg
 val lambda3 = arg: number => return arg
 val lambda4 = (arg: number) => return arg
-val lambda5 = (arg: number) -> number => return arg
+val lambda5 = (arg: number)-> number => return arg
 
 %%/*
   조건문
 */%%
 if not a console log 'a is not true'
 
-def matchTest(x: number) -> string => x match {
+def matchTest(x: number)-> string => x match {
   case 1 => return "one"
   case 2 => return "two"
   case _ => return "other"
@@ -133,8 +97,6 @@ def matchTest(x: number) -> string => x match {
   반복문 관련
 */%%
 for (a <- array; b <- array) { console.log(a, b) }
-%%////todo while a < array.length and sum(a, b) == 2 b += 1
-%%////todo do console.log(a) while a < array.length and sum(a, b) == 2
 do {
   console.log(a)
   a += 1

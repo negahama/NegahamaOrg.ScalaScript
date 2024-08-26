@@ -23,20 +23,32 @@ Statement:
 TypeDeclaration:
   'type' name=Id '=' value=ObjectType;
 
+// 모든 변수는 다음의 규칙을 가지고 있다.
+// 이름 : 타입 = 값
+// 이름은 유효한 식별자이어야 한다.
+// 타입이나 값을 통해서 변수의 타입을 정할 수 있어야 한다.
+// Rule 자체는 타입과 값이 모두 없을 수 있지만 둘 다 있거나 적어도 하나는 있어야 한다.
+// 타입과 값은 모두 있으면 값은 명시된 타입으로 변환되며 이 변환이 실패하면 에러가 된다.
+fragment VarSigniture: name=Id (':' type=Type)? ('=' value=Expression)?;
+
 // Value and Variable Declarations and Definitions
 // 다중 대입문을 지원하기 위해서 아래와 같이 되어져 있다.
 // 하지만 이 방식은 어떻게 해도 Langium의 default 처리로는 cross-reference가 처리되지 않는다.
 // 이를 처리하기 위해서 DefaultScopeComputation의 processNode()를 override해서
 // 새로운 AstNodeDescription을 precomputedScope에 추가해 준다.
 // FunctionDeclaration과 Class의 Method가 동일한 것처럼
-// VariableDeclaration과 Class의 Field는 동일하지만 다중 대입문 때문에 이건 따로 취급한다.
+// VariableDeclaration과 Class의 Field는 동일하지만 다중 대입문 때문에 따로 취급한다.
+// var, val 은 변수를 선언하는 것이지만 엄밀하게 말하면 변수의 성격을 결정하는 것으로써
+// var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
 VariableDeclaration infers Variable:
   (Annotation)? kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=Type)? ('=' value=Expression)?;
 fragment Annotation:
   '@' annotate=Id;
 
 // Function Declarations and Definitions
-// parametre는 초기값을 가질 수 있으나 argument는 그렇지 않다.
+// 함수의 리턴 타입은 -> 으로 표시하고 함수의 바디는 => 으로 표시한다.
+// 이건 ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
+// parameter는 초기값을 가질 수 있으나 argument는 그렇지 않다.
 FunctionDeclaration infers Method:
   (Annotation)? 'def' (extension=Type '.')? FunSigniture;
 fragment FunSigniture:
@@ -47,6 +59,8 @@ Parameter: VarSigniture;
 Block:
   ('{' codes+=Code* '}') | codes+=Expression;
 
+// 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다.
+// 인수는 괄호를 사용해서 묶어야 하지만 인수가 하나인 경우에는 괄호없이 사용할 수도 있다.
 LambdaType: '(' Bindings? ')' '->' returnType=Type;
 LambdaCall: ('(' Bindings? ')' ('->' returnType=Type)? | bindings+=Binding) '=>' body=Block;
 fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
@@ -101,17 +115,6 @@ Break: dummy?='break';
 // Bypass
 Bypass: bypass=BYPASS;
 terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
-
-// 모든 변수는 다음의 규칙을 가지고 있다.
-// 이름 : 타입 = 값
-// 이름은 유효한 식별자이어야 한다.
-// 타입이나 값을 통해서 변수의 타입을 정할 수 있어야 한다.
-// 즉 타입이나 값 둘다 있거나 적어도 하나는 있어야만 된다.
-// 타입과 값은 모두 있으면 값은 명시된 타입으로 변환되며 이 변환이 실패하면 에러가 된다.
-// var, val 은 변수를 선언하는 것이지만 엄밀하게 말하면 변수의 성격을 결정하는 것으로써
-// var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
-// 그래서 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다. 
-fragment VarSigniture: name=Id (':' type=Type)? ('=' value=Expression)?;
 
 type NamedElement = TypeDeclaration
   | Variable
@@ -177,10 +180,15 @@ Group:
 // There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
 // The syntax of these literals is in each case as in Java.
 Literal:
-  value=BooleanLiteral
-  | value=NumberLiteral
-  | value=StringLiteral
-  | 'null';
+  BooleanExpression
+  | NumberExpression
+  | StringExpression
+  | VoidExpression;
+
+NumberExpression: value=NumberLiteral;
+StringExpression: value=StringLiteral;
+BooleanExpression: value?='true' | 'false';
+VoidExpression: value='void';
 
 // 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
 // ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은

@@ -154,7 +154,30 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
       result += expr.element ? expr.element.$refText : "";
     }
     if (expr.explicitCall) {
-      result += "(" + expr.args.map((arg) => generateExpression(arg, indent)).join(", ") + ")";
+      // endsWith()의 endPosition은 1부터 카운트되므로 제외
+      const methodsUsingArrayIndex = [
+        { methodName: "charAt", argIndices: [0] },
+        { methodName: "charCodeAt", argIndices: [0] },
+        { methodName: "codePointAt", argIndices: [0] },
+        { methodName: "includes", argIndices: [1] },
+        { methodName: "indexOf", argIndices: [1] },
+        { methodName: "lastIndexOf", argIndices: [1] },
+        { methodName: "slice", argIndices: [0, 1] },
+        { methodName: "startsWith", argIndices: [1] },
+        { methodName: "substring", argIndices: [0, 1] },
+        { methodName: "at", argIndices: [0] },
+      ];
+      const found = methodsUsingArrayIndex.find((e) => e.methodName == expr.element?.$refText);
+      if (found) {
+        result += "(";
+        expr.args.map((arg, index) => {
+          if (index != 0) result += ", ";
+          result += generateExpression(arg, indent) + (found.argIndices.includes(index) ? " - 1" : "");
+        });
+        result += ")";
+      } else {
+        result += "(" + expr.args.map((arg) => generateExpression(arg, indent)).join(", ") + ")";
+      }
     }
   } else if (isUnaryExpression(expr)) {
     let op = "";

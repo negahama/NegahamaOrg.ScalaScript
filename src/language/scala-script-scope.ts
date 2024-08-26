@@ -1,7 +1,7 @@
 import {
   AstNode,
   // AstNodeDescription,
-  // AstUtils,
+  AstUtils,
   DefaultScopeComputation,
   DefaultScopeProvider,
   EMPTY_SCOPE,
@@ -15,48 +15,10 @@ import {
   // Stream,
   // StreamScope,
 } from "langium";
-import {
-  Class,
-  isClass,
-  isField,
-  isMethodCall,
-  isMethod,
-  isType,
-  isLambdaType,
-  isObjectType,
-  isTupleType,
-  isTypeDeclaration,
-  isVariable,
-  MethodCall,
-  ObjectType,
-  Type,
-  Method,
-} from "./generated/ast.js";
+import { Class, isClass, isMethod, isVariable, MethodCall, Method } from "./generated/ast.js";
 import { LangiumServices } from "langium/lsp";
+import { enterLog, traceLog, exitLog, getClassChain, inferType, isClassType } from "./scala-script-types.js";
 // import { CancellationToken } from "vscode-languageserver";
-
-export interface TypeDescription {
-  $type: string;
-  source?: AstNode;
-  message?: string;
-  class?: Class;
-  object?: ObjectType;
-  parameters?: FunctionParameter[];
-  returnType?: TypeDescription;
-}
-
-export interface FunctionParameter {
-  name: string;
-  type: TypeDescription;
-}
-
-export function createErrorType(message: string, source?: AstNode): TypeDescription {
-  return {
-    $type: "error",
-    message,
-    source,
-  };
-}
 
 const extensionFunctions: { type: string; name: string; node: Method }[] = [];
 
@@ -78,7 +40,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
 
   override getScope(context: ReferenceInfo): Scope {
     const scopeId = `${context.container.$type}.${context.property} = ${context.reference.$refText}`;
-    console.log(`Enter getScope: ${scopeId}`);
+    const scopeLog = enterLog("getScope", scopeId, 0);
     // const scopes: Array<Stream<AstNodeDescription>> = [];
     // const referenceType = this.reflection.getReferenceType(context);
     // const precomputed = AstUtils.getDocument(context.container).precomputedScopes;
@@ -109,222 +71,81 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // // return result;
 
     // target element of member calls
-    if (context.property === "element") {
-      // // for now, `this` and `super` simply target the container class type
-      // if (context.reference.$refText === "this" || context.reference.$refText === "super") {
-      //   const classItem = AstUtils.getContainerOfType(context.container, isClass);
-      //   if (classItem) {
-      //     return this.scopeClassMembers(classItem);
-      //   } else {
-      //     return EMPTY_SCOPE;
-      //   }
-      // }
-      const methodCall = context.container as MethodCall;
-      if (methodCall.args == undefined) {
-        console.log("    MethodCall.args is undefined");
-      }
-
-      const previous = methodCall.previous;
-      if (!previous) {
-        console.log("    MethodCall.previous is undefined");
-        const scope = super.getScope(context);
-        console.log(`Exit1 getScope: ${scopeId}`);
-        return scope;
-      }
-
-      console.log(`    MethodCall.previous is ${previous.$type}`);
-      // if (isMethodCall(previous)) {
-      //   console.log("    MethodCall.previous is this:", previous.this);
-      //   if (previous.this == "this") {
-      //     const classItem = AstUtils.getContainerOfType(context.container, isClass); //previous면 안됨
-      //     if (classItem) {
-      //       return this.scopeClassMembers(classItem);
-      //     } else {
-      //       return EMPTY_SCOPE;
-      //     }
-      //   }
-      // }
-
-      const prevTypeDesc = this.inferType(previous, new Map(), 1);
-      if (prevTypeDesc.$type === "class") {
-        console.log(`    FIND Class: ${previous.$type}, ${prevTypeDesc.class?.$type}, ${isClass(prevTypeDesc.class)}`);
-        if (prevTypeDesc.class) {
-          console.log(`Exit2 getScope: ${scopeId}`);
-          return this.scopeClassMembers(prevTypeDesc.class);
-        }
-      } else if (prevTypeDesc.$type === "string") {
-        console.log(`    FIND string: ${previous.$type}`);
-        const allMembers = this.getExtensionFunction();
-        console.log(allMembers.map((m) => m.name));
-        return this.createScopeForNodes(allMembers);
-      }
-
-      // When the target of our member call isn't a class
-      // This means it is either a primitive type or a type resolution error
-      // Simply return an empty scope
-      console.log(`Exit3 getScope: ${scopeId}`);
-      return EMPTY_SCOPE;
+    if (context.property !== "element") {
+      exitLog(scopeLog.replace("Exit", "Exit4"));
+      return super.getScope(context);
     }
-    console.log(`Exit4 getScope: ${scopeId}`);
+
+    // for now, `this` and `super` simply target the container class type
+    if (context.reference.$refText === "this" || context.reference.$refText === "super") {
+      const classItem = AstUtils.getContainerOfType(context.container, isClass);
+      if (classItem) {
+        console.error("this or super");
+        return this.scopeClassMembers(classItem);
+      } else {
+        console.error("this or super: empty");
+        return EMPTY_SCOPE;
+      }
+    }
+
+    const methodCall = context.container as MethodCall;
+    if (methodCall.args == undefined) {
+      traceLog(1, "MethodCall.args is undefined");
+    }
+
+    const previous = methodCall.previous;
+    traceLog(1, `MethodCall.previous is ${previous?.$type}`);
+    if (!previous) {
+      const scope = super.getScope(context);
+      exitLog(scopeLog.replace("Exit", "Exit1"));
+      return scope;
+    }
+
+    // if (isMethodCall(previous)) {
+    //   console.log("    MethodCall.previous is this:", previous.this);
+    //   if (previous.this == "this") {
+    //     const classItem = AstUtils.getContainerOfType(context.container, isClass); //previous면 안됨
+    //     if (classItem) {
+    //       return this.scopeClassMembers(classItem);
+    //     } else {
+    //       return EMPTY_SCOPE;
+    //     }
+    //   }
+    // }
+
+    const prevTypeDesc = inferType(previous, new Map(), 1);
+    if (isClassType(prevTypeDesc)) {
+      traceLog(1, `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}, ${isClass(prevTypeDesc.literal)}`);
+      exitLog(scopeLog.replace("Exit", "Exit2"));
+      return this.scopeClassMembers(prevTypeDesc.literal);
+    } else if (prevTypeDesc.$type === "string") {
+      traceLog(1, `FIND string: ${previous.$type}`);
+      const allMembers = this.getExtensionFunction();
+      traceLog(
+        0,
+        "",
+        allMembers.map((m) => m.name)
+      );
+      return this.createScopeForNodes(allMembers);
+    }
+
+    // When the target of our member call isn't a class
+    // This means it is either a primitive type or a type resolution error
+    // Simply return an empty scope
+    exitLog(scopeLog.replace("Exit", "Exit3"));
     return super.getScope(context);
-  }
-
-  private inferType(node: AstNode | undefined, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const inferTypeId = `node is ${node?.$type}`;
-    const space = "    ".repeat(indent);
-    const space2 = "    ".repeat(indent + 1);
-    console.log(space + `Enter inferType: ${inferTypeId}`);
-
-    let type: TypeDescription | undefined;
-    if (!node) {
-      console.log(space + `Exit1 inferType: ${inferTypeId}`);
-      return createErrorType("Could not infer type for undefined", node);
-    }
-
-    const existing = cache.get(node);
-    if (existing) {
-      console.log(space + `Exit2 inferType: ${inferTypeId}`);
-      return existing;
-    }
-
-    // Prevent recursive inference errors
-    cache.set(node, createErrorType("Recursive definition", node));
-
-    if (isMethodCall(node)) {
-      console.log(space2 + "MethodCall name:", node.element?.$refText);
-      type = this.inferMethodCall(node, cache, indent + 1);
-      if (node.explicitCall) {
-        console.log(space2 + "Methodcall is explicitCall");
-        if (type.$type == "method") {
-          type = type.returnType;
-          console.log(space2 + "Methodcall is mehod:", type?.$type);
-        }
-      }
-      console.log(space2 + "MethodCall END:", node.element?.$refText);
-    } else if (isVariable(node)) {
-      console.log(space2 + "VariableDeclaration name:", node.names);
-      if (node.type) {
-        type = this.inferType(node.type, cache, indent + 1);
-      } else if (node.value) {
-        type = this.inferType(node.value, cache, indent + 1);
-      } else {
-        type = {
-          $type: "error",
-          message: "No type hint for this element",
-        };
-      }
-    } else if (isClass(node)) {
-      console.log(space2 + "Class name:", node.name);
-      type = {
-        $type: "class",
-        class: node,
-      };
-    } else if (isField(node)) {
-      console.log(space2 + "Field name:", node.name);
-      if (node.type) type = this.inferTypeRef(node.type, cache);
-      console.log(space2 + "result of inferTypeRef:", type?.$type);
-    } else if (isMethod(node)) {
-      console.log(space2 + "Method name:", node.name);
-      console.log(space2 + "return type:");
-      const returnType = this.inferType(node.returnType, cache, indent + 2);
-      console.log(space2 + "parameters type:");
-      const parameters = node.parameters.map((e) => ({
-        name: e.name,
-        type: this.inferType(e.type, cache, indent + 2),
-      }));
-      type = {
-        $type: "method",
-        parameters,
-        returnType,
-      };
-    } else if (isType(node)) {
-      console.log(space2 + "Node is Type");
-      type = this.inferTypeRef(node, cache);
-      console.log(space2 + "result of inferTypeRef:", type.$type);
-    }
-
-    if (!type) {
-      type = createErrorType("Could not infer type for " + node.$type, node);
-    }
-
-    cache.set(node, type);
-    console.log(space + `Exit3 inferType: ${inferTypeId},`, `type: ${type.$type}, message: ${type.message}`);
-    return type;
-  }
-
-  private inferMethodCall(node: MethodCall, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const inferMethodCallId = node.element?.$refText;
-    const space = "    ".repeat(indent);
-    console.log(space + `Enter inferMethodCall: ${inferMethodCallId}`);
-    console.log(space + "ref 참조전:", inferMethodCallId);
-    const element = node.element?.ref;
-    console.log(space + "ref 참조후:", inferMethodCallId);
-    if (element) {
-      return this.inferType(element, cache, indent + 1);
-    } else if (node.explicitCall && node.previous) {
-      const previousType = this.inferType(node.previous, cache, indent + 1);
-      if (previousType.$type == "method") {
-        if (previousType.returnType) {
-          console.log(space + "Exit1 inferMethodCall:", inferMethodCallId);
-          return previousType.returnType;
-        }
-      }
-      console.log(space + "Exit2 inferMethodCall:", inferMethodCallId);
-      return createErrorType("Cannot call operation on non-function type", node);
-    }
-    console.log(space + "Exit3 inferMethodCall:", inferMethodCallId);
-    return createErrorType("Could not infer type for element " + node.element?.$refText, node);
-  }
-
-  private inferTypeRef(node: Type, cache: Map<AstNode, TypeDescription>): TypeDescription {
-    if (node.primitive) {
-      return { $type: node.primitive };
-    } else if (node.reference) {
-      if (node.reference.ref) {
-        const ref = node.reference.ref;
-        if (isClass(ref)) {
-          return {
-            $type: "class",
-            class: ref,
-          };
-        } else if (isTypeDeclaration(ref)) {
-          return {
-            $type: "type-dec",
-            object: ref.value,
-          };
-        } else {
-          return { $type: "other-ref" };
-        }
-      } else {
-        console.log("  it's not node.reference.ref");
-      }
-    } else if (isLambdaType(node)) {
-      return { $type: "lambda" };
-    } else if (isTupleType(node)) {
-      return { $type: "tuple" };
-    } else if (isObjectType(node)) {
-      return { $type: "object" };
-    }
-    return createErrorType("Could not infer type for this reference", node);
   }
 
   private scopeClassMembers(classItem: Class): Scope {
     // Since Lox allows class-inheritance,
     // we also need to look at all members of possible super classes for scoping
-    const allMembers = this.getClassChain(classItem).flatMap((e) => e.members);
-    console.log(allMembers.map((m) => m.name));
+    const allMembers = getClassChain(classItem).flatMap((e) => e.members);
+    traceLog(
+      0,
+      "",
+      allMembers.map((m) => m.name)
+    );
     return this.createScopeForNodes(allMembers);
-  }
-
-  private getClassChain(classItem: Class): Class[] {
-    const set = new Set<Class>();
-    let value: Class | undefined = classItem;
-    while (value && !set.has(value)) {
-      set.add(value);
-      value = value.superClass?.ref;
-    }
-    // Sets preserve insertion order
-    return Array.from(set);
   }
 
   private getExtensionFunction(): Method[] {
@@ -392,7 +213,7 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
       const container = node.$container;
       if (container) {
         const name = this.nameProvider.getName(node);
-        console.log("  node:", node.$type, name);
+        traceLog(0, "  node:", node.$type, name);
         if (name) {
           scopes.add(container, this.descriptions.createDescription(node, name, document));
         }
@@ -402,14 +223,14 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
     const container = node.$container;
     if (container) {
       if (isVariable(node)) {
-        console.log("  node:", node.$type);
+        traceLog(0, "  node:", node.$type);
         node.names.forEach((name) => {
-          console.log("    ", name);
+          traceLog(1, name);
           scopes.add(container, this.descriptions.createDescription(node, name, document));
         });
       } else if (isMethod(node)) {
         if (node.extension?.primitive) {
-          console.log("extension function:", node.extension.primitive, node.name);
+          traceLog(0, "extension function:", node.extension.primitive, node.name);
           extensionFunctions.push({ type: node.extension.primitive, name: node.name, node: node });
         } else {
           defaultProcess(node, document, scopes);

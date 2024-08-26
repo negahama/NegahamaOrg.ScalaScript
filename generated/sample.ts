@@ -29,29 +29,6 @@ const array: string[] = ['a', 'b', 'c'];
 const tuple: [string, number, boolean] = ['Hello', 42, true];
 const s1 = array[(a + b) - 1] + array[(1) - 1];
 /*
-  Class
-*/
-class Person {
-  name: string = 'no name';
-  gender: number;
-  age: number;
-  display() {
-    //todo console.log(this.name, this.gender, this.age)
-  }
-}
-class Student extends Person {
-  grade: number;
-  registerClass(what: Class) {
-    console.log("register class", what)
-  }
-}
-class Class {
-  name: string;
-}
-let person: Person;
-person = new Person()
-person.display()
-/*
   함수 정의
 */
 function factorial(N: number): number {
@@ -61,23 +38,12 @@ function factorial(N: number): number {
   }
   return sum;
 }
-const oncePerSecond = (callback: (p: string) => void): void => {
-  //def oncePerSecond(callback: (p: string) -> void) -> void => {
-  while (true) {
-    callback('1초 지남!')
-    /*Thread sleep 1000*/
-  }
-  // setTimeout(() => {
-  //   callback('1초 지남!')
-  // }, 1000)
-};
-const timeFlies = (msg: string) => {
-  //def timeFlies(msg: string): void = {
+const timeFlies1 = (msg: string): void => {
   console.log("time flies like an arrow... ", msg)
 };
-//def main(args: Array[String]) -> Unit => {
-//  oncePerSecond(timeFlies)
-//}
+function timeFlies2(msg: string): void {
+  console.log("time flies like an arrow... ", msg)
+}
 // function types and anonymous function call
 // 스칼라는 인수의 이름을 명시할 필요없이 인수의 타입만 열거해서 표현한다.
 // 인수가 하나이면 괄호를 생략할 수 있고 인수가 없으면 빈 괄호로 표현한다.
@@ -133,8 +99,6 @@ for (const a of array) {
     console.log(a, b)
   }
 }
-//todo while a < array.length and sum(a, b) == 2 b += 1
-//todo do console.log(a) while a < array.length and sum(a, b) == 2
 do {
   console.log(a)
   a += 1;

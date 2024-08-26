@@ -6,3 +6,4 @@ node_modules/
 out/
 src/language/generated/
 syntaxes/
+ScalaScript-0.0.1.vsix
