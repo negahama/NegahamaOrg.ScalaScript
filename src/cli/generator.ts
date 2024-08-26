@@ -39,6 +39,9 @@ import {
   isReturnExpr,
   isContinue,
   isBreak,
+  isArrayType,
+  isSimpleType,
+  isPrimitiveType,
 } from "../language/generated/ast.js";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as fs from "node:fs";
@@ -93,11 +96,13 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
     if (stmt.annotate == "NotTrans") return result;
     result += `class ${stmt.name} `;
     result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
-    stmt.members.forEach((m) => {
+    stmt.statements.forEach((m) => {
       if (isMethod(m)) {
         result += applyIndent(indent + 1, generateFunction(m, indent + 1, true));
       } else if (isField(m)) {
         result += applyIndent(indent + 1, generateVariable(m.name, m.type, m.value, indent) + ";");
+      } else if (isBypass(m)) {
+        result += applyIndent(indent + 1, generateBypass(m));
       }
       result += "\n";
     });
@@ -109,12 +114,16 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
     stmt.iterators.forEach((iter, idx) => {
       const name = iter.name;
       if (isForOf(iter)) {
-        result += applyIndent(forIndent, `for (const ${name} of ${generateExpression(iter.of, indent)}) `);
+        const text = `for (const ${name} of ${generateExpression(iter.of, indent)}) `;
+        if (idx == 0) result += text;
+        else result += applyIndent(forIndent, text);
       } else {
         const mark = isForTo(iter) ? "<=" : "<";
         const e1 = generateExpression(iter.e1, indent);
         const e2 = generateExpression(iter.e2, indent);
-        result += applyIndent(forIndent, `for (let ${name} = ${e1}; ${name} ${mark} ${e2}; ${name}++) `);
+        const text = `for (let ${name} = ${e1}; ${name} ${mark} ${e2}; ${name}++) `;
+        if (idx == 0) result += text;
+        else result += applyIndent(forIndent, text);
       }
       if (idx < stmt.iterators.length - 1) {
         result += "{\n";
@@ -243,7 +252,7 @@ function generateExpression(expr: Expression | undefined, indent: number): strin
       result += "\n" + applyIndent(indent, "else " + generateBlock(expr.else, indent));
     }
   } else if (isMatchExpression(expr)) {
-    result += `switch (${expr.name}) {\n`;
+    result += `switch (${generateExpression(expr.expr, indent)}) {\n`;
     expr.cases.forEach((mc) => {
       if (isBypass(mc)) {
         result += generateBypass(mc) + "\n";
@@ -366,10 +375,18 @@ function generateCondition(condition: Expression): string {
 function generateType(type: Type | undefined, includeColon: boolean = true): string {
   const typeonly = (t: Type | undefined) => {
     if (t == undefined) return "";
-    if (t.reference) {
-      return t.reference.$refText + (t.isArray ? "[]" : "");
-    } else if (t.primitive) {
-      return t.primitive + (t.isArray ? "[]" : "");
+    if (isSimpleType(t)) {
+      if (t.reference) {
+        return t.reference.$refText;
+      } else if (isPrimitiveType(t)) {
+        return t.type;
+      }
+    } else if (isArrayType(t)) {
+      if (t.elementType.reference) {
+        return t.elementType.reference.$refText + "[]";
+      } else if (isPrimitiveType(t.elementType)) {
+        return t.elementType.type + "[]";
+      }
     }
     return "";
   };

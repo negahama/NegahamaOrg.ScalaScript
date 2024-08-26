@@ -75,7 +75,8 @@ Binding: name=Id (':' type=Type)?;
 ClassDeclaration infers Class:
   (Annotation)? 'class' name=Id
   ('extends' superClass=[Class:Id])?
-  '{' members+=(Field | Method)* '}';
+  '{' statements+=ClassStatements* '}';
+ClassStatements: Bypass | Field | Method;
 Field: VarSignature;
 Method: FunSignature;
 
@@ -126,15 +127,22 @@ type NamedElement = TypeDeclaration
   | Binding;
 
 // Type
-Type:
-  LambdaType
-  | TupleType
-  | ObjectType
-  | primitive=("string" | "number" | "boolean" | "void") (isArray?='[]')?
-  | reference=[UserDefType:Id] (isArray?='[]')?;
+Type: LambdaType | ArrayType | SimpleType;
 
-TupleType  : '[' types+=Type (',' types+=Type)* ']' (isArray?='[]')?;
-ObjectType : '{' elements+=TypedId (',' elements+=TypedId)* '}' (isArray?='[]')?;
+ArrayType:
+  // SimpleType ({infer ArrayType.elementType=current} '[' ']')? ;
+  elementType=SimpleType '[' ']';
+
+SimpleType:
+  TupleType
+  | ObjectType
+  | PrimitiveType
+  | reference=[UserDefType:Id];
+
+TupleType  : '[' types+=SimpleType (',' types+=SimpleType)* ']';
+ObjectType : '{' elements+=TypedId (',' elements+=TypedId)* '}';
+PrimitiveType:
+  type=("string" | "number" | "boolean" | "void");
 
 type UserDefType = Class | TypeDeclaration;
 
@@ -185,10 +193,22 @@ Literal:
   | StringExpression
   | VoidExpression;
 
+BooleanExpression: value?='true' | 'false';
 NumberExpression: value=NumberLiteral;
 StringExpression: value=StringLiteral;
-BooleanExpression: value?='true' | 'false';
 VoidExpression: value='void';
+
+ValueLiteral:
+  StringLiteral | NumberLiteral | BooleanLiteral | ArrayLiteral;
+
+// Array literal
+ArrayLiteral:
+  '[' items+=Literal (',' items+=Literal )* ']';
+
+// Object literal
+ObjectLiteral:
+  '{' items+=ObjectBinding (',' items+=ObjectBinding )* '}';
+ObjectBinding: name=Id (':' value=Expression)?;
 
 // 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
 // ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은
@@ -273,22 +293,13 @@ IfElseExpression:
 
 // Match expression
 MatchExpression:
-  name=Id 'match' '{' cases+=CaseClause+ '}';
+  expr=SimpleExpression 'match' '{' cases+=CaseClause+ '}';
 
 CaseClause:
   'case' pattern=(CaseDefalut | CasePattern) '=>' body=Block;
 
 CaseDefalut returns string: '_';
 CasePattern: Literal;
-
-// Array literal
-ArrayLiteral:
-  '[' items+=Literal (',' items+=Literal )* ']';
-
-// Object literal
-ObjectLiteral:
-  '{' items+=ObjectBinding (',' items+=ObjectBinding )* '}';
-ObjectBinding: name=Id (':' value=Expression)?;
 
 InfixExpr:
   e1=Id name=Id e2=Literal;
@@ -311,7 +322,7 @@ ReturnExpr:
 // Boolean Literals
 // It has to place before ID or Identifier
 // Otherwise `true` and `false` is identified for Indentifier
-// terminal BooleanLiteral returns boolean: 'true' | 'false';
+terminal BooleanLiteral returns boolean: 'true' | 'false';
 
 NumberLiteral returns number:
   ('-')? FloatingPointLiteral

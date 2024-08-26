@@ -1,21 +1,33 @@
 import {
   AstNode,
-  // AstNodeDescription,
   AstUtils,
   DefaultScopeComputation,
   DefaultScopeProvider,
   EMPTY_SCOPE,
   LangiumDocument,
-  // interruptAndCheck,
-  // MultiMap,
   PrecomputedScopes,
   ReferenceInfo,
   Scope,
+  // AstNodeDescription,
+  // interruptAndCheck,
+  // MultiMap,
   // stream,
   // Stream,
   // StreamScope,
 } from "langium";
-import { Class, isClass, isMethod, isVariable, MethodCall, Method } from "./generated/ast.js";
+import {
+  Class,
+  isClass,
+  isMethod,
+  isField,
+  isVariable,
+  MethodCall,
+  Method,
+  isArrayType,
+  isSimpleType,
+  isPrimitiveType,
+  isBypass,
+} from "./generated/ast.js";
 import { LangiumServices } from "langium/lsp";
 import { enterLog, traceLog, exitLog, getClassChain, inferType, isClassType } from "./scala-script-types.js";
 // import { CancellationToken } from "vscode-languageserver";
@@ -127,13 +139,14 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   private scopeClassMembers(classItem: Class): Scope {
     // Since Lox allows class-inheritance,
     // we also need to look at all members of possible super classes for scoping
-    const allMembers = getClassChain(classItem).flatMap((e) => e.members);
-    traceLog(
-      0,
-      "",
-      allMembers.map((m) => m.name)
-    );
-    return this.createScopeForNodes(allMembers);
+    const allMembers = getClassChain(classItem).flatMap((e) => e.statements);
+    const removedBypass = allMembers.filter((e) => !isBypass(e));
+    removedBypass.forEach((e) => {
+      if (isMethod(e) || isField(e)) {
+        traceLog(0, "scopeClassMembers", e.name);
+      } else console.error("error");
+    });
+    return this.createScopeForNodes(removedBypass);
   }
 
   private getExtensionFunction(): Method[] {
@@ -217,10 +230,19 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
           scopes.add(container, this.descriptions.createDescription(node, name, document));
         });
       } else if (isMethod(node)) {
-        if (node.extension?.primitive) {
-          traceLog(0, "extension function:", node.extension.primitive, node.name);
-          extensionFunctions.push({ type: node.extension.primitive, name: node.name, node: node });
-        } else {
+        let isProcessed = false;
+        if (node.extension) {
+          if (isSimpleType(node.extension)) {
+            if (isPrimitiveType(node.extension)) {
+              traceLog(0, "extension function:", node.extension.type, node.name);
+              extensionFunctions.push({ type: node.extension.type, name: node.name, node: node });
+              isProcessed = true;
+            }
+          } else if (isArrayType(node.extension)) {
+            console.log("this is array");
+          }
+        }
+        if (!isProcessed) {
           defaultProcess(node, document, scopes);
         }
       } else {

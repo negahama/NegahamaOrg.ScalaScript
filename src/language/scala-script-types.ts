@@ -11,7 +11,6 @@ import {
   isMethod,
   isParameter,
   isBinding,
-  isType,
   isTypeDeclaration,
   isLambdaType,
   isTupleType,
@@ -23,6 +22,9 @@ import {
   isBinaryExpression,
   isUnaryExpression,
   isReturnExpr,
+  isArrayType,
+  isSimpleType,
+  isPrimitiveType,
 } from "./generated/ast.js";
 
 export type TypeDescription =
@@ -265,17 +267,30 @@ export function inferType(
       type = inferType(node.type, cache, indent + 1);
     }
     exitLog(log);
-  } else if (isType(node)) {
-    const log = enterLog("isType", undefined, indent);
-    if (node.primitive) {
+  } else if (isSimpleType(node)) {
+    const log = enterLog("isSimpleType", undefined, indent);
+    if (isTupleType(node)) {
+      traceLog(indent + 1, "it's TupleType");
+      // type = { $type: "tuple" };
+    } else if (isObjectType(node)) {
+      traceLog(indent + 1, "it's ObjectType");
+      // type = { $type: "object" };
+      // } else if (node.returnType) {
+      //   const returnType = inferType(node.returnType, cache);
+      //   const parameters = node.parameters.map((e, i) => ({
+      //     name: e.name ?? `$${i}`,
+      //     type: inferType(e.type, cache, indent + 1),
+      //   }));
+      //   type = createFunctionType(returnType, parameters);
+    } else if (isPrimitiveType(node)) {
       traceLog(indent + 1, "Type is primitive");
-      if (node.primitive === "number") {
+      if (node.type === "number") {
         type = createNumberType();
-      } else if (node.primitive === "string") {
+      } else if (node.type === "string") {
         type = createStringType();
-      } else if (node.primitive === "boolean") {
+      } else if (node.type === "boolean") {
         type = createBooleanType();
-      } else if (node.primitive === "void") {
+      } else if (node.type === "void") {
         type = createVoidType();
       }
     } else if (node.reference) {
@@ -297,23 +312,15 @@ export function inferType(
       } else {
         traceLog(indent + 1, "it's not node.reference.ref");
       }
-    } else if (isLambdaType(node)) {
-      traceLog(indent + 1, "it's LambdaType");
-      //type = { $type: "lambda" };
-    } else if (isTupleType(node)) {
-      traceLog(indent + 1, "it's TupleType");
-      // type = { $type: "tuple" };
-    } else if (isObjectType(node)) {
-      traceLog(indent + 1, "it's ObjectType");
-      // type = { $type: "object" };
-      // } else if (node.returnType) {
-      //   const returnType = inferType(node.returnType, cache);
-      //   const parameters = node.parameters.map((e, i) => ({
-      //     name: e.name ?? `$${i}`,
-      //     type: inferType(e.type, cache, indent + 1),
-      //   }));
-      //   type = createFunctionType(returnType, parameters);
     } else type = createErrorType("Could not infer type for this reference", node);
+    exitLog(log);
+  } else if (isArrayType(node)) {
+    // isArrayType은 isSimpleType보다 나중에 검사되어야 한다.
+    const log = enterLog("isArrayType", undefined, indent);
+    exitLog(log);
+  } else if (isLambdaType(node)) {
+    const log = enterLog("isLambdaType", undefined, indent);
+    //type = { $type: "lambda" };
     exitLog(log);
   } else if (isStringExpression(node)) {
     const log = enterLog("isStringExpression", node.value, indent);

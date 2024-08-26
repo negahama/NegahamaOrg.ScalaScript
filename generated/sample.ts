@@ -33,7 +33,7 @@ const s1 = array[(a + b) - 1] + array[(1) - 1];
 */
 function factorial(N: number): number {
   let sum: number = 0;
-    for (let d = 1; d <= N; d++) {
+  for (let d = 1; d <= N; d++) {
     sum += d;
   }
   return sum;

@@ -33,7 +33,7 @@ function hanoi(n: number, from: string, to1: string, mid: string): void {
 }
 function concatenate(ary: string[]): string {
   let result = "";
-    for (const e of ary) {
+  for (const e of ary) {
     result += e;
   }
   return result;
