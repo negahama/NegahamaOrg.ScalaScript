@@ -93,8 +93,8 @@ ForStatement:
 Iterator: ForOf | ForTo | ForUntil;
 
 ForOf   : name=Id '<-' of=Expression;
-ForTo   : name=Id '<-' e1=Expression 'to'    e2=Expression;
-ForUntil: name=Id '<-' e1=Expression 'until' e2=Expression;
+ForTo   : name=Id '<-' e1=Expression 'to'    e2=Expression ('step' step=NumberLiteral)?;
+ForUntil: name=Id '<-' e1=Expression 'until' e2=Expression ('step' step=NumberLiteral)?;
 
 // While Loop
 WhileStatement:

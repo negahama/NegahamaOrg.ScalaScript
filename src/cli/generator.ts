@@ -118,10 +118,18 @@ function generateStatement(stmt: Statement | undefined, indent: number): string 
         if (idx == 0) result += text;
         else result += applyIndent(forIndent, text);
       } else {
-        const mark = isForTo(iter) ? "<=" : "<";
         const e1 = generateExpression(iter.e1, indent);
         const e2 = generateExpression(iter.e2, indent);
-        const text = `for (let ${name} = ${e1}; ${name} ${mark} ${e2}; ${name}++) `;
+        let mark = isForTo(iter) ? "<=" : "<";
+        let step = `${name}++`;
+        if (iter.step) {
+          if (iter.step >= 0) step = `${name} += ${iter.step}`;
+          if (iter.step < 0) {
+            mark = isForTo(iter) ? ">=" : ">";
+            step = `${name} -= ${-iter.step}`;
+          }
+        }
+        const text = `for (let ${name} = ${e1}; ${name} ${mark} ${e2}; ${step}) `;
         if (idx == 0) result += text;
         else result += applyIndent(forIndent, text);
       }

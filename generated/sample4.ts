@@ -28,7 +28,7 @@ class LogUtil {
     const len = this.getTextLength(str);
     if (len > width) {
       let cnt = 0;
-      for (let c = str.length; c <= 0; c++) {
+      for (let c = str.length; c >= 0; c -= 1) {
         if (escape(str.charAt(c - 1)).length == 6) {
           cnt += 1;
         }
@@ -55,7 +55,7 @@ class LogUtil {
     const len = this.getTextLength(str);
     if (len > width) {
       let cnt = 0;
-      for (let c = str.length; c <= 0; c++) {
+      for (let c = str.length; c >= 0; c -= 1) {
         if (escape(str.charAt(c - 1)).length == 6) {
           cnt += 1;
         }
@@ -118,6 +118,9 @@ class LogUtil {
         prefix = "\u001b[1;36m";
         break;
       }
+      default: {
+        assert(false, color.toLowerCase().trim());
+      }
     }
     return prefix + str + "\u001b[0m";
   }
@@ -148,6 +151,9 @@ class LogUtil {
       case "cyan": {
         prefix = "\u001b[1;46m";
         break;
+      }
+      default: {
+        assert(false, color.toLowerCase().trim());
       }
     }
     return prefix + str + "\u001b[0m";

@@ -109,7 +109,7 @@ import assert from "assert";
     val len = this.getTextLength(str)
     if (len > width) {
       var cnt = 0
-      for (c <- str.length to 0) {
+      for (c <- str.length to 0 step -1) {
         if (escape(str.charAt(c)).length == 6) {
           cnt += 1
         }
@@ -143,7 +143,7 @@ import assert from "assert";
     val len = this.getTextLength(str)
     if (len > width) {
       var cnt = 0
-      for (c <- str.length to 0) {
+      for (c <- str.length to 0 step -1) {
         if (escape(str.charAt(c)).length == 6) {
           cnt += 1
         }
@@ -232,9 +232,7 @@ import assert from "assert";
         prefix = "\u001b[1;36m"
         break
       }
-      // _ => {
-      //   assert(false, color.toLowerCase().trim())
-      // }
+      case _ => assert(false, color.toLowerCase().trim())
     }
     return prefix + str + "\u001b[0m"
   }
@@ -272,8 +270,7 @@ import assert from "assert";
         prefix = "\u001b[1;46m"
         break
       }
-      // _ =>
-      //   assert(false, color.toLowerCase().trim())
+      case _ => assert(false, color.toLowerCase().trim())
     }
     return prefix + str + "\u001b[0m"
   }
