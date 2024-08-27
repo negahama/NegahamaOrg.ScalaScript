@@ -6,8 +6,8 @@ export default
 class LogUtil {
   static
   formatNumber(value: number, point: number, width: number) {
-    const p = Math.round(value * 10 ** point) / 10 ** point;
-    return this.addComma(p).padStart(width);
+    const 계산결과 = Math.round(value * 10 ** point) / 10 ** point;
+    return this.addComma(계산결과).padStart(width);
   }
   static
   getTextLength(str: string) {
