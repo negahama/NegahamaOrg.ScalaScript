@@ -8,6 +8,9 @@ import {
 import { WorkspaceFolder } from "vscode-languageserver";
 import { URI } from "vscode-uri";
 
+/**
+ *
+ */
 const ScalaScriptBuiltinLibrary = `
 @NotTrans def string.charAt(index: number)-> string
 @NotTrans def string.charCodeAt(index: number)-> number
@@ -74,6 +77,9 @@ const ScalaScriptBuiltinLibrary = `
 @NotTrans def string.values()-> string
 `.trim();
 
+/**
+ *
+ */
 export class ScalaScriptWorkspaceManager extends DefaultWorkspaceManager {
   private documentFactory: LangiumDocumentFactory;
 
@@ -82,13 +88,18 @@ export class ScalaScriptWorkspaceManager extends DefaultWorkspaceManager {
     this.documentFactory = services.workspace.LangiumDocumentFactory;
   }
 
+  /**
+   *
+   * @param folders
+   * @param collector
+   */
   protected override async loadAdditionalDocuments(
     folders: WorkspaceFolder[],
     collector: (document: LangiumDocument<AstNode>) => void
   ): Promise<void> {
-    console.log("before loadAdditionalDocuments", folders);
+    // console.log("before loadAdditionalDocuments", folders);
     await super.loadAdditionalDocuments(folders, collector);
-    console.log("after loadAdditionalDocuments");
+    // console.log("after loadAdditionalDocuments");
     // Load our library using the `builtin` URI schema
     collector(this.documentFactory.fromString(ScalaScriptBuiltinLibrary, URI.parse("builtin:///library.hello")));
   }

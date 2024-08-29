@@ -1,6 +1,6 @@
 @NotTrans class Console { log() }
 @NotTrans var console: Console
-@NotTrans def string.length()
+@NotTrans def string.length()->number
 // @NotTrans def string.concat(str: string)-> string
 // @NotTrans def string.includes(searchString: string, position: number)-> boolean
 // @NotTrans def string.endsWith(searchString: string, endPosition: number)-> boolean
@@ -74,12 +74,12 @@ val oncePerSecond = (callback: (p:string)-> void)-> void => {
 %%/*
   반복문 관련
 */%%
-def sum(a: number, b: number) => return a + b
+def sum(a: number, b: number)-> number => return a + b
 val array2: string[] = ['a', 'b', 'c']
 for (a <- array2; b <- array2) { console.log(a, b) }
 var arrLen = 1
-while arrLen < array2.length and sum(arrLen, 1) == 2 arrLen += 1
-do console.log(arrLen) while arrLen < array2.length and sum(arrLen, 1) == 2
+while arrLen < array2.length() and sum(arrLen, 1) == 2 arrLen += 1
+do console.log(arrLen) while arrLen < array2.length() and sum(arrLen, 1) == 2
 
 def generateBypassElement(bypass: string[])-> string => {
   var result: string = ""

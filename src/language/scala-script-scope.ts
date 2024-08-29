@@ -29,9 +29,12 @@ import {
   isBypass,
 } from "./generated/ast.js";
 import { LangiumServices } from "langium/lsp";
-import { enterLog, traceLog, exitLog, getClassChain, inferType, isClassType } from "./scala-script-types.js";
+import { enterLog, traceLog, exitLog, TypeSystem } from "./scala-script-types.js";
 // import { CancellationToken } from "vscode-languageserver";
 
+/**
+ *
+ */
 const extensionFunctions: { type: string; name: string; node: Method }[] = [];
 
 // function findExtensionByType(type: Type): string[] {
@@ -45,13 +48,21 @@ const extensionFunctions: { type: string; name: string; node: Method }[] = [];
 //   return undefined;
 // }
 
+/**
+ *
+ */
 export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   constructor(services: LangiumServices) {
     super(services);
   }
 
+  /**
+   *
+   * @param context
+   * @returns
+   */
   override getScope(context: ReferenceInfo): Scope {
-    const scopeId = `${context.container.$type}.${context.property} = ${context.reference.$refText}`;
+    const scopeId = `${context.container.$type}.${context.property} = '${context.reference.$refText}'`;
     const scopeLog = enterLog("getScope", scopeId, 0);
     // const scopes: Array<Stream<AstNodeDescription>> = [];
     // const referenceType = this.reflection.getReferenceType(context);
@@ -113,8 +124,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       return scope;
     }
 
-    const prevTypeDesc = inferType(previous, new Map(), 1);
-    if (isClassType(prevTypeDesc)) {
+    const prevTypeDesc = TypeSystem.inferType(previous, new Map(), 1);
+    if (TypeSystem.isClassType(prevTypeDesc)) {
       traceLog(1, `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}, ${isClass(prevTypeDesc.literal)}`);
       exitLog(scopeLog.replace("Exit", "Exit2"));
       return this.scopeClassMembers(prevTypeDesc.literal);
@@ -136,10 +147,15 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     return super.getScope(context);
   }
 
+  /**
+   *
+   * @param classItem
+   * @returns
+   */
   private scopeClassMembers(classItem: Class): Scope {
     // Since Lox allows class-inheritance,
     // we also need to look at all members of possible super classes for scoping
-    const allMembers = getClassChain(classItem).flatMap((e) => e.statements);
+    const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.statements);
     const removedBypass = allMembers.filter((e) => !isBypass(e));
     removedBypass.forEach((e) => {
       if (isMethod(e) || isField(e)) {
@@ -149,11 +165,18 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     return this.createScopeForNodes(removedBypass);
   }
 
+  /**
+   *
+   * @returns
+   */
   private getExtensionFunction(): Method[] {
     return extensionFunctions.map((e) => e.node);
   }
 }
 
+/**
+ *
+ */
 export class ScalaScriptScopeComputation extends DefaultScopeComputation {
   constructor(services: LangiumServices) {
     super(services);
@@ -214,7 +237,7 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
       const container = node.$container;
       if (container) {
         const name = this.nameProvider.getName(node);
-        traceLog(0, "  node:", node.$type, name);
+        traceLog(0, `  node: ${node.$type} '${name}'`);
         if (name) {
           scopes.add(container, this.descriptions.createDescription(node, name, document));
         }
@@ -226,7 +249,7 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
       if (isVariable(node)) {
         traceLog(0, "  node:", node.$type);
         node.names.forEach((name) => {
-          traceLog(1, name);
+          traceLog(1, `'${name}'`);
           scopes.add(container, this.descriptions.createDescription(node, name, document));
         });
       } else if (isMethod(node)) {

@@ -24,9 +24,8 @@ const obj: {name: string, age: number} = {
   name: "samuel",
   age: 50,
 };
-// array and tuple type
+// array type
 const array: string[] = ['a', 'b', 'c'];
-const tuple: [string, number, boolean] = ['Hello', 42, true];
 const s1 = array[(a + b) - 1] + array[(1) - 1];
 /*
   함수 정의
@@ -75,9 +74,6 @@ const lambda5 = (arg: number): number => {
 /*
   조건문
 */
-if (! a) {
-  console.log('a is not true')
-}
 function matchTest(x: number): string {
   switch (x) {
     case 1: {

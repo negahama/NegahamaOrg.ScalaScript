@@ -37,7 +37,7 @@
   함수 호출
 */%%
 var s: string = "this is sample"
-var list2 = s.concat("2" + 'def').trim().split(",")
+var list2 = s.concat("2" .. 'def').trim().split(",")
 
 %%/*
   배열의 인덱스는 1 부터
@@ -73,6 +73,6 @@ def hanoi(n: number, from: string, to1: string, mid: string)-> void => {
 def concatenate(ary: string[])-> string => {
   var result = ""
   for (e <- ary)
-    result += e
+    result = result .. e
   return result
 }

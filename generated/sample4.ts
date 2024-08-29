@@ -5,12 +5,12 @@ import assert from "assert";
 export default
 class LogUtil {
   static
-  formatNumber(value: number, point: number, width: number) {
+  formatNumber(value: number, point: number, width: number): string {
     const 계산결과 = Math.round(value * 10 ** point) / 10 ** point;
     return this.addComma(계산결과).padStart(width);
   }
   static
-  getTextLength(str: string) {
+  getTextLength(str: string): number {
     if (! str) {
       return 0;
     }
@@ -24,7 +24,7 @@ class LogUtil {
     return len;
   }
   static
-  formatNameL(str: string, width: number) {
+  formatNameL(str: string, width: number): string {
     const len = this.getTextLength(str);
     if (len > width) {
       let cnt = 0;
@@ -51,7 +51,7 @@ class LogUtil {
     return str + ns;
   }
   static
-  formatNameR(str: string, width: number) {
+  formatNameR(str: string, width: number): string {
     const len = this.getTextLength(str);
     if (len > width) {
       let cnt = 0;
@@ -78,20 +78,22 @@ class LogUtil {
     return ns + str;
   }
   static
-  formatMoney(money: number) {
+  formatMoney(money: number): string {
     return this.addComma(Math.round(money));
   }
   static
-  formatMoney2(money: number) {
+  formatMoney2(money: number): string {
+    return "";
         let value = money.toFixed(2);
     return value.replace(/\B(?=(\d{4})+(?!\d))/g, ",");
   }
   static
-  addComma(value: number) {
+  addComma(value: number): string {
+    return "";
         return value?.toString().replace(/\B(?=(\d{4})+(?!\d))/g, ",");
   }
   static
-  setTextColor(color: string, str: string) {
+  setTextColor(color: string, str: string): string {
     let prefix = "";
     switch ((color.toLowerCase().trim())) {
       case "red": {
@@ -125,7 +127,7 @@ class LogUtil {
     return prefix + str + "\u001b[0m";
   }
   static
-  setBackColor(color: string, str: string) {
+  setBackColor(color: string, str: string): string {
     let prefix = "";
     switch ((color.toLowerCase().trim())) {
       case "red": {
@@ -159,7 +161,7 @@ class LogUtil {
     return prefix + str + "\u001b[0m";
   }
   static
-  bar(min: number, max: number, value: number, width: number) {
+  bar(min: number, max: number, value: number, width: number): string {
     let range = max - min;
     if (range <= 0) {
       assert.equal(max, value)
@@ -182,7 +184,7 @@ class LogUtil {
     return bar.padEnd(width);
   }
   static
-  colorBar(min: number, max: number, value: number, width: number) {
+  colorBar(min: number, max: number, value: number, width: number): string {
     if (min == max) {
       assert.equal(max, value)
       assert.equal(min, value)

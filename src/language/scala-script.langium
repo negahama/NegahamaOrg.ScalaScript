@@ -157,18 +157,18 @@ Expression:
   LogicalNot
   | Logical
   | Assignment
+  | LambdaCall
   | IfExpression
   | MatchExpression
-  | LambdaCall
   | ArrayLiteral
   | ObjectLiteral
-  | InfixExpr
-  | ReturnExpr;
+  | InfixExpression
+  | ReturnExpression;
 
 SimpleExpression infers Expression:
   UnaryExpression
-  | ArrayExpr
-  | Group
+  | ArrayExpression
+  | GroupExpression
   | Literal
   | FeatureCall;
 
@@ -177,11 +177,11 @@ UnaryExpression:
   operator=('-' | '+') value=Expression;
 
 // Array Expression
-ArrayExpr:
-  name=Id '[' index=Expression ']';
+ArrayExpression:
+  element=[NamedElement:Id] '[' index=Expression ']';
 
 // grouped expression with parentheses
-Group:
+GroupExpression:
   '(' value=Expression ')';
 
 // Literals
@@ -240,16 +240,16 @@ FeatureCall infers Expression: {infer MethodCall}
 LogicalNot infers UnaryExpression:
   operator=('not' | '!') value=Expression;
 
-// Binary Operators
+// Assignment를 아래와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.
 // Assignment infers Expression:
 //   Logical ({infer BinaryExpression.left=current} operator=('=') right=Logical)*;
-// Assignment를 위와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.
 // 우선 대입 연산의 순서가 왼쪽에서 오른쪽으로 가기 때문에 a = b = 0 은 a = b가 먼저 처리된다.
 // 또 다른 문제는 이 좌결합성 때문에 다중 대입문에서 세미콜론을 제대로 표시할 수 없다.
 // 따라서 assignment는 따로 정의되며 좌변에 MethodCall을 사용해 a.b = 0를 처리한다.
 Assignment:
   assign=MethodCall operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
+// Binary Operators
 Logical infers Expression:
   Comparison     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '&&' | '||') right=Comparison)*;
 
@@ -301,10 +301,10 @@ CaseClause:
 CaseDefalut returns string: '_';
 CasePattern: Literal;
 
-InfixExpr:
+InfixExpression:
   e1=Id name=Id e2=Literal;
 
-ReturnExpr:
+ReturnExpression:
   'return' (value=Expression)?;
 
 // Parentheses

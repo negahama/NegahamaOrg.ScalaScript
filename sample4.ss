@@ -1,6 +1,6 @@
 @NotTrans class Console { log() }
 @NotTrans var console: Console
-@NotTrans def string.length()
+@NotTrans def string.length()-> number
 @NotTrans def string.charAt(index: number)-> string
 @NotTrans def string.charCodeAt(index: number)-> number
 @NotTrans def string.codePointAt(pos: number)-> number
@@ -29,7 +29,7 @@
 @NotTrans def string.forEach()-> string
 @NotTrans def setTimeout()
 @NotTrans def escape()
-@NotTrans class Math { round() abs() }
+@NotTrans class Math { round()-> number abs()-> number }
 @NotTrans class assert { equal() }
 
 %%
@@ -62,7 +62,7 @@ import assert from "assert";
    * @param width
    * @returns
    */
-  %%static%% formatNumber(value: number, point: number, width: number) => {
+  %%static%% formatNumber(value: number, point: number, width: number)-> string => {
     val 계산결과 = Math.round(value * 10 ** point) / 10 ** point
     return this.addComma(계산결과).padStart(width)
   }
@@ -87,11 +87,11 @@ import assert from "assert";
    * @param str
    * @returns
    */
-  %%static%% getTextLength(str: string) => {
+  %%static%% getTextLength(str: string)-> number => {
     if (!str) return 0
     var len = 0
     for (i <- 1 to str.length) {
-      if (escape(str.charAt(i)).length == 6) {
+      if (escape(str.charAt(i)).length() == 6) {
         len += 1
       }
       len += 1
@@ -105,23 +105,23 @@ import assert from "assert";
    * @param width
    * @returns
    */
-  %%static%% formatNameL(str: string, width: number) => {
+  %%static%% formatNameL(str: string, width: number)-> string => {
     val len = this.getTextLength(str)
     if (len > width) {
       var cnt = 0
       for (c <- str.length to 0 step -1) {
-        if (escape(str.charAt(c)).length == 6) {
+        if (escape(str.charAt(c)).length() == 6) {
           cnt += 1
         }
         cnt += 1
         if (cnt > width - 3) {
-          val ellipsis = "..." + str.slice(c)
+          val ellipsis = "..." .. str.slice(c)
           val ellipsisLen = this.getTextLength(ellipsis)
           var ns = ""
           for (c <- 0 to width - ellipsisLen) {
             ns += " "
           }
-          return ns + ellipsis
+          return ns .. ellipsis
         }
       }
     }
@@ -130,7 +130,7 @@ import assert from "assert";
     for (c <- 0 to width - len) {
       ns += " "
     }
-    return str + ns
+    return str .. ns
   }
 
   /**
@@ -139,23 +139,23 @@ import assert from "assert";
    * @param width
    * @returns
    */
-  %%static%% formatNameR(str: string, width: number) => {
+  %%static%% formatNameR(str: string, width: number)-> string => {
     val len = this.getTextLength(str)
     if (len > width) {
       var cnt = 0
       for (c <- str.length to 0 step -1) {
-        if (escape(str.charAt(c)).length == 6) {
+        if (escape(str.charAt(c)).length() == 6) {
           cnt += 1
         }
         cnt += 1
         if (cnt > width - 3) {
-          val ellipsis = "..." + str.slice(c)
+          val ellipsis = "..." .. str.slice(c)
           val ellipsisLen = this.getTextLength(ellipsis)
           var ns = ""
           for (c <- 0 to width - ellipsisLen) {
             ns += " "
           }
-          return ns + ellipsis
+          return ns .. ellipsis
         }
       }
     }
@@ -164,7 +164,7 @@ import assert from "assert";
     for (c <- 0 to width - len) {
       ns += " "
     }
-    return ns + str
+    return ns .. str
   }
 
   /**
@@ -172,7 +172,7 @@ import assert from "assert";
    * @param money
    * @returns
    */
-  %%static%% formatMoney(money: number) => {
+  %%static%% formatMoney(money: number)-> string => {
     return this.addComma(Math.round(money))
   }
 
@@ -181,7 +181,7 @@ import assert from "assert";
    * @param money
    * @returns
    */
-  %%static%% formatMoney2(money: number) => {
+  %%static%% formatMoney2(money: number)-> string => {
 %%
     let value = money.toFixed(2);
     return value.replace(/\B(?=(\d{4})+(?!\d))/g, ",");
@@ -193,7 +193,7 @@ import assert from "assert";
    * @param value
    * @returns
    */
-  %%static%% addComma(value: number) => {
+  %%static%% addComma(value: number)-> string => {
 %%
     return value?.toString().replace(/\B(?=(\d{4})+(?!\d))/g, ",");
 %%
@@ -205,7 +205,7 @@ import assert from "assert";
    * @param str
    * @returns
    */
-  %%static%% setTextColor(color: string, str: string) => {
+  %%static%% setTextColor(color: string, str: string)-> string => {
     var prefix = ""
     (color.toLowerCase().trim()) match {
       case "red" => {
@@ -234,7 +234,7 @@ import assert from "assert";
       }
       case _ => assert(false, color.toLowerCase().trim())
     }
-    return prefix + str + "\u001b[0m"
+    return prefix .. str .. "\u001b[0m"
   }
 
   /**
@@ -243,7 +243,7 @@ import assert from "assert";
    * @param str
    * @returns
    */
-  %%static%% setBackColor(color: string, str: string) => {
+  %%static%% setBackColor(color: string, str: string)-> string => {
     var prefix = ""
     (color.toLowerCase().trim()) match {
       case "red" => {
@@ -272,7 +272,7 @@ import assert from "assert";
       }
       case _ => assert(false, color.toLowerCase().trim())
     }
-    return prefix + str + "\u001b[0m"
+    return prefix .. str .. "\u001b[0m"
   }
 
   /**
@@ -283,7 +283,7 @@ import assert from "assert";
    * @param width
    * @returns
    */
-  %%static%% bar(min: number, max: number, value: number, width: number = 5) => {
+  %%static%% bar(min: number, max: number, value: number, width: number = 5)-> string => {
     var range = max - min
     if (range <= 0) {
       assert.equal(max, value)
@@ -311,7 +311,7 @@ import assert from "assert";
    * @param width
    * @returns
    */
-  %%static%% colorBar(min: number, max: number, value: number, width: number = 5) => {
+  %%static%% colorBar(min: number, max: number, value: number, width: number = 5)-> string => {
     if (min == max) {
       assert.equal(max, value)
       assert.equal(min, value)

@@ -16,7 +16,7 @@ a = b = c = 0b11 + 0o11 + 0x11 + 11.1 + 1.1e+1
 c = (1 + 2) * 3 % 2 ** 3
 
 %%//// 문자열 접합 연산자
-val ts:string = "abc" .. 'def' + 's'
+val ts:string = "abc" .. 'def' .. 's'
 
 %%//// 삼항 연산자
 var gender = if a == 1 then 'male' else 'female'
@@ -39,10 +39,9 @@ val obj: {
   age: 50
 }
 
-%%//// array and tuple type
+%%//// array type
 val array: string[] = ['a', 'b', 'c']
-val tuple: [string, number, boolean] = ['Hello', 42, true]
-val s1 = array[a+b] + array[1]
+val s1 = array[a + b] .. array[1]
 
 %%/*
   함수 정의
@@ -85,8 +84,6 @@ val lambda5 = (arg: number)-> number => return arg
 %%/*
   조건문
 */%%
-if not a console log 'a is not true'
-
 def matchTest(x: number)-> string => x match {
   case 1 => return "one"
   case 2 => return "two"

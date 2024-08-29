@@ -51,7 +51,7 @@ const oncePerSecond = (callback: (p: string) => void): void => {
 /*
   반복문 관련
 */
-function sum(a: number, b: number) {
+function sum(a: number, b: number): number {
   return a + b;
 }
 const array2: string[] = ['a', 'b', 'c'];
@@ -61,12 +61,12 @@ for (const a of array2) {
   }
 }
 let arrLen = 1;
-while (arrLen < array2.length && sum(arrLen, 1) == 2) {
+while (arrLen < array2.length() && sum(arrLen, 1) == 2) {
   arrLen += 1;
 }
 do {
   console.log(arrLen)
-} while (arrLen < array2.length && sum(arrLen, 1) == 2)
+} while (arrLen < array2.length() && sum(arrLen, 1) == 2)
 function generateBypassElement(bypass: string[]): string {
   let result: string = "";
   let t = result.trim();
