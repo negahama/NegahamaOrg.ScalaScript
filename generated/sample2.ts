@@ -2,39 +2,49 @@
 "use strict";
 
 /*
-  함수 호출
+  Class
 */
-let s: string = "this is sample";
-let list2 = s.concat("2" + 'def').trim().split(",");
-/*
-  배열의 인덱스는 1 부터
-*/
-let s4 = s.includes("is", 1 - 1);
-/*
-  주석은 그대로 변환되어야 한다.
-*/
-function main() {
-  hanoi(3, "a", "b", "c")
-  let ary: string[] = ['a', 'b', 'c'];
-  concatenate(ary)
-}
-function hanoi(n: number, from: string, to1: string, mid: string): void {
-  function move(from: string, to1: string) {
-    console.log(`${from} ${to1}`)
-  }
-  if (n == 1) {
-    move(from, to1)
-  }
-  else {
-    hanoi(n - 1, from, mid, to1)
-    move(from, to1)
-    hanoi(n - 1, mid, to1, from)
+class ClassA {
+  b: ClassB;
+  getB(param: string): ClassB {
+    return this.b;
   }
 }
-function concatenate(ary: string[]): string {
-  let result = "";
-  for (const e of ary) {
-    result = result + e;
-  }
-  return result;
+class ClassB {
+  c: string;
 }
+let classA: ClassA;
+classA = new ClassA
+const st1 = classA.b.c;
+const st2 = classA.getB("dummy").c;
+function fun(a: number) {
+  let b = 0;
+  b = 1;
+}
+class Person {
+  name: string = 'no name';
+  gender: number;
+  age: number;
+  display() {
+    console.log(this.name, this.gender, this.age)
+  }
+}
+class Student extends Person {
+  grade: number;
+  registerClass(what: string) {
+    console.log("register class", what)
+  }
+}
+let boy: Student;
+boy = new Student()
+boy.display()
+// object type
+interface BasicInfo {name: string, parts: string[]}
+const car: BasicInfo = {
+  name: 'car',
+  parts: ['engine', 'wheel', 'body'],
+};
+const obj: {name: string, age: number} = {
+  name: "samuel",
+  age: 50,
+};

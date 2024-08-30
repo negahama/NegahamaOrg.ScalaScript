@@ -2,8 +2,8 @@ import { AstNode } from "langium";
 import {
   isCatchStatement,
   isExpression,
-  isForOf,
   isForStatement,
+  isForOf,
   isForTo,
   isForUntil,
   isLiteral,
@@ -64,6 +64,7 @@ export class ForStatementComponent {
   }
 
   /**
+   * //todo 중첩 for 문인 경우 타입 처리는?
    *
    * @param node
    * @param cache
@@ -74,7 +75,7 @@ export class ForStatementComponent {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
     if (!isForStatement(node)) return type;
 
-    const log = enterLog("isField", node.$type, indent);
+    const log = enterLog("isForStatement", node.$type, indent);
     exitLog(log);
     return type;
   }
@@ -98,6 +99,7 @@ export class ForOfComponent {
   }
 
   /**
+   * 이 함수는 for(a <- ary)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
    *
    * @param node
    * @param cache
@@ -109,10 +111,8 @@ export class ForOfComponent {
     if (!isForOf(node)) return type;
 
     const log = enterLog("isForOf", node.name, indent);
-    // console.log("isForOf:");
     type = TypeSystem.inferType(node.of, cache, indent + 1);
-    if (TypeSystem.isArrayType(type)) type = TypeSystem.inferType(type.literal, cache, indent + 2);
-    // console.log("isForOf:", type?.$type);
+    if (TypeSystem.isArrayType(type)) type = type.elementType;
     exitLog(log);
     return type;
   }
@@ -136,6 +136,7 @@ export class ForToComponent {
   }
 
   /**
+   * 이 함수는 for(a <- 1 to 10)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
    *
    * @param node
    * @param cache
@@ -147,10 +148,8 @@ export class ForToComponent {
     if (!isForTo(node)) return type;
 
     const log = enterLog("isForTo", node.name, indent);
-    // console.log("isForTo:");
     type = TypeSystem.inferType(node.e1, cache, indent + 1);
-    if (TypeSystem.isArrayType(type)) type = TypeSystem.inferType(type.literal, cache, indent + 2);
-    // console.log("isForTo:", type?.$type);
+    if (TypeSystem.isArrayType(type)) type = type.elementType;
     exitLog(log);
     return type;
   }
@@ -174,6 +173,7 @@ export class ForUntilComponent {
   }
 
   /**
+   * 이 함수는 for(a <- 1 until 10)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
    *
    * @param node
    * @param cache
@@ -185,10 +185,8 @@ export class ForUntilComponent {
     if (!isForUntil(node)) return type;
 
     const log = enterLog("isForUntil", node.name, indent);
-    // console.log("isForUntil:");
     type = TypeSystem.inferType(node.e1, cache, indent + 1);
-    if (TypeSystem.isArrayType(type)) type = TypeSystem.inferType(type.literal, cache, indent + 2);
-    // console.log("isForUntil:", type?.$type);
+    if (TypeSystem.isArrayType(type)) type = type.elementType;
     exitLog(log);
     return type;
   }

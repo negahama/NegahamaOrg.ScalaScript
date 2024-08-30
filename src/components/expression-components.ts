@@ -12,7 +12,7 @@ import {
   UnaryExpression,
 } from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
-import { getTypeCache, isAssignable, isLegalOperation } from "../language/scala-script-validator.js";
+import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
 import { applyIndent, generateBlock, generateCondition } from "../cli/generator-util.js";
 import { generateExpression, generateStatement } from "../cli/generator.js";
 
@@ -155,12 +155,15 @@ export class BinaryExpressionComponent {
    * @param accept
    */
   static validationChecks(binary: BinaryExpression, accept: ValidationAcceptor): void {
-    // console.log("checkBinaryOperationAllowed");
+    console.log("checkBinaryOperationAllowed");
+    const expr = `'${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`;
+    console.log(`    expression: ${expr}`);
+
     const map = getTypeCache();
-    // console.log(`    left: '${binary.left.$cstNode?.text}'`);
-    const left = TypeSystem.inferType(binary.left, map, 2);
-    // console.log(`    right: '${binary.right.$cstNode?.text}'`);
-    const right = TypeSystem.inferType(binary.right, map, 2);
+    const left = TypeSystem.inferType(binary.left, map);
+    const right = TypeSystem.inferType(binary.right, map);
+    console.log(`    type1: ${left.$type}, ${right.$type}`);
+    console.log(`    type2: ${TypeSystem.typeToString(left)}, ${TypeSystem.typeToString(right)}`);
     if (!isLegalOperation(binary.operator, left, right)) {
       const msg =
         `Cannot perform operation '${binary.operator}' on values of type ` +
@@ -178,6 +181,33 @@ export class BinaryExpressionComponent {
       }
     }
   }
+}
+
+/**
+ * 연산자가 적법한 타입을 취하는지 확인한다.
+ *
+ * @param operator
+ * @param left
+ * @param right
+ * @returns
+ */
+export function isLegalOperation(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
+  if (operator === "+") {
+    if (!right) return left.$type === "number";
+    return left.$type === "number" && right.$type === "number";
+  } else if (operator === "..") {
+    if (!right) return left.$type === "string";
+    return left.$type === "string" && right.$type === "string";
+  } else if (["-", "+", "**", "*", "/", "%", "<", "<=", ">", ">="].includes(operator)) {
+    if (!right) return left.$type === "number";
+    return left.$type === "number" && right.$type === "number";
+  } else if (["and", "or", "&&", "||"].includes(operator)) {
+    return left.$type === "boolean" && right?.$type === "boolean";
+  } else if (["not", "!"].includes(operator)) {
+    // 부정(논리적 NOT) 단항 연산자는 문자열과 숫자에도 적용되는데 빈 문자열과 0 을 거짓으로 취급한다.
+    return left.$type === "boolean" || left.$type === "string" || left.$type === "number";
+  }
+  return true;
 }
 
 /**

@@ -119,31 +119,6 @@ export class ScalaScriptValidator {
 
 /**
  *
- * @param operator
- * @param left
- * @param right
- * @returns
- */
-export function isLegalOperation(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
-  if (operator === "+") {
-    if (!right) return left.$type === "number";
-    return left.$type === "number" && right.$type === "number";
-  } else if (operator === "..") {
-    if (!right) return left.$type === "string";
-    return left.$type === "string" && right.$type === "string";
-  } else if (["-", "+", "**", "*", "/", "%", "<", "<=", ">", ">="].includes(operator)) {
-    if (!right) return left.$type === "number";
-    return left.$type === "number" && right.$type === "number";
-  } else if (["and", "or", "&&", "||"].includes(operator)) {
-    return left.$type === "boolean" && right?.$type === "boolean";
-  } else if (["not", "!"].includes(operator)) {
-    return left.$type === "boolean" || left.$type === "string";
-  }
-  return true;
-}
-
-/**
- *
  * @param from
  * @param to
  * @returns

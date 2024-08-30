@@ -1,7 +1,6 @@
 import { AstNode, AstUtils } from "langium";
 import {
   Class,
-  SimpleType,
   BooleanExpression,
   StringExpression,
   NumberExpression,
@@ -32,9 +31,9 @@ import {
 } from "./generated/ast.js";
 import { SimpleTypeComponent } from "../components/datatype-components.js";
 import { MethodCallComponent } from "../components/methodcall-components.js";
-import { ForOfComponent, ForToComponent } from "../components/statement-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import { ClassComponent, FieldComponent, MethodComponent } from "../components/class-components.js";
+import { ForOfComponent, ForToComponent, ForUntilComponent } from "../components/statement-components.js";
 import { BinaryExpressionComponent, UnaryExpressionComponent } from "../components/expression-components.js";
 import { ArrayExpressionComponent, ArrayLiteralComponent, ArrayTypeComponent } from "../components/array-components.js";
 
@@ -45,9 +44,13 @@ import { ArrayExpressionComponent, ArrayLiteralComponent, ArrayTypeComponent } f
  * @param indent
  * @returns
  */
+var _enableLog_ = false;
+export function enableLog(enable: boolean) {
+  _enableLog_ = enable;
+}
 export function enterLog(procKind: string, procId: string | undefined, indent: number): string {
   const space = "    ".repeat(indent);
-  // console.log(space + `Enter ${procKind}, ${procId}`);
+  if (_enableLog_) console.log(space + `Enter ${procKind}, ${procId}`);
   return space + `Exit ${procKind}, ${procId}`;
 }
 
@@ -58,8 +61,7 @@ export function enterLog(procKind: string, procId: string | undefined, indent: n
  * @param optionalParams
  */
 export function traceLog(indent: number, msg: string, ...optionalParams: any[]) {
-  // const space = "    ".repeat(indent);
-  // console.log(space + msg, ...optionalParams);
+  if (_enableLog_) console.log("    ".repeat(indent) + msg, ...optionalParams);
 }
 
 /**
@@ -67,7 +69,7 @@ export function traceLog(indent: number, msg: string, ...optionalParams: any[]) 
  * @param log
  */
 export function exitLog(log: string) {
-  // console.log(log);
+  if (_enableLog_) console.log(log);
 }
 
 /**
@@ -119,7 +121,7 @@ export interface NumberTypeDescription {
  */
 export interface ArrayTypeDescription {
   readonly $type: "array";
-  readonly literal?: SimpleType;
+  readonly elementType: TypeDescription;
 }
 
 /**
@@ -244,13 +246,13 @@ export class TypeSystem {
 
   /**
    *
-   * @param literal
+   * @param elementType
    * @returns
    */
-  static createArrayType(literal?: SimpleType): ArrayTypeDescription {
+  static createArrayType(elementType: TypeDescription): ArrayTypeDescription {
     return {
       $type: "array",
-      literal,
+      elementType,
     };
   }
 
@@ -388,15 +390,15 @@ export class TypeSystem {
     } else if (isParameter(node)) {
       const log = enterLog("isParameter", node.name, indent);
       if (node.type) {
-        type = this.inferType(node.type, cache, indent + 1);
+        type = TypeSystem.inferType(node.type, cache, indent + 1);
       } else if (node.value) {
-        type = this.inferType(node.value, cache, indent + 1);
+        type = TypeSystem.inferType(node.value, cache, indent + 1);
       }
       exitLog(log);
     } else if (isBinding(node)) {
       const log = enterLog("isBinding", node.name, indent);
       if (node.type) {
-        type = this.inferType(node.type, cache, indent + 1);
+        type = TypeSystem.inferType(node.type, cache, indent + 1);
       }
       exitLog(log);
     } else if (isSimpleType(node)) {
@@ -413,7 +415,7 @@ export class TypeSystem {
     } else if (isForTo(node)) {
       type = ForToComponent.inferType(node, cache, indent);
     } else if (isForUntil(node)) {
-      type = ForToComponent.inferType(node, cache, indent);
+      type = ForUntilComponent.inferType(node, cache, indent);
     } else if (isAssignment(node)) {
       type = AssignmentComponent.inferType(node, cache, indent);
     } else if (isLambdaType(node)) {
@@ -442,14 +444,14 @@ export class TypeSystem {
       type = UnaryExpressionComponent.inferType(node, cache, indent);
     } else if (isGroupExpression(node)) {
       const log = enterLog("isGroup", node.$cstNode?.text, indent);
-      type = this.inferType(node.value, cache, indent + 1);
+      type = TypeSystem.inferType(node.value, cache, indent + 1);
       exitLog(log);
     } else if (isReturnExpression(node)) {
       const log = enterLog("isReturnExpr", undefined, indent);
       if (!node.value) {
         type = this.createVoidType();
       } else {
-        type = this.inferType(node.value, cache, indent + 1);
+        type = TypeSystem.inferType(node.value, cache, indent + 1);
       }
       exitLog(log);
     }
@@ -475,13 +477,12 @@ export class TypeSystem {
     name: string,
     cache: Map<AstNode, TypeDescription>,
     indent: number = 0
-  ): TypeDescription | undefined {
+  ): TypeDescription {
     const rootLog = enterLog("inferTypeByName", `node is ${node?.$type}, name is ${name}`, indent);
-    let type: TypeDescription | undefined;
-
     if (node == undefined)
       return this.createErrorType("Could not infer type because node is undefined in inferTypeByName", node);
 
+    let type: TypeDescription = this.createErrorType("Could not find name in inferTypeByName", node);
     const precomputed = AstUtils.getDocument(node).precomputedScopes;
     if (precomputed) {
       let currentNode: AstNode | undefined = node;
@@ -491,14 +492,8 @@ export class TypeSystem {
         if (allDescriptions.length > 0) {
           const found = allDescriptions.find((d) => d.name == name && d.type == "Variable");
           if (found) {
-            // console.log("    found:" + found.name, found.type);
-            if (isVariable(found.node)) {
-              type = this.inferType(found.node.type, cache, indent + 1);
-              if (this.isArrayType(type)) {
-                type = this.inferType(type.literal, cache, indent + 1);
-                // console.log(type.$type);
-              }
-            }
+            // console.log("     found:", found.name, found.type);
+            type = TypeSystem.inferType(found.node, cache, indent + 1);
           }
         }
         currentNode = currentNode?.$container;

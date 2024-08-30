@@ -27,8 +27,7 @@ export class ClassComponent {
       } else if (isField(m)) {
         result += applyIndent(indent + 1, generateVariable(m.name, m.type, m.value, indent) + ";");
       } else if (isBypass(m)) {
-        // result += applyIndent(indent + 1, generateBypass(m));
-        result += generateStatement(m, indent + 1);
+        result += applyIndent(indent + 1, generateStatement(m, indent + 1));
       }
       result += "\n";
     });

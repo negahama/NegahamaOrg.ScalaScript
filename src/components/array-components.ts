@@ -4,10 +4,12 @@ import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scal
 import { generateExpression } from "../cli/generator.js";
 
 /**
- *
+ * ArrayType: elementType=SimpleType '[' ']';
+ * example: val ary: **string[]** = [ ... ]
  */
 export class ArrayTypeComponent {
   /**
+   * //todo 여기가 호출되지 않는 이유는?
    *
    * @param expr
    * @param indent
@@ -32,15 +34,15 @@ export class ArrayTypeComponent {
     if (!isArrayType(node)) return type;
 
     const log = enterLog("isArrayType", node.elementType.$cstNode?.text, indent);
-    type = TypeSystem.createArrayType(node.elementType);
-    // console.log("array type:", type.$type, type.literal?.$cstNode?.text);
+    type = TypeSystem.createArrayType(TypeSystem.inferType(node.elementType, cache, indent));
     exitLog(log);
     return type;
   }
 }
 
 /**
- *
+ * ArrayLiteral: '[' items+=Literal (',' items+=Literal )* ']';
+ * example: val ary = **[ 1, 2, 3 ]**
  */
 export class ArrayLiteralComponent {
   /**
@@ -58,6 +60,7 @@ export class ArrayLiteralComponent {
   }
 
   /**
+   * //todo 모두 동일한 타입을 가지는지 검사해야 한다.
    *
    * @param node
    * @param cache
@@ -69,15 +72,17 @@ export class ArrayLiteralComponent {
     if (!isArrayLiteral(node)) return type;
 
     const log = enterLog("isArrayLiteral", node.items.toString(), indent);
-    type = TypeSystem.createArrayType();
-    // console.log("array literal:", type?.$type);
+    if (node.items.length > 0) {
+      type = TypeSystem.createArrayType(TypeSystem.inferType(node.items[0], cache, indent));
+    }
     exitLog(log);
     return type;
   }
 }
 
 /**
- *
+ * ArrayExpression: element=[NamedElement:Id] '[' index=Expression ']';
+ * example: a = **ary[10]**
  */
 export class ArrayExpressionComponent {
   /**
@@ -90,11 +95,12 @@ export class ArrayExpressionComponent {
     let result = "";
     if (!isArrayExpression(expr)) return result;
 
-    result += `${expr.element}[(${generateExpression(expr.index, indent)}) - 1]`;
+    result += `${expr.element.$refText}[(${generateExpression(expr.index, indent)}) - 1]`;
     return result;
   }
 
   /**
+   * ArrayExpression의 타입은 array가 아니라 element-type이다.
    *
    * @param node
    * @param cache
@@ -102,14 +108,13 @@ export class ArrayExpressionComponent {
    * @returns
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription | undefined = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error");
     if (!isArrayExpression(node)) return type;
 
     // 다른 것들은 node의 타입을 통해서 타입을 추론하지만 이것은 이름을 이용해서 추론해야만 한다.
     const log = enterLog("isArrayExpression", node.element.$refText, indent);
     type = TypeSystem.inferTypeByName(node, node.element.$refText, cache, indent + 1);
-    // console.log("array expr:", type?.$type);
-    if (!type) type = TypeSystem.createErrorType("internal error");
+    if (TypeSystem.isArrayType(type)) type = type.elementType;
     exitLog(log);
     return type;
   }

@@ -130,6 +130,7 @@ export class AssignmentComponent {
   }
 
   /**
+   * //todo 다중 대입문이 아니면 이게 호출되지 않는 이유?
    *
    * @param node
    * @param cache
@@ -148,6 +149,7 @@ export class AssignmentComponent {
     } else {
       type = TypeSystem.createErrorType("No type hint for this element", node);
     }
+    // console.log("AssignmentComponent.inferType:", type.$type);
     exitLog(log);
     return type;
   }
@@ -161,10 +163,10 @@ export class AssignmentComponent {
     // console.log("checkAssignment");
     const map = getTypeCache();
     // console.log(`    left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`);
-    const left = TypeSystem.inferType(expr.assign, map, 2);
+    const left = TypeSystem.inferType(expr.assign, map);
     // console.log(`    left: ${left.$type}`);
     // console.log(`    right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`);
-    const right = TypeSystem.inferType(expr.value, map, 2);
+    const right = TypeSystem.inferType(expr.value, map);
     // console.log(`    right: ${right.$type}`);
     if (!isAssignable(right, left)) {
       accept(

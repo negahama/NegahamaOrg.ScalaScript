@@ -1,5 +1,4 @@
 import {
-  Bypass,
   Block,
   Code,
   Type,
@@ -16,19 +15,6 @@ import {
   isPrimitiveType,
 } from "../language/generated/ast.js";
 import { generateStatement, generateExpression } from "./generator.js";
-
-/**
- *
- * @param bypass
- * @returns
- */
-export function generateBypass(bypass: Bypass): string {
-  let result = "";
-  if (bypass.bypass) {
-    return bypass.bypass.replaceAll("%%\r\n", "").replaceAll("\r\n%%", "").replaceAll("%%//", "").replaceAll("%%", "");
-  }
-  return result;
-}
 
 /**
  *

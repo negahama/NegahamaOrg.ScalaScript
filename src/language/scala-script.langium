@@ -73,7 +73,7 @@ Binding: name=Id (':' type=Type)?;
 //   message
 // }
 ClassDeclaration infers Class:
-  (Annotation)? 'class' name=Id
+  (Annotation)? 'class' name=(Id | "string" | "number" | "array")
   ('extends' superClass=[Class:Id])?
   '{' statements+=ClassStatements* '}';
 ClassStatements: Bypass | Field | Method;

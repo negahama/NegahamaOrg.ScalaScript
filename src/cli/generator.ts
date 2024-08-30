@@ -36,7 +36,7 @@ import {
   isObjectLiteral,
 } from "../language/generated/ast.js";
 import { extractDestinationAndName } from "./cli-util.js";
-import { applyIndent, generateBlock, generateBypass, generateCondition, generateType } from "./generator-util.js";
+import { applyIndent, generateBlock, generateCondition, generateType } from "./generator-util.js";
 import { LambdaCallComponent } from "../components/datatype-components.js";
 import { MethodCallComponent } from "../components/methodcall-components.js";
 import { ClassComponent, MethodComponent } from "../components/class-components.js";
@@ -122,7 +122,13 @@ export function generateStatement(stmt: Statement | undefined, indent: number): 
   } else if (isBreak(stmt)) {
     result += "break;";
   } else if (isBypass(stmt)) {
-    result += generateBypass(stmt);
+    if (stmt.bypass) {
+      result += stmt.bypass
+        .replaceAll("%%\r\n", "")
+        .replaceAll("\r\n%%", "")
+        .replaceAll("%%//", "")
+        .replaceAll("%%", "");
+    }
   } else {
     console.log("ERROR in Statement");
   }

@@ -8,41 +8,59 @@ import {
   PrecomputedScopes,
   ReferenceInfo,
   Scope,
-  // AstNodeDescription,
-  // interruptAndCheck,
-  // MultiMap,
-  // stream,
-  // Stream,
-  // StreamScope,
 } from "langium";
 import {
   Class,
+  Field,
+  Method,
+  MethodCall,
+  isBypass,
   isClass,
   isMethod,
   isField,
   isVariable,
-  MethodCall,
-  Method,
-  isArrayType,
-  isSimpleType,
   isPrimitiveType,
-  isBypass,
 } from "./generated/ast.js";
 import { LangiumServices } from "langium/lsp";
 import { enterLog, traceLog, exitLog, TypeSystem } from "./scala-script-types.js";
-// import { CancellationToken } from "vscode-languageserver";
 
 /**
  *
  */
-const extensionFunctions: { type: string; name: string; node: Method }[] = [];
+interface ExtensionFunction {
+  type: string;
+  name: string;
+  node: Method | Field;
+}
 
-// function findExtensionByType(type: Type): string[] {
+const stringExtensionFunctions: ExtensionFunction[] = [];
+const arrayExtensionFunctions: ExtensionFunction[] = [];
+
+/**
+ *
+ * @returns
+ */
+function getExtensionAll(kind: string): (Method | Field)[] {
+  switch (kind) {
+    case "string":
+      return stringExtensionFunctions.map((e) => e.node);
+    case "array":
+      return arrayExtensionFunctions.map((e) => e.node);
+    default:
+      console.log("internal error");
+      return arrayExtensionFunctions.map((e) => e.node);
+  }
+}
+
+// function getExtensionByType(kind: string, type: string): (Method | Field)[] {
+//   const extensionFunctions = kind == "string" ? stringExtensionFunctions : arrayExtensionFunctions
 //   const result = extensionFunctions.filter((e) => type == e.type);
-//   if (result.length > 0) return result.map((e) => e.name);
+//   if (result.length > 0) return result.map((e) => e.node);
 //   return [];
 // }
-// function findExtensionByName(name: string): Method | undefined {
+
+// function getExtensionByName(kind: string, name: string): Method | Field | undefined {
+//   const extensionFunctions = kind == "string" ? stringExtensionFunctions : arrayExtensionFunctions
 //   const result = extensionFunctions.find((e) => name == e.name);
 //   if (result) return result.node;
 //   return undefined;
@@ -57,6 +75,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   }
 
   /**
+   * getScope()는 cross-reference를 처리하기 위해 호출된다는 점이 중요하다.
+   *
+   * 이것은 a.b 와 같은 구문에서 b가 무엇을 가르키는 것인지를 확인하기 위한 것이다.
+   * 이를 위해서 a가 무엇인지를 먼저 파악하고 이것이 클래스이면 클래스의 멤버들 이름을 모두 제시해 준다.
+   * 여기서는 b의 후보가 될 수 있는 것들을 제시만 할 뿐 실제 b를 결정하는 것은 linker에서 처리한다.
+   * a가 문자열이거나 배열이고 b가 문자열이나 배열 관련 함수일 수도 있다.
+   * 이를 위해서 확장 함수를 등록해 주고 이를 사용한다.
    *
    * @param context
    * @returns
@@ -64,7 +89,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   override getScope(context: ReferenceInfo): Scope {
     const scopeId = `${context.container.$type}.${context.property} = '${context.reference.$refText}'`;
     const scopeLog = enterLog("getScope", scopeId, 0);
-    // const scopes: Array<Stream<AstNodeDescription>> = [];
+
+    // DefaultScopeProvider의 getScope() 코드이다.
+    // Scope에 대한 default 처리가 어떻게 되는지 확인하기 위한 것이다.
+    // // const scopes: Array<Stream<AstNodeDescription>> = [];
     // const referenceType = this.reflection.getReferenceType(context);
     // const precomputed = AstUtils.getDocument(context.container).precomputedScopes;
     // if (precomputed) {
@@ -77,7 +105,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     //       allDescriptions.forEach((d) => {
     //         console.log("    " + d.name);
     //       });
-    //       scopes.push(stream(allDescriptions).filter((desc) => this.reflection.isSubtype(desc.type, referenceType)));
+    //       // scopes.push(stream(allDescriptions).filter((desc) => this.reflection.isSubtype(desc.type, referenceType)));
     //     }
     //     currentNode = currentNode.$container;
     //   } while (currentNode);
@@ -88,9 +116,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // result.getAllElements().forEach((d) => {
     //   console.log("  " + d.name);
     // });
-    // for (let i = scopes.length - 1; i >= 0; i--) {
-    //   result = this.createScope(scopes[i], result);
-    // }
+    // // for (let i = scopes.length - 1; i >= 0; i--) {
+    // //   result = this.createScope(scopes[i], result);
+    // // }
     // // return result;
 
     // target element of member calls
@@ -111,6 +139,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       }
     }
 
+    // (explicitCall?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 Arguments를 그대로 대입한
+    // args+=Expression ... 과 동작이 동일할 것 같은데 그렇지 않다. 실제로는 Arguments는 타입은 존재하진 않아도
+    // args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해 함수의 인수가 있는 경우 즉
+    // methodCall.args가 있는 경우에 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고
+    // 이 코드는 이를 확인하기 위한 것이다.
     const methodCall = context.container as MethodCall;
     if (methodCall.args == undefined) {
       traceLog(1, "MethodCall.args is undefined");
@@ -124,19 +157,36 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       return scope;
     }
 
+    // previous 의 타입을 추론한 결과가...
     const prevTypeDesc = TypeSystem.inferType(previous, new Map(), 1);
+
+    // 클래스이면
+    // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
     if (TypeSystem.isClassType(prevTypeDesc)) {
       traceLog(1, `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}, ${isClass(prevTypeDesc.literal)}`);
       exitLog(scopeLog.replace("Exit", "Exit2"));
       return this.scopeClassMembers(prevTypeDesc.literal);
-    } else if (prevTypeDesc.$type === "string") {
+    }
+
+    // 문자열이면
+    // 문자열 확장 함수로 등록된 모든 멤버를 리턴한다.
+    else if (TypeSystem.isStringType(prevTypeDesc)) {
       traceLog(1, `FIND string: ${previous.$type}`);
-      const allMembers = this.getExtensionFunction();
-      traceLog(
-        0,
-        "",
-        allMembers.map((m) => m.name)
-      );
+      const allMembers = getExtensionAll("string");
+      const allMemberNames = allMembers.map((m) => m.name);
+      traceLog(0, "", allMemberNames);
+      console.log("FIND string:", allMemberNames);
+      return this.createScopeForNodes(allMembers);
+    }
+
+    // 배열이면
+    // 배열의 확장 함수로 등록된 모든 멤버를 리턴한다.
+    else if (TypeSystem.isArrayType(prevTypeDesc)) {
+      traceLog(1, `FIND array: ${previous.$type}, element-type:${prevTypeDesc.elementType.$type}`);
+      const allMembers = getExtensionAll("array");
+      const allMemberNames = allMembers.map((m) => m.name);
+      traceLog(0, "", allMemberNames);
+      console.log("FIND array:", allMemberNames);
       return this.createScopeForNodes(allMembers);
     }
 
@@ -163,14 +213,6 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       } else console.error("error");
     });
     return this.createScopeForNodes(removedBypass);
-  }
-
-  /**
-   *
-   * @returns
-   */
-  private getExtensionFunction(): Method[] {
-    return extensionFunctions.map((e) => e.node);
   }
 }
 
@@ -231,6 +273,18 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
    * Process a single node during scopes computation. The default implementation makes the node visible
    * in the subtree of its container (if the node has a name). Override this method to change this,
    * e.g. by increasing the visibility to a higher level in the AST.
+   *
+   * 이 함수는 위의 computeLocalScopes()에서 rootNode부터 모든 contents에 대해서 호출된다.
+   * 디폴트 동작은 NameProvider에서 해당 AstNode의 이름을 받아서 기타 정보들과 함께 description을 구성하고
+   * 이를 precomputedScopes에 추가해 주는 것이다.
+   *
+   * 내 경우는 다중 대입문 지원으로 인해 변수 선언시 이름이 names에 있기 때문에 Langium의 디폴트 처리로는
+   * 변수명을 인식하지 못하기 때문에 여기서 names에 있는 모든 이름을 등록해 주고, 매서드나 클래스 구문 중에서
+   * 확장 함수가 있으면 이를 확장 함수 테이블에 등록해 준다.
+   *
+   * @param node
+   * @param document
+   * @param scopes
    */
   override processNode(node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes): void {
     const defaultProcess = (node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes) => {
@@ -245,32 +299,56 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
     };
 
     const container = node.$container;
-    if (container) {
-      if (isVariable(node)) {
-        traceLog(0, "  node:", node.$type);
-        node.names.forEach((name) => {
-          traceLog(1, `'${name}'`);
-          scopes.add(container, this.descriptions.createDescription(node, name, document));
-        });
-      } else if (isMethod(node)) {
-        let isProcessed = false;
-        if (node.extension) {
-          if (isSimpleType(node.extension)) {
-            if (isPrimitiveType(node.extension)) {
-              traceLog(0, "extension function:", node.extension.type, node.name);
-              extensionFunctions.push({ type: node.extension.type, name: node.name, node: node });
-              isProcessed = true;
-            }
-          } else if (isArrayType(node.extension)) {
-            console.log("this is array");
+    if (!container) return;
+
+    let isProcessed = false;
+
+    // 변수 선언문에서의 이름을 처리한다
+    if (isVariable(node)) {
+      traceLog(0, "  node:", node.$type);
+      node.names.forEach((name) => {
+        traceLog(1, `'${name}'`);
+        scopes.add(container, this.descriptions.createDescription(node, name, document));
+      });
+      isProcessed = true;
+    }
+
+    // 함수 중에 확장 함수가 있으면 이를 처리한다.
+    else if (isMethod(node) && node.extension) {
+      // 현재는 extension으로 string이 명시된 경우만 확장함수로 등록된다.
+      if (isPrimitiveType(node.extension)) {
+        traceLog(0, "extension function:", node.extension.type, node.name);
+        switch (node.extension.type) {
+          case "string":
+            stringExtensionFunctions.push({ type: node.extension.type, name: node.name, node: node });
+            break;
+        }
+        isProcessed = true;
+      } else {
+        console.log("Not support...");
+      }
+    }
+
+    // 클래스 중에 클래스 이름이 string, array가 있으면 이를 확장함수로 처리한다
+    else if (isClass(node) && (node.name == "string" || node.name == "array")) {
+      traceLog(0, "extension class:", node.name);
+      node.statements.forEach((s) => {
+        if (isField(s) || isMethod(s)) {
+          switch (node.name) {
+            case "string":
+              stringExtensionFunctions.push({ type: node.name, name: s.name, node: s });
+              break;
+            case "array":
+              arrayExtensionFunctions.push({ type: node.name, name: s.name, node: s });
+              break;
           }
         }
-        if (!isProcessed) {
-          defaultProcess(node, document, scopes);
-        }
-      } else {
-        defaultProcess(node, document, scopes);
-      }
+      });
+      isProcessed = true;
+    }
+
+    if (!isProcessed) {
+      defaultProcess(node, document, scopes);
     }
   }
 }
