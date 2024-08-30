@@ -1,34 +1,5 @@
 import { AstNode, AstUtils } from "langium";
-import {
-  Class,
-  BooleanExpression,
-  StringExpression,
-  NumberExpression,
-  isMethodCall,
-  isVariable,
-  isClass,
-  isField,
-  isMethod,
-  isParameter,
-  isBinding,
-  isForOf,
-  isForTo,
-  isForUntil,
-  isAssignment,
-  isLambdaType,
-  isArrayType,
-  isSimpleType,
-  isArrayExpression,
-  isGroupExpression,
-  isUnaryExpression,
-  isReturnExpression,
-  isBinaryExpression,
-  isStringExpression,
-  isNumberExpression,
-  isBooleanExpression,
-  isVoidExpression,
-  isArrayLiteral,
-} from "./generated/ast.js";
+import * as ast from "./generated/ast.js";
 import { SimpleTypeComponent } from "../components/datatype-components.js";
 import { MethodCallComponent } from "../components/methodcall-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
@@ -97,7 +68,7 @@ export interface VoidTypeDescription {
  */
 export interface BooleanTypeDescription {
   readonly $type: "boolean";
-  readonly literal?: BooleanExpression;
+  readonly literal?: ast.BooleanExpression;
 }
 
 /**
@@ -105,7 +76,7 @@ export interface BooleanTypeDescription {
  */
 export interface StringTypeDescription {
   readonly $type: "string";
-  readonly literal?: StringExpression;
+  readonly literal?: ast.StringExpression;
 }
 
 /**
@@ -113,7 +84,7 @@ export interface StringTypeDescription {
  */
 export interface NumberTypeDescription {
   readonly $type: "number";
-  readonly literal?: NumberExpression;
+  readonly literal?: ast.NumberExpression;
 }
 
 /**
@@ -146,7 +117,7 @@ export interface FunctionParameter {
  */
 export interface ClassTypeDescription {
   readonly $type: "class";
-  readonly literal: Class;
+  readonly literal: ast.Class;
 }
 
 /**
@@ -186,7 +157,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createBooleanType(literal?: BooleanExpression): BooleanTypeDescription {
+  static createBooleanType(literal?: ast.BooleanExpression): BooleanTypeDescription {
     return {
       $type: "boolean",
       literal,
@@ -207,7 +178,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createStringType(literal?: StringExpression): StringTypeDescription {
+  static createStringType(literal?: ast.StringExpression): StringTypeDescription {
     return {
       $type: "string",
       literal,
@@ -228,7 +199,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createNumberType(literal?: NumberExpression): NumberTypeDescription {
+  static createNumberType(literal?: ast.NumberExpression): NumberTypeDescription {
     return {
       $type: "number",
       literal,
@@ -293,7 +264,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createClassType(literal: Class): ClassTypeDescription {
+  static createClassType(literal: ast.Class): ClassTypeDescription {
     return {
       $type: "class",
       literal,
@@ -377,17 +348,17 @@ export class TypeSystem {
     // Prevent recursive inference errors
     cache.set(node, this.createErrorType("Recursive definition", node));
 
-    if (isMethodCall(node)) {
+    if (ast.isMethodCall(node)) {
       type = MethodCallComponent.inferType(node, cache, indent);
-    } else if (isVariable(node)) {
+    } else if (ast.isVariable(node)) {
       type = VariableComponent.inferType(node, cache, indent);
-    } else if (isClass(node)) {
+    } else if (ast.isClass(node)) {
       type = ClassComponent.inferType(node, cache, indent);
-    } else if (isField(node)) {
+    } else if (ast.isField(node)) {
       type = FieldComponent.inferType(node, cache, indent);
-    } else if (isMethod(node)) {
+    } else if (ast.isMethod(node)) {
       type = MethodComponent.inferType(node, cache, indent);
-    } else if (isParameter(node)) {
+    } else if (ast.isParameter(node)) {
       const log = enterLog("isParameter", node.name, indent);
       if (node.type) {
         type = TypeSystem.inferType(node.type, cache, indent + 1);
@@ -395,58 +366,58 @@ export class TypeSystem {
         type = TypeSystem.inferType(node.value, cache, indent + 1);
       }
       exitLog(log);
-    } else if (isBinding(node)) {
+    } else if (ast.isBinding(node)) {
       const log = enterLog("isBinding", node.name, indent);
       if (node.type) {
         type = TypeSystem.inferType(node.type, cache, indent + 1);
       }
       exitLog(log);
-    } else if (isSimpleType(node)) {
+    } else if (ast.isSimpleType(node)) {
       type = SimpleTypeComponent.inferType(node, cache, indent);
-    } else if (isArrayType(node)) {
+    } else if (ast.isArrayType(node)) {
       // isArrayType은 isSimpleType보다 나중에 검사되어야 한다.
       type = ArrayTypeComponent.inferType(node, cache, indent);
-    } else if (isArrayLiteral(node)) {
+    } else if (ast.isArrayLiteral(node)) {
       type = ArrayLiteralComponent.inferType(node, cache, indent);
-    } else if (isArrayExpression(node)) {
+    } else if (ast.isArrayExpression(node)) {
       type = ArrayExpressionComponent.inferType(node, cache, indent);
-    } else if (isForOf(node)) {
+    } else if (ast.isForOf(node)) {
       type = ForOfComponent.inferType(node, cache, indent);
-    } else if (isForTo(node)) {
+    } else if (ast.isForTo(node)) {
       type = ForToComponent.inferType(node, cache, indent);
-    } else if (isForUntil(node)) {
+    } else if (ast.isForUntil(node)) {
       type = ForUntilComponent.inferType(node, cache, indent);
-    } else if (isAssignment(node)) {
+    } else if (ast.isAssignment(node)) {
       type = AssignmentComponent.inferType(node, cache, indent);
-    } else if (isLambdaType(node)) {
+    } else if (ast.isLambdaType(node)) {
       const log = enterLog("isLambdaType", undefined, indent);
       //type = { $type: "lambda" };
       exitLog(log);
-    } else if (isStringExpression(node)) {
+    } else if (ast.isStringExpression(node)) {
       const log = enterLog("isStringExpression", node.value, indent);
       type = this.createStringType(node);
       exitLog(log);
-    } else if (isNumberExpression(node)) {
+    } else if (ast.isNumberExpression(node)) {
       const log = enterLog("isNumberExpression", node.value.toString(), indent);
       type = this.createNumberType(node);
       exitLog(log);
-    } else if (isBooleanExpression(node)) {
+    } else if (ast.isBooleanExpression(node)) {
       const log = enterLog("isBooleanExpression", node.value.toString(), indent);
       type = this.createBooleanType(node);
       exitLog(log);
-    } else if (isVoidExpression(node)) {
+    } else if (ast.isVoidExpression(node)) {
       const log = enterLog("isVoidExpression", node.value, indent);
       type = this.createVoidType();
       exitLog(log);
-    } else if (isBinaryExpression(node)) {
+    } else if (ast.isBinaryExpression(node)) {
       type = BinaryExpressionComponent.inferType(node, cache, indent);
-    } else if (isUnaryExpression(node)) {
+    } else if (ast.isUnaryExpression(node)) {
       type = UnaryExpressionComponent.inferType(node, cache, indent);
-    } else if (isGroupExpression(node)) {
+    } else if (ast.isGroupExpression(node)) {
       const log = enterLog("isGroup", node.$cstNode?.text, indent);
       type = TypeSystem.inferType(node.value, cache, indent + 1);
       exitLog(log);
-    } else if (isReturnExpression(node)) {
+    } else if (ast.isReturnExpression(node)) {
       const log = enterLog("isReturnExpr", undefined, indent);
       if (!node.value) {
         type = this.createVoidType();
@@ -509,9 +480,9 @@ export class TypeSystem {
    * @param classItem
    * @returns
    */
-  static getClassChain(classItem: Class): Class[] {
-    const set = new Set<Class>();
-    let value: Class | undefined = classItem;
+  static getClassChain(classItem: ast.Class): ast.Class[] {
+    const set = new Set<ast.Class>();
+    let value: ast.Class | undefined = classItem;
     while (value && !set.has(value)) {
       set.add(value);
       value = value.superClass?.ref;

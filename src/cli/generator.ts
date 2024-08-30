@@ -1,40 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { expandToNode, joinToNode, toString } from "langium/generate";
-import {
-  type Program,
-  Code,
-  Statement,
-  Expression,
-  isStatement,
-  isExpression,
-  isTypeDeclaration,
-  isVariable,
-  isMethod,
-  isClass,
-  isBypass,
-  isDoStatement,
-  isForStatement,
-  isWhileStatement,
-  isThrowStatement,
-  isCatchStatement,
-  isContinue,
-  isBreak,
-  isAssignment,
-  isMethodCall,
-  isLambdaCall,
-  isArrayExpression,
-  isGroupExpression,
-  isUnaryExpression,
-  isBinaryExpression,
-  isMatchExpression,
-  isIfExpression,
-  isInfixExpression,
-  isReturnExpression,
-  isLiteral,
-  isArrayLiteral,
-  isObjectLiteral,
-} from "../language/generated/ast.js";
+import * as ast from "../language/generated/ast.js";
 import { extractDestinationAndName } from "./cli-util.js";
 import { applyIndent, generateBlock, generateCondition, generateType } from "./generator-util.js";
 import { LambdaCallComponent } from "../components/datatype-components.js";
@@ -57,7 +24,7 @@ import {
  * @param destination
  * @returns
  */
-export function generateTypeScript(program: Program, filePath: string, destination: string | undefined): string {
+export function generateTypeScript(program: ast.Program, filePath: string, destination: string | undefined): string {
   const data = extractDestinationAndName(filePath, destination);
   const generatedFilePath = `${path.join(data.destination, data.name)}.ts`;
 
@@ -82,10 +49,10 @@ export function generateTypeScript(program: Program, filePath: string, destinati
  * @param code
  * @returns
  */
-export function generateCode(code: Code): string {
+export function generateCode(code: ast.Code): string {
   let result = "";
-  if (isStatement(code)) result += generateStatement(code, 0);
-  else if (isExpression(code)) result += generateExpression(code, 0);
+  if (ast.isStatement(code)) result += generateStatement(code, 0);
+  else if (ast.isExpression(code)) result += generateExpression(code, 0);
   else console.log("ERROR in Code:", code);
   return result;
 }
@@ -96,32 +63,32 @@ export function generateCode(code: Code): string {
  * @param indent
  * @returns
  */
-export function generateStatement(stmt: Statement | undefined, indent: number): string {
+export function generateStatement(stmt: ast.Statement | undefined, indent: number): string {
   let result = "";
   if (stmt == undefined) return result;
-  if (isTypeDeclaration(stmt)) {
+  if (ast.isTypeDeclaration(stmt)) {
     result += `interface ${stmt.name} ${generateType(stmt.value, false)}`;
-  } else if (isVariable(stmt)) {
+  } else if (ast.isVariable(stmt)) {
     result += VariableComponent.transpile(stmt, indent);
-  } else if (isMethod(stmt)) {
+  } else if (ast.isMethod(stmt)) {
     result += MethodComponent.transpile(stmt, indent);
-  } else if (isClass(stmt)) {
+  } else if (ast.isClass(stmt)) {
     result += ClassComponent.transpile(stmt, indent);
-  } else if (isDoStatement(stmt)) {
+  } else if (ast.isDoStatement(stmt)) {
     result += `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition)}`;
-  } else if (isForStatement(stmt)) {
+  } else if (ast.isForStatement(stmt)) {
     result += ForStatementComponent.transpile(stmt, indent);
-  } else if (isWhileStatement(stmt)) {
+  } else if (ast.isWhileStatement(stmt)) {
     result += `while ${generateCondition(stmt.condition)} ${generateBlock(stmt.loop, indent)}`;
-  } else if (isThrowStatement(stmt)) {
+  } else if (ast.isThrowStatement(stmt)) {
     result += `throw ${generateExpression(stmt.throw, indent)}`;
-  } else if (isCatchStatement(stmt)) {
+  } else if (ast.isCatchStatement(stmt)) {
     result += CatchStatementComponent.transpile(stmt, indent);
-  } else if (isContinue(stmt)) {
+  } else if (ast.isContinue(stmt)) {
     result += "continue;";
-  } else if (isBreak(stmt)) {
+  } else if (ast.isBreak(stmt)) {
     result += "break;";
-  } else if (isBypass(stmt)) {
+  } else if (ast.isBypass(stmt)) {
     if (stmt.bypass) {
       result += stmt.bypass
         .replaceAll("%%\r\n", "")
@@ -141,32 +108,32 @@ export function generateStatement(stmt: Statement | undefined, indent: number): 
  * @param indent
  * @returns
  */
-export function generateExpression(expr: Expression | undefined, indent: number): string {
+export function generateExpression(expr: ast.Expression | undefined, indent: number): string {
   let result = "";
   if (expr == undefined) return result;
-  if (isAssignment(expr)) {
+  if (ast.isAssignment(expr)) {
     result += AssignmentComponent.transpile(expr, indent);
-  } else if (isIfExpression(expr)) {
+  } else if (ast.isIfExpression(expr)) {
     result += IfExpressionComponent.transpile(expr, indent);
-  } else if (isMatchExpression(expr)) {
+  } else if (ast.isMatchExpression(expr)) {
     result += MatchExpressionComponent.transpile(expr, indent);
-  } else if (isLambdaCall(expr)) {
+  } else if (ast.isLambdaCall(expr)) {
     result += LambdaCallComponent.transpile(expr, indent);
-  } else if (isMethodCall(expr)) {
+  } else if (ast.isMethodCall(expr)) {
     result += MethodCallComponent.transpile(expr, indent);
-  } else if (isUnaryExpression(expr)) {
+  } else if (ast.isUnaryExpression(expr)) {
     result += UnaryExpressionComponent.transpile(expr, indent);
-  } else if (isBinaryExpression(expr)) {
+  } else if (ast.isBinaryExpression(expr)) {
     result += BinaryExpressionComponent.transpile(expr, indent);
-  } else if (isArrayExpression(expr)) {
+  } else if (ast.isArrayExpression(expr)) {
     result += ArrayExpressionComponent.transpile(expr, indent);
-  } else if (isGroupExpression(expr)) {
+  } else if (ast.isGroupExpression(expr)) {
     result += "(" + generateExpression(expr.value, indent) + ")";
-  } else if (isLiteral(expr)) {
+  } else if (ast.isLiteral(expr)) {
     result += expr.value;
-  } else if (isArrayLiteral(expr)) {
+  } else if (ast.isArrayLiteral(expr)) {
     result += ArrayLiteralComponent.transpile(expr, indent);
-  } else if (isObjectLiteral(expr)) {
+  } else if (ast.isObjectLiteral(expr)) {
     result += "{\n";
     expr.items.forEach((item) => {
       result += applyIndent(
@@ -175,9 +142,9 @@ export function generateExpression(expr: Expression | undefined, indent: number)
       );
     });
     result += "}";
-  } else if (isInfixExpression(expr)) {
+  } else if (ast.isInfixExpression(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
-  } else if (isReturnExpression(expr)) {
+  } else if (ast.isReturnExpression(expr)) {
     result = `return ${generateExpression(expr.value, indent)};`;
   } else {
     console.log("ERROR in Expression:", expr);

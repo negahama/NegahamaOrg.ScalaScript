@@ -1,5 +1,5 @@
 import { AstNode } from "langium";
-import { Expression, isMethodCall } from "../language/generated/ast.js";
+import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog, traceLog } from "../language/scala-script-types.js";
 import { generateExpression } from "../cli/generator.js";
 
@@ -13,9 +13,9 @@ export class MethodCallComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isMethodCall(expr)) return result;
+    if (!ast.isMethodCall(expr)) return result;
 
     if (expr.previous) {
       result += generateExpression(expr.previous, indent);
@@ -62,7 +62,7 @@ export class MethodCallComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isMethodCall(node)) return type;
+    if (!ast.isMethodCall(node)) return type;
 
     const id = node.element?.$refText;
     const log = enterLog("isMethodCall", id, indent);

@@ -1,5 +1,5 @@
 import { AstNode } from "langium";
-import { Expression, isArrayExpression, isArrayLiteral, isArrayType } from "../language/generated/ast.js";
+import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
 import { generateExpression } from "../cli/generator.js";
 
@@ -15,9 +15,9 @@ export class ArrayTypeComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isArrayType(expr)) return result;
+    if (!ast.isArrayType(expr)) return result;
 
     return result;
   }
@@ -31,7 +31,7 @@ export class ArrayTypeComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isArrayType(node)) return type;
+    if (!ast.isArrayType(node)) return type;
 
     const log = enterLog("isArrayType", node.elementType.$cstNode?.text, indent);
     type = TypeSystem.createArrayType(TypeSystem.inferType(node.elementType, cache, indent));
@@ -51,9 +51,9 @@ export class ArrayLiteralComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isArrayLiteral(expr)) return result;
+    if (!ast.isArrayLiteral(expr)) return result;
 
     result += "[" + expr.items.map((item) => item.value).join(", ") + "]";
     return result;
@@ -69,7 +69,7 @@ export class ArrayLiteralComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isArrayLiteral(node)) return type;
+    if (!ast.isArrayLiteral(node)) return type;
 
     const log = enterLog("isArrayLiteral", node.items.toString(), indent);
     if (node.items.length > 0) {
@@ -91,9 +91,9 @@ export class ArrayExpressionComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isArrayExpression(expr)) return result;
+    if (!ast.isArrayExpression(expr)) return result;
 
     result += `${expr.element.$refText}[(${generateExpression(expr.index, indent)}) - 1]`;
     return result;
@@ -109,7 +109,7 @@ export class ArrayExpressionComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isArrayExpression(node)) return type;
+    if (!ast.isArrayExpression(node)) return type;
 
     // 다른 것들은 node의 타입을 통해서 타입을 추론하지만 이것은 이름을 이용해서 추론해야만 한다.
     const log = enterLog("isArrayExpression", node.element.$refText, indent);

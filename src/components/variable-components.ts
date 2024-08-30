@@ -1,13 +1,5 @@
 import { AstNode, ValidationAcceptor } from "langium";
-import {
-  Assignment,
-  Expression,
-  isAssignment,
-  isLiteral,
-  isVariable,
-  Statement,
-  Variable,
-} from "../language/generated/ast.js";
+import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
 import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
 import { generateExpression } from "../cli/generator.js";
@@ -23,9 +15,9 @@ export class VariableComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: Statement, indent: number): string {
+  static transpile(stmt: ast.Statement, indent: number): string {
     let result = "";
-    if (!isVariable(stmt)) return result;
+    if (!ast.isVariable(stmt)) return result;
 
     if (stmt.annotate == "NotTrans") return result;
     if (stmt.kind == "var") result += "let ";
@@ -43,7 +35,7 @@ export class VariableComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isVariable(node)) return type;
+    if (!ast.isVariable(node)) return type;
 
     const log = enterLog("isVariable", node.names.toString(), indent);
     if (node.type) {
@@ -62,7 +54,7 @@ export class VariableComponent {
    * @param expr
    * @param accept
    */
-  static validationChecks(expr: Variable, accept: ValidationAcceptor): void {
+  static validationChecks(expr: ast.Variable, accept: ValidationAcceptor): void {
     // console.log("checkVariableDeclaration");
     // const text = AstUtils.getDocument(expr).parseResult.value.$cstNode?.text;
     // const text = (AstUtils.getDocument(expr).parseResult.value.$cstNode as RootCstNode).fullText;
@@ -80,7 +72,7 @@ export class VariableComponent {
     // console.log("    expr.type:", `'${expr.type?.$cstNode?.text}'`);
     // console.log("    expr.value:", `${expr.value?.$type}, '${expr.value?.$cstNode?.text}'`);
     if (expr.type == undefined) {
-      if (isLiteral(expr.value)) {
+      if (ast.isLiteral(expr.value)) {
         // console.log("    expr.value:", expr.value.$type, expr.value.value, typeof expr.value.value);
       }
     }
@@ -119,13 +111,13 @@ export class AssignmentComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isAssignment(expr)) return result;
+    if (!ast.isAssignment(expr)) return result;
 
     const name = generateExpression(expr.assign, indent);
     result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`;
-    result += isAssignment(expr.value) ? "" : ";";
+    result += ast.isAssignment(expr.value) ? "" : ";";
     return result;
   }
 
@@ -139,7 +131,7 @@ export class AssignmentComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isAssignment(node)) return type;
+    if (!ast.isAssignment(node)) return type;
 
     const log = enterLog("isAssignment", node.operator, indent);
     if (node.assign) {
@@ -159,7 +151,7 @@ export class AssignmentComponent {
    * @param expr
    * @param accept
    */
-  static validationChecks(expr: Assignment, accept: ValidationAcceptor): void {
+  static validationChecks(expr: ast.Assignment, accept: ValidationAcceptor): void {
     // console.log("checkAssignment");
     const map = getTypeCache();
     // console.log(`    left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`);

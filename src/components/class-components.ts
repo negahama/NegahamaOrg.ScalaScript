@@ -1,5 +1,5 @@
 import { AstNode, ValidationAcceptor } from "langium";
-import { Class, isBypass, isClass, isField, isMethod, Statement } from "../language/generated/ast.js";
+import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
 import { applyIndent, generateFunction, generateVariable } from "../cli/generator-util.js";
 import { generateStatement } from "../cli/generator.js";
@@ -14,19 +14,19 @@ export class ClassComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: Statement, indent: number): string {
+  static transpile(stmt: ast.Statement, indent: number): string {
     let result = "";
-    if (!isClass(stmt)) return result;
+    if (!ast.isClass(stmt)) return result;
 
     if (stmt.annotate == "NotTrans") return result;
     result += `class ${stmt.name} `;
     result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
     stmt.statements.forEach((m) => {
-      if (isMethod(m)) {
+      if (ast.isMethod(m)) {
         result += applyIndent(indent + 1, generateFunction(m, indent + 1, true));
-      } else if (isField(m)) {
+      } else if (ast.isField(m)) {
         result += applyIndent(indent + 1, generateVariable(m.name, m.type, m.value, indent) + ";");
-      } else if (isBypass(m)) {
+      } else if (ast.isBypass(m)) {
         result += applyIndent(indent + 1, generateStatement(m, indent + 1));
       }
       result += "\n";
@@ -44,7 +44,7 @@ export class ClassComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isClass(node)) return type;
+    if (!ast.isClass(node)) return type;
 
     const log = enterLog("isClass", node.name, indent);
     type = TypeSystem.createClassType(node);
@@ -57,7 +57,7 @@ export class ClassComponent {
    * @param declaration
    * @param accept
    */
-  static validationChecks(declaration: Class, accept: ValidationAcceptor): void {
+  static validationChecks(declaration: ast.Class, accept: ValidationAcceptor): void {
     // TODO: implement classes
     // console.log("checkClassDeclaration");
     // accept("error", "Classes are currently unsupported.", {
@@ -77,9 +77,9 @@ export class FieldComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: Statement, indent: number): string {
+  static transpile(stmt: ast.Statement, indent: number): string {
     let result = "";
-    if (!isField(stmt)) return result;
+    if (!ast.isField(stmt)) return result;
 
     return result;
   }
@@ -93,7 +93,7 @@ export class FieldComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isField(node)) return type;
+    if (!ast.isField(node)) return type;
 
     const log = enterLog("isField", node.name, indent);
     if (node.type) {
@@ -114,9 +114,9 @@ export class MethodComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: Statement, indent: number): string {
+  static transpile(stmt: ast.Statement, indent: number): string {
     let result = "";
-    if (!isMethod(stmt)) return result;
+    if (!ast.isMethod(stmt)) return result;
 
     result += generateFunction(stmt, indent);
     return result;
@@ -131,7 +131,7 @@ export class MethodComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isMethod(node)) return type;
+    if (!ast.isMethod(node)) return type;
 
     const log = enterLog("isMethod", node.name, indent);
     const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);

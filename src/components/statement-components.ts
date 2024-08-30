@@ -1,15 +1,5 @@
 import { AstNode } from "langium";
-import {
-  isCatchStatement,
-  isExpression,
-  isForStatement,
-  isForOf,
-  isForTo,
-  isForUntil,
-  isLiteral,
-  isStatement,
-  Statement,
-} from "../language/generated/ast.js";
+import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
 import { generateExpression, generateStatement } from "../cli/generator.js";
 import { applyIndent, generateBlock } from "../cli/generator-util.js";
@@ -24,26 +14,26 @@ export class ForStatementComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: Statement, indent: number): string {
+  static transpile(stmt: ast.Statement, indent: number): string {
     let result = "";
-    if (!isForStatement(stmt)) return result;
+    if (!ast.isForStatement(stmt)) return result;
 
     let forIndent = indent;
     stmt.iterators.forEach((iter, idx) => {
       const name = iter.name;
-      if (isForOf(iter)) {
+      if (ast.isForOf(iter)) {
         const text = `for (const ${name} of ${generateExpression(iter.of, indent)}) `;
         if (idx == 0) result += text;
         else result += applyIndent(forIndent, text);
       } else {
         const e1 = generateExpression(iter.e1, indent);
         const e2 = generateExpression(iter.e2, indent);
-        let mark = isForTo(iter) ? "<=" : "<";
+        let mark = ast.isForTo(iter) ? "<=" : "<";
         let step = `${name}++`;
         if (iter.step) {
           if (iter.step >= 0) step = `${name} += ${iter.step}`;
           if (iter.step < 0) {
-            mark = isForTo(iter) ? ">=" : ">";
+            mark = ast.isForTo(iter) ? ">=" : ">";
             step = `${name} -= ${-iter.step}`;
           }
         }
@@ -73,7 +63,7 @@ export class ForStatementComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isForStatement(node)) return type;
+    if (!ast.isForStatement(node)) return type;
 
     const log = enterLog("isForStatement", node.$type, indent);
     exitLog(log);
@@ -91,9 +81,9 @@ export class ForOfComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: Statement, indent: number): string {
+  static transpile(stmt: ast.Statement, indent: number): string {
     let result = "";
-    if (!isForOf(stmt)) return result;
+    if (!ast.isForOf(stmt)) return result;
 
     return result;
   }
@@ -108,7 +98,7 @@ export class ForOfComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isForOf(node)) return type;
+    if (!ast.isForOf(node)) return type;
 
     const log = enterLog("isForOf", node.name, indent);
     type = TypeSystem.inferType(node.of, cache, indent + 1);
@@ -128,9 +118,9 @@ export class ForToComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: Statement, indent: number): string {
+  static transpile(stmt: ast.Statement, indent: number): string {
     let result = "";
-    if (!isForTo(stmt)) return result;
+    if (!ast.isForTo(stmt)) return result;
 
     return result;
   }
@@ -145,7 +135,7 @@ export class ForToComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isForTo(node)) return type;
+    if (!ast.isForTo(node)) return type;
 
     const log = enterLog("isForTo", node.name, indent);
     type = TypeSystem.inferType(node.e1, cache, indent + 1);
@@ -165,9 +155,9 @@ export class ForUntilComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: Statement, indent: number): string {
+  static transpile(stmt: ast.Statement, indent: number): string {
     let result = "";
-    if (!isForUntil(stmt)) return result;
+    if (!ast.isForUntil(stmt)) return result;
 
     return result;
   }
@@ -182,7 +172,7 @@ export class ForUntilComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isForUntil(node)) return type;
+    if (!ast.isForUntil(node)) return type;
 
     const log = enterLog("isForUntil", node.name, indent);
     type = TypeSystem.inferType(node.e1, cache, indent + 1);
@@ -202,14 +192,14 @@ export class CatchStatementComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: Statement, indent: number): string {
+  static transpile(stmt: ast.Statement, indent: number): string {
     let result = "";
-    if (!isCatchStatement(stmt)) return result;
+    if (!ast.isCatchStatement(stmt)) return result;
 
     result += `try ${generateBlock(stmt.body, indent)}`;
     result += applyIndent(indent, "catch {\n");
     stmt.cases.forEach((mc) => {
-      if (isLiteral(mc.pattern)) {
+      if (ast.isLiteral(mc.pattern)) {
         const pattern = generateExpression(mc.pattern, indent);
         result += applyIndent(indent + 1, `case ${pattern}: `);
       } else {
@@ -217,8 +207,8 @@ export class CatchStatementComponent {
       }
       result +=
         generateBlock(mc.body, indent + 1, (lastCode, indent) => {
-          if (isStatement(lastCode)) return generateStatement(lastCode, indent);
-          else if (isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
+          if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
+          else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
           else return "";
         }) + "\n";
     });
@@ -236,7 +226,7 @@ export class CatchStatementComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isCatchStatement(node)) return type;
+    if (!ast.isCatchStatement(node)) return type;
 
     const log = enterLog("isCatchStatement", node.$type, indent);
     exitLog(log);

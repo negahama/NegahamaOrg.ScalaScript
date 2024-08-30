@@ -1,14 +1,5 @@
 import { AstNode, AstUtils, type ValidationAcceptor, type ValidationChecks } from "langium";
-import {
-  Variable,
-  Class,
-  Method,
-  UnaryExpression,
-  BinaryExpression,
-  isReturnExpression,
-  type Assignment,
-  type ScalaScriptAstType,
-} from "./generated/ast.js";
+import * as ast from "./generated/ast.js";
 import type { ScalaScriptServices } from "./scala-script-module.js";
 import { TypeSystem, TypeDescription } from "./scala-script-types.js";
 import { ClassComponent } from "../components/class-components.js";
@@ -21,7 +12,7 @@ import { BinaryExpressionComponent, UnaryExpressionComponent } from "../componen
 export function registerValidationChecks(services: ScalaScriptServices) {
   const registry = services.validation.ValidationRegistry;
   const validator = services.validation.ScalaScriptValidator;
-  const checks: ValidationChecks<ScalaScriptAstType> = {
+  const checks: ValidationChecks<ast.ScalaScriptAstType> = {
     Class: validator.checkClassDeclaration,
     Method: validator.checkMethodReturnType,
     Variable: validator.checkVariableDeclaration,
@@ -41,7 +32,7 @@ export class ScalaScriptValidator {
    * @param declaration
    * @param accept
    */
-  checkClassDeclaration(declaration: Class, accept: ValidationAcceptor): void {
+  checkClassDeclaration(declaration: ast.Class, accept: ValidationAcceptor): void {
     ClassComponent.validationChecks(declaration, accept);
   }
 
@@ -50,7 +41,7 @@ export class ScalaScriptValidator {
    * @param expr
    * @param accept
    */
-  checkVariableDeclaration(expr: Variable, accept: ValidationAcceptor): void {
+  checkVariableDeclaration(expr: ast.Variable, accept: ValidationAcceptor): void {
     VariableComponent.validationChecks(expr, accept);
   }
 
@@ -59,7 +50,7 @@ export class ScalaScriptValidator {
    * @param expr
    * @param accept
    */
-  checkAssignment(expr: Assignment, accept: ValidationAcceptor): void {
+  checkAssignment(expr: ast.Assignment, accept: ValidationAcceptor): void {
     AssignmentComponent.validationChecks(expr, accept);
   }
 
@@ -68,7 +59,7 @@ export class ScalaScriptValidator {
    * @param unary
    * @param accept
    */
-  checkUnaryOperationAllowed(unary: UnaryExpression, accept: ValidationAcceptor): void {
+  checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
     UnaryExpressionComponent.validationChecks(unary, accept);
   }
 
@@ -77,7 +68,7 @@ export class ScalaScriptValidator {
    * @param binary
    * @param accept
    */
-  checkBinaryOperationAllowed(binary: BinaryExpression, accept: ValidationAcceptor): void {
+  checkBinaryOperationAllowed(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
     BinaryExpressionComponent.validationChecks(binary, accept);
   }
 
@@ -87,11 +78,11 @@ export class ScalaScriptValidator {
    * @param accept
    * @returns
    */
-  checkMethodReturnType(method: Method, accept: ValidationAcceptor): void {
+  checkMethodReturnType(method: ast.Method, accept: ValidationAcceptor): void {
     // console.log("checkMethodReturnType");
     if (method.body && method.returnType) {
       const map = getTypeCache();
-      const returnStatements = AstUtils.streamAllContents(method.body).filter(isReturnExpression).toArray();
+      const returnStatements = AstUtils.streamAllContents(method.body).filter(ast.isReturnExpression).toArray();
       const expectedType = TypeSystem.inferType(method.returnType, map);
       if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
         accept("error", "A function whose declared type is not 'void' must return a value.", {

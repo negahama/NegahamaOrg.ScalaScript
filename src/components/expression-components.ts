@@ -1,16 +1,5 @@
 import { AstNode, ValidationAcceptor } from "langium";
-import {
-  BinaryExpression,
-  Expression,
-  isBinaryExpression,
-  isExpression,
-  isIfExpression,
-  isLiteral,
-  isMatchExpression,
-  isStatement,
-  isUnaryExpression,
-  UnaryExpression,
-} from "../language/generated/ast.js";
+import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
 import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
 import { applyIndent, generateBlock, generateCondition } from "../cli/generator-util.js";
@@ -26,9 +15,9 @@ export class UnaryExpressionComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isUnaryExpression(expr)) return result;
+    if (!ast.isUnaryExpression(expr)) return result;
 
     let op = "";
     switch (expr.operator) {
@@ -53,7 +42,7 @@ export class UnaryExpressionComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isUnaryExpression(node)) return type;
+    if (!ast.isUnaryExpression(node)) return type;
 
     const log = enterLog("isUnaryExpression", node.operator, indent);
     if (node.operator === "!" || node.operator === "not") {
@@ -70,7 +59,7 @@ export class UnaryExpressionComponent {
    * @param unary
    * @param accept
    */
-  static validationChecks(unary: UnaryExpression, accept: ValidationAcceptor): void {
+  static validationChecks(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
     // console.log("checkUnaryOperationAllowed");
     const item = TypeSystem.inferType(unary.value, getTypeCache());
     if (!isLegalOperation(unary.operator, item)) {
@@ -95,9 +84,9 @@ export class BinaryExpressionComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isBinaryExpression(expr)) return result;
+    if (!ast.isBinaryExpression(expr)) return result;
 
     let op = "";
     switch (expr.operator) {
@@ -130,7 +119,7 @@ export class BinaryExpressionComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isBinaryExpression(node)) return type;
+    if (!ast.isBinaryExpression(node)) return type;
 
     const log = enterLog("isBinaryExpression", node.operator, indent);
     type = TypeSystem.createErrorType("Could not infer type from binary expression", node);
@@ -154,7 +143,7 @@ export class BinaryExpressionComponent {
    * @param binary
    * @param accept
    */
-  static validationChecks(binary: BinaryExpression, accept: ValidationAcceptor): void {
+  static validationChecks(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
     console.log("checkBinaryOperationAllowed");
     const expr = `'${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`;
     console.log(`    expression: ${expr}`);
@@ -220,18 +209,18 @@ export class IfExpressionComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isIfExpression(expr)) return result;
+    if (!ast.isIfExpression(expr)) return result;
 
     // 삼항 연산자 처리
     if (
       expr.then != undefined &&
       expr.then.codes.length == 1 &&
-      isExpression(expr.then.codes[0]) &&
+      ast.isExpression(expr.then.codes[0]) &&
       expr.else != undefined &&
       expr.else.codes.length == 1 &&
-      isExpression(expr.else.codes[0]) &&
+      ast.isExpression(expr.else.codes[0]) &&
       (expr.elif == undefined || expr.elif.length == 0)
     ) {
       result += `${generateCondition(expr.condition)} ? `;
@@ -265,7 +254,7 @@ export class IfExpressionComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isIfExpression(node)) return type;
+    if (!ast.isIfExpression(node)) return type;
 
     const log = enterLog("isIfExpression", node.$type, indent);
     exitLog(log);
@@ -283,13 +272,13 @@ export class MatchExpressionComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isMatchExpression(expr)) return result;
+    if (!ast.isMatchExpression(expr)) return result;
 
     result += `switch (${generateExpression(expr.expr, indent)}) {\n`;
     expr.cases.forEach((mc) => {
-      if (isLiteral(mc.pattern)) {
+      if (ast.isLiteral(mc.pattern)) {
         const pattern = generateExpression(mc.pattern, indent);
         result += applyIndent(indent + 1, `case ${pattern}: `);
       } else {
@@ -297,8 +286,8 @@ export class MatchExpressionComponent {
       }
       result +=
         generateBlock(mc.body, indent + 1, (lastCode, indent) => {
-          if (isStatement(lastCode)) return generateStatement(lastCode, indent);
-          else if (isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
+          if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
+          else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
           else return "";
         }) + "\n";
     });
@@ -315,7 +304,7 @@ export class MatchExpressionComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isMatchExpression(node)) return type;
+    if (!ast.isMatchExpression(node)) return type;
 
     const log = enterLog("isMatchExpression", node.$type, indent);
     exitLog(log);

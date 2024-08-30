@@ -363,7 +363,7 @@ terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'|`(\\.|[^'\\])*`/;
 // Identifiers
 // 이것은 BooleanLiteral 다음에 와야 한다.
 // 그렇지 않으면 true, false가 ID로 취급되어진다.
-terminal ID: /[_a-zA-Zㄱ-ㅎ가-힣][\w_ㄱ-ㅎ가-힣]*/;
+terminal ID: /[_a-zA-Zㄱ-ㅎ가-힣][\wㄱ-ㅎ가-힣]*/;
 
 // opchar ::= // printableChar not matched by (whiteSpace | upper | lower |
 //            // letter | digit | paren | delim | opchar | Unicode_Sm | Unicode_So)

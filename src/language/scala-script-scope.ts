@@ -9,18 +9,7 @@ import {
   ReferenceInfo,
   Scope,
 } from "langium";
-import {
-  Class,
-  Field,
-  Method,
-  MethodCall,
-  isBypass,
-  isClass,
-  isMethod,
-  isField,
-  isVariable,
-  isPrimitiveType,
-} from "./generated/ast.js";
+import * as ast from "./generated/ast.js";
 import { LangiumServices } from "langium/lsp";
 import { enterLog, traceLog, exitLog, TypeSystem } from "./scala-script-types.js";
 
@@ -30,7 +19,7 @@ import { enterLog, traceLog, exitLog, TypeSystem } from "./scala-script-types.js
 interface ExtensionFunction {
   type: string;
   name: string;
-  node: Method | Field;
+  node: ast.Method | ast.Field;
 }
 
 const stringExtensionFunctions: ExtensionFunction[] = [];
@@ -40,7 +29,7 @@ const arrayExtensionFunctions: ExtensionFunction[] = [];
  *
  * @returns
  */
-function getExtensionAll(kind: string): (Method | Field)[] {
+function getExtensionAll(kind: string): (ast.Method | ast.Field)[] {
   switch (kind) {
     case "string":
       return stringExtensionFunctions.map((e) => e.node);
@@ -129,7 +118,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
 
     // for now, `this` and `super` simply target the container class type
     if (context.reference.$refText === "this" || context.reference.$refText === "super") {
-      const classItem = AstUtils.getContainerOfType(context.container, isClass);
+      const classItem = AstUtils.getContainerOfType(context.container, ast.isClass);
       if (classItem) {
         traceLog(1, "this or super");
         return this.scopeClassMembers(classItem);
@@ -144,7 +133,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해 함수의 인수가 있는 경우 즉
     // methodCall.args가 있는 경우에 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고
     // 이 코드는 이를 확인하기 위한 것이다.
-    const methodCall = context.container as MethodCall;
+    const methodCall = context.container as ast.MethodCall;
     if (methodCall.args == undefined) {
       traceLog(1, "MethodCall.args is undefined");
     }
@@ -163,7 +152,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 클래스이면
     // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
     if (TypeSystem.isClassType(prevTypeDesc)) {
-      traceLog(1, `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}, ${isClass(prevTypeDesc.literal)}`);
+      traceLog(
+        1,
+        `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}, ${ast.isClass(prevTypeDesc.literal)}`
+      );
       exitLog(scopeLog.replace("Exit", "Exit2"));
       return this.scopeClassMembers(prevTypeDesc.literal);
     }
@@ -202,13 +194,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @param classItem
    * @returns
    */
-  private scopeClassMembers(classItem: Class): Scope {
+  private scopeClassMembers(classItem: ast.Class): Scope {
     // Since Lox allows class-inheritance,
     // we also need to look at all members of possible super classes for scoping
     const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.statements);
-    const removedBypass = allMembers.filter((e) => !isBypass(e));
+    const removedBypass = allMembers.filter((e) => !ast.isBypass(e));
     removedBypass.forEach((e) => {
-      if (isMethod(e) || isField(e)) {
+      if (ast.isMethod(e) || ast.isField(e)) {
         traceLog(0, "scopeClassMembers", e.name);
       } else console.error("error");
     });
@@ -304,7 +296,7 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
     let isProcessed = false;
 
     // 변수 선언문에서의 이름을 처리한다
-    if (isVariable(node)) {
+    if (ast.isVariable(node)) {
       traceLog(0, "  node:", node.$type);
       node.names.forEach((name) => {
         traceLog(1, `'${name}'`);
@@ -314,9 +306,9 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
     }
 
     // 함수 중에 확장 함수가 있으면 이를 처리한다.
-    else if (isMethod(node) && node.extension) {
+    else if (ast.isMethod(node) && node.extension) {
       // 현재는 extension으로 string이 명시된 경우만 확장함수로 등록된다.
-      if (isPrimitiveType(node.extension)) {
+      if (ast.isPrimitiveType(node.extension)) {
         traceLog(0, "extension function:", node.extension.type, node.name);
         switch (node.extension.type) {
           case "string":
@@ -330,10 +322,10 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
     }
 
     // 클래스 중에 클래스 이름이 string, array가 있으면 이를 확장함수로 처리한다
-    else if (isClass(node) && (node.name == "string" || node.name == "array")) {
+    else if (ast.isClass(node) && (node.name == "string" || node.name == "array")) {
       traceLog(0, "extension class:", node.name);
       node.statements.forEach((s) => {
-        if (isField(s) || isMethod(s)) {
+        if (ast.isField(s) || ast.isMethod(s)) {
           switch (node.name) {
             case "string":
               stringExtensionFunctions.push({ type: node.name, name: s.name, node: s });

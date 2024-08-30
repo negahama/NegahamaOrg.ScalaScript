@@ -1,17 +1,5 @@
 import { AstNode } from "langium";
-import {
-  Code,
-  Expression,
-  isClass,
-  isExpression,
-  isLambdaCall,
-  isObjectType,
-  isPrimitiveType,
-  isSimpleType,
-  isStatement,
-  isTupleType,
-  isTypeDeclaration,
-} from "../language/generated/ast.js";
+import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog, traceLog } from "../language/scala-script-types.js";
 import { generateExpression, generateStatement } from "../cli/generator.js";
 import { generateBlock, generateType } from "../cli/generator-util.js";
@@ -26,15 +14,15 @@ export class LambdaCallComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isLambdaCall(expr)) return result;
+    if (!ast.isLambdaCall(expr)) return result;
 
     result += "(" + expr.bindings.map((bind) => bind.name + generateType(bind.type)).join(", ");
     result += ")" + generateType(expr.returnType) + " => ";
-    result += generateBlock(expr.body, indent, (lastCode: Code, indent: number) => {
-      if (isStatement(lastCode)) return generateStatement(lastCode, indent);
-      else if (isExpression(lastCode)) return generateExpression(lastCode, indent);
+    result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
+      if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
+      else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
       else return "";
     });
     return result;
@@ -49,7 +37,7 @@ export class LambdaCallComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isLambdaCall(node)) return type;
+    if (!ast.isLambdaCall(node)) return type;
 
     return type;
   }
@@ -65,9 +53,9 @@ export class SimpleTypeComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: Expression, indent: number): string {
+  static transpile(expr: ast.Expression, indent: number): string {
     let result = "";
-    if (!isSimpleType(expr)) return result;
+    if (!ast.isSimpleType(expr)) return result;
 
     return result;
   }
@@ -81,13 +69,13 @@ export class SimpleTypeComponent {
    */
   static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!isSimpleType(node)) return type;
+    if (!ast.isSimpleType(node)) return type;
 
     const log = enterLog("isSimpleType", undefined, indent);
-    if (isTupleType(node)) {
+    if (ast.isTupleType(node)) {
       traceLog(indent + 1, "it's TupleType");
       // type = { $type: "tuple" };
-    } else if (isObjectType(node)) {
+    } else if (ast.isObjectType(node)) {
       traceLog(indent + 1, "it's ObjectType");
       // type = { $type: "object" };
       // } else if (node.returnType) {
@@ -97,7 +85,7 @@ export class SimpleTypeComponent {
       //     type: inferType(e.type, cache, indent + 1),
       //   }));
       //   type = createFunctionType(returnType, parameters);
-    } else if (isPrimitiveType(node)) {
+    } else if (ast.isPrimitiveType(node)) {
       traceLog(indent + 1, "Type is primitive");
       if (node.type === "number") {
         type = TypeSystem.createNumberType();
@@ -112,9 +100,9 @@ export class SimpleTypeComponent {
       traceLog(indent + 1, "Type is reference");
       if (node.reference.ref) {
         const ref = node.reference.ref;
-        if (isClass(ref)) {
+        if (ast.isClass(ref)) {
           type = TypeSystem.createClassType(ref);
-        } else if (isTypeDeclaration(ref)) {
+        } else if (ast.isTypeDeclaration(ref)) {
           traceLog(indent + 1, "it's TypeDeclaration");
           // type = {
           //   $type: "type-dec",
