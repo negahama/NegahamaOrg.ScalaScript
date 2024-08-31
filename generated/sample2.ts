@@ -10,7 +10,7 @@ class ClassA {
     return this.b;
   }
 }
-class ClassB {
+interface ClassB {
   c: string;
 }
 let classA: ClassA;
@@ -39,7 +39,10 @@ let boy: Student;
 boy = new Student()
 boy.display()
 // object type
-interface BasicInfo {name: string, parts: string[]}
+interface BasicInfo {
+  name: string;
+  parts: string[];
+}
 const car: BasicInfo = {
   name: 'car',
   parts: ['engine', 'wheel', 'body'],

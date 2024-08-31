@@ -1,13 +1,13 @@
-@NotTrans class Console { log() }
+@NotTrans def Console => { log() }
 @NotTrans var console: Console
-@NotTrans class $string$ {
+@NotTrans def $string$ => {
   length: number
 }
-@NotTrans class $array$ {
+@NotTrans def $array$ => {
   length: number
 }
 
-//val tuple: [string, number, boolean] = ['Hello', 42, true]
+// val tuple: [string, number, boolean] = ['Hello', 42, true]
 def formatMoney2(money: number)-> string => {
   return ""
 %%
@@ -24,3 +24,35 @@ def formatMoney2(money: number)-> string => {
 //     return value.toString().padStart(width)
 //   }
 // }
+
+%%//// object type
+def BasicInfo => { name: string parts: string[] }
+val car: BasicInfo = {
+	name = 'car'
+	parts = [
+		'engine',
+		'wheel',
+		'body'
+	]
+}
+val obj: {
+  name: string
+  age: number
+} = {
+  name = "samuel"
+  age = 50
+}
+
+def ClassA => {
+  b: ClassB
+  getB(param: string)-> ClassB => {
+    return this.b
+  }
+}
+def ClassB => {
+  c: string
+}
+var classA: ClassA
+%%//classA = new ClassA
+val st1 = classA.b.c
+val st2 = classA.getB("dummy").c

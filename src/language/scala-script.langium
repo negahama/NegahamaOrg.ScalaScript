@@ -4,10 +4,69 @@ entry Program: codes+=Code*;
 
 Code: Statement | Expression;
 
+//-----------------------------------------------------------------------------
+// 스칼라스크립트의 자료형 관련
+//-----------------------------------------------------------------------------
+// 타입의 선언이란 클래스, 오브젝트, 함수 타입에 이름을 부여하는 것이다.
+// 클래스를 예로 들어서 설명하면 일반적으로 클래스의 선언이라고 하는 것은 클래스 타입에 이름을 부여하는 것을 말한다.
+// 우리가 보통 문자열의 선언 또는 숫자형 배열의 선언이라고 하면 이것은 var array: number[] 와 같이 해당 자료형을 가진
+// 변수를 선언하는 것을 말하지만 클래스, 오브젝트, 함수는 변수를 선언하는 것이 아니라 타입 자체를 선언하는 것이다.
+// 따라서 스칼라스크립트에서는 이것을 타입의 선언으로 보지 않고 별칭을 정의하는 것으로 본다.
+// 모든 클래스, 오브젝트, 함수는 def 와 => 으로 정의한다.
+//
+// 또한 스칼라스크립트는 오브젝트와 클래스가 하나로 합쳐져 있다.
+// 메서드를 가지지 않는 클래스는 오브젝트(인터페이스)로 변환되며 타입으로 사용할 수 있고 값을 할당할 수도 있다.
+
+
+// 타입으로 사용될 수 있는 모든 타입들
+AllTypes: LambdaType | ArrayType | SimpleType;
+
+LambdaType: '(' Bindings? ')' '->' returnType=AllTypes;
+
+SimpleType:
+  TupleType
+  | ClassType
+  | PrimitiveType
+  | reference=[Class:Id];
+
+TupleType: '[' types+=SimpleType (',' types+=SimpleType)* ']';
+
+PrimitiveType:
+  type=("string" | "number" | "boolean" | "void");
+
+// Array Type
+// ex) number[]
+ArrayType:
+  // SimpleType ({infer ArrayType.elementType=current} '[' ']')? ;
+  elementType=SimpleType '[' ']';
+
+// Array Literal
+// ex) [ 1, 2, 3 ]
+ArrayLiteral:
+  '[' items+=Literal (',' items+=Literal )* ']';
+
+// Array Expression
+// ex) array[ 1 ]
+ArrayExpression:
+  element=[NamedElement:Id] '[' index=Expression ']';
+
+
+type NamedElement =
+  Variable
+  | TFunction
+  | Class
+  | Field
+  | Method
+  | Iterator
+  | Parameter
+  | Binding;
+
+//-----------------------------------------------------------------------------
 // Statements
+//-----------------------------------------------------------------------------
+
 Statement:
   Bypass
-  | TypeDeclaration
   | VariableDeclaration
   | FunctionDeclaration
   | ClassDeclaration
@@ -15,13 +74,9 @@ Statement:
   | ForStatement
   | WhileStatement
   | ThrowStatement
-  | CatchStatement
+  | TryCatchStatement
   | Continue
   | Break;
-
-// Type Declarations
-TypeDeclaration:
-  'type' name=Id '=' value=ObjectType;
 
 // 모든 변수는 다음의 규칙을 가지고 있다.
 // 이름 : 타입 = 값
@@ -29,9 +84,10 @@ TypeDeclaration:
 // 타입이나 값을 통해서 변수의 타입을 정할 수 있어야 한다.
 // Rule 자체는 타입과 값이 모두 없을 수 있지만 둘 다 있거나 적어도 하나는 있어야 한다.
 // 타입과 값은 모두 있으면 값은 명시된 타입으로 변환되며 이 변환이 실패하면 에러가 된다.
-fragment VarSignature: name=Id (':' type=Type)? ('=' value=Expression)?;
+fragment VarSignature: name=Id (':' type=AllTypes)? ('=' value=Expression)?;
 
 // Value and Variable Declarations and Definitions
+//-----------------------------------------------------------------------------
 // 다중 대입문을 지원하기 위해서 아래와 같이 되어져 있다.
 // 하지만 이 방식은 어떻게 해도 Langium의 default 처리로는 cross-reference가 처리되지 않는다.
 // 이를 처리하기 위해서 DefaultScopeComputation의 processNode()를 override해서
@@ -41,52 +97,82 @@ fragment VarSignature: name=Id (':' type=Type)? ('=' value=Expression)?;
 // var, val 은 변수를 선언하는 것이지만 엄밀하게 말하면 변수의 성격을 결정하는 것으로써
 // var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
 VariableDeclaration infers Variable:
-  (Annotation)? kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=Type)? ('=' value=Expression)?;
+  (Annotation)? kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=AllTypes)? ('=' value=Expression)?;
 fragment Annotation:
   '@' annotate=Id;
 
-// Function Declarations and Definitions
+// Function Declarations
+//-----------------------------------------------------------------------------
 // 함수의 리턴 타입은 -> 으로 표시하고 함수의 바디는 => 으로 표시한다.
 // 이건 ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
 // parameter는 초기값을 가질 수 있으나 argument는 그렇지 않다.
-FunctionDeclaration infers Method:
-  (Annotation)? 'def' (extension=Type '.')? FunSignature;
+FunctionDeclaration infers TFunction:
+  (Annotation)? 'def' (extension=[Class:Id] '.')? name=Id FunSignature;
+
 fragment FunSignature:
-  name=Id '(' Parameters? ')' ('->' returnType=Type)? ('=>' body=Block)?;
+  '(' Parameters? ')' ('->' returnType=AllTypes)? ('=>' FunctionBody)?;
+
+fragment FunctionBody:
+  body=Block;
+
 fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
+
 Parameter: VarSignature;
+
 Block:
   ('{' codes+=Code* '}') | codes+=Expression;
 
+// LambdaCall은 expression이다.
 // 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다.
 // 인수는 괄호를 사용해서 묶어야 하지만 인수가 하나인 경우에는 괄호없이 사용할 수도 있다.
-LambdaType: '(' Bindings? ')' '->' returnType=Type;
-LambdaCall: ('(' Bindings? ')' ('->' returnType=Type)? | bindings+=Binding) '=>' body=Block;
+LambdaCall: ('(' Bindings? ')' ('->' returnType=AllTypes)? | bindings+=Binding) '=>' body=Block;
+
 fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
-Binding: name=Id (':' type=Type)?;
+
+Binding: name=Id (':' type=AllTypes)?;
 
 // Class Declarations
+//-----------------------------------------------------------------------------
+// Class의 선언은 Class 타입에 이름을 부여하는 것이다.
 // 아래 규칙은 MethodMember의 파라메터로 초기값을 가질 수 있고 FieldMember로 타입이 없을 수도 있다.
 // class ClassName extends SuperClass {
 //   display(msg: string = "hello")
 //   message
 // }
 ClassDeclaration infers Class:
-  (Annotation)? 'class' name=Id
-  ('extends' superClass=[Class:Id])?
-  '{' statements+=ClassStatements* '}';
-ClassStatements: Bypass | Field | Method;
+  (Annotation)? 'def' name=Id ClassSignature;
+
+fragment ClassSignature:
+  ('extends' superClass=[Class:Id])? '=>' ClassBody;
+
+fragment ClassBody:
+  '{' statements+=(Bypass | Field | Method)* '}';
+
 Field: VarSignature;
-Method: FunSignature;
+
+Method: name=Id FunSignature;
+
+// Class Type
+// ex) var obj: { name: string age: number }
+ClassType: '{' elements+=TypedId* '}';
+
+// Class literal
+// ex) var obj = { name = "samuel" age = 20 }
+// ClassLiteral은 expression이다.
+ClassLiteral:
+  '{' items+=(MemberBinding)* '}';
+
+MemberBinding: name=Id ('=' value=Expression)?;
+
+// 기타
+//-----------------------------------------------------------------------------
 
 // Do Loop
 DoStatement:
   'do' loop=Block 'while' ConditionClause;
 
 // For Comprehensions and For Loops
-// ForStatement:
-//   'for' '(' counter=VariableDeclaration? ';' condition=Expression? ';' execution=Expression? ')' loop=Block;
 ForStatement:
   'for' '(' iterators+=Iterator (';' iterators+=Iterator)* ')' loop=Block;
 
@@ -105,7 +191,7 @@ ThrowStatement:
   'throw' throw=Expression;
 
 // Try Statement
-CatchStatement:
+TryCatchStatement:
   'try' body=Block
   ('catch' '{' cases+=CaseClause+ '}')?
   ('finally' finally=Expression)?;
@@ -117,38 +203,9 @@ Break: dummy?='break';
 Bypass: bypass=BYPASS;
 terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
 
-type NamedElement = TypeDeclaration
-  | Variable
-  | Class
-  | Field
-  | Method
-  | Iterator
-  | Parameter
-  | Binding;
-
-// Type
-Type: LambdaType | ArrayType | SimpleType;
-
-ArrayType:
-  // SimpleType ({infer ArrayType.elementType=current} '[' ']')? ;
-  elementType=SimpleType '[' ']';
-
-SimpleType:
-  TupleType
-  | ObjectType
-  | PrimitiveType
-  | reference=[UserDefType:Id];
-
-TupleType  : '[' types+=SimpleType (',' types+=SimpleType)* ']';
-ObjectType : '{' elements+=TypedId (',' elements+=TypedId)* '}';
-PrimitiveType:
-  type=("string" | "number" | "boolean" | "void");
-
-type UserDefType = Class | TypeDeclaration;
-
+//-----------------------------------------------------------------------------
 // Expressions
-// Expressions:
-//   exprs+=Expression (',' exprs+=Expression)*;
+//-----------------------------------------------------------------------------
 
 // Logical rule은 많은 rule을 내포하고 있다.
 // 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
@@ -161,7 +218,7 @@ Expression:
   | IfExpression
   | MatchExpression
   | ArrayLiteral
-  | ObjectLiteral
+  | ClassLiteral
   | InfixExpression
   | ReturnExpression;
 
@@ -175,10 +232,6 @@ SimpleExpression infers Expression:
 // Unary operators
 UnaryExpression:
   operator=('-' | '+') value=Expression;
-
-// Array Expression
-ArrayExpression:
-  element=[NamedElement:Id] '[' index=Expression ']';
 
 // grouped expression with parentheses
 GroupExpression:
@@ -198,17 +251,8 @@ NumberExpression: value=NumberLiteral;
 StringExpression: value=StringLiteral;
 VoidExpression: value='void';
 
-ValueLiteral:
-  StringLiteral | NumberLiteral | BooleanLiteral | ArrayLiteral;
-
-// Array literal
-ArrayLiteral:
-  '[' items+=Literal (',' items+=Literal )* ']';
-
-// Object literal
-ObjectLiteral:
-  '{' items+=ObjectBinding (',' items+=ObjectBinding )* '}';
-ObjectBinding: name=Id (':' value=Expression)?;
+// ValueLiteral:
+//   StringLiteral | NumberLiteral | BooleanLiteral | ArrayLiteral;
 
 // 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
 // ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은
@@ -221,7 +265,7 @@ ObjectBinding: name=Id (':' value=Expression)?;
 // @NotTrans def string.repeat(count: number): string
 // @NotTrans def string.replace(searchFor: string, replaceWith: string): string
 // @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
-// 
+//
 // this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
 // this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
 // 설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
@@ -230,7 +274,7 @@ ObjectBinding: name=Id (':' value=Expression)?;
 //
 // (explicitCall?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 args+=Expression ... 과 동일할 것 같은데
 // 실제로는 Arguments는 타입은 존재하진 않아도 args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해
-// 함수의 인수가 있는 경우 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고  
+// 함수의 인수가 있는 경우 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고
 FeatureCall infers Expression: {infer MethodCall}
 	(element=[NamedElement:Id] | this='this' | this='super')
   (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
@@ -268,9 +312,9 @@ Exponentiation infers Expression:
 // Member call and Chaining of Member calls
 // 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수도 있다.
 // 즉 다음과 같은 것들을 파싱할 수 있다. ()안에는 인수들이 있을 수도 있다.
-// a, a(), a.b, a().b, a.b(), a().b(), ... 
+// a, a(), a.b, a().b, a.b(), a().b(), ...
 MethodCall infers Expression:
-  SimpleExpression ({infer MethodCall.previous=current} 
+  SimpleExpression ({infer MethodCall.previous=current}
   "." element=[NamedElement:Id] (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?
   )*;
 
@@ -307,6 +351,10 @@ InfixExpression:
 ReturnExpression:
   'return' (value=Expression)?;
 
+//-----------------------------------------------------------------------------
+// terminal & literal
+//-----------------------------------------------------------------------------
+
 // Parentheses
 // terminal Paren: '(' | ')' | '[' | ']' | '{' | '}';
 
@@ -322,7 +370,7 @@ ReturnExpression:
 // Boolean Literals
 // It has to place before ID or Identifier
 // Otherwise `true` and `false` is identified for Indentifier
-terminal BooleanLiteral returns boolean: 'true' | 'false';
+// terminal BooleanLiteral returns boolean: 'true' | 'false';
 
 NumberLiteral returns number:
   ('-')? FloatingPointLiteral
@@ -377,7 +425,7 @@ terminal ID: /[_$a-zA-Zㄱ-ㅎ가-힣][\w$ㄱ-ㅎ가-힣]*/;
 
 // Identifiers
 terminal Id returns string: ID;
-TypedId: name=Id ':' type=Type;
+TypedId: name=Id ':' type=AllTypes;
 
 // Whitespace and Comments
 hidden terminal WS: /\s+/;

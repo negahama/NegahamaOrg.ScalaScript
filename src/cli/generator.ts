@@ -3,12 +3,12 @@ import * as path from "node:path";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as ast from "../language/generated/ast.js";
 import { extractDestinationAndName } from "./cli-util.js";
-import { applyIndent, generateBlock, generateCondition, generateType } from "./generator-util.js";
+import { generateBlock, generateCondition } from "./generator-util.js";
 import { LambdaCallComponent } from "../components/datatype-components.js";
-import { MethodCallComponent } from "../components/methodcall-components.js";
-import { ClassComponent, MethodComponent } from "../components/class-components.js";
+import { FunctionComponent, MethodCallComponent } from "../components/methodcall-components.js";
+import { ClassComponent, ClassLiteralComponent } from "../components/class-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
-import { CatchStatementComponent, ForStatementComponent } from "../components/statement-components.js";
+import { TryCatchStatementComponent, ForStatementComponent } from "../components/statement-components.js";
 import { ArrayExpressionComponent, ArrayLiteralComponent } from "../components/array-components.js";
 import {
   UnaryExpressionComponent,
@@ -66,12 +66,10 @@ export function generateCode(code: ast.Code): string {
 export function generateStatement(stmt: ast.Statement | undefined, indent: number): string {
   let result = "";
   if (stmt == undefined) return result;
-  if (ast.isTypeDeclaration(stmt)) {
-    result += `interface ${stmt.name} ${generateType(stmt.value, false)}`;
-  } else if (ast.isVariable(stmt)) {
+  if (ast.isVariable(stmt)) {
     result += VariableComponent.transpile(stmt, indent);
-  } else if (ast.isMethod(stmt)) {
-    result += MethodComponent.transpile(stmt, indent);
+  } else if (ast.isTFunction(stmt)) {
+    result += FunctionComponent.transpile(stmt, indent);
   } else if (ast.isClass(stmt)) {
     result += ClassComponent.transpile(stmt, indent);
   } else if (ast.isDoStatement(stmt)) {
@@ -82,8 +80,8 @@ export function generateStatement(stmt: ast.Statement | undefined, indent: numbe
     result += `while ${generateCondition(stmt.condition)} ${generateBlock(stmt.loop, indent)}`;
   } else if (ast.isThrowStatement(stmt)) {
     result += `throw ${generateExpression(stmt.throw, indent)}`;
-  } else if (ast.isCatchStatement(stmt)) {
-    result += CatchStatementComponent.transpile(stmt, indent);
+  } else if (ast.isTryCatchStatement(stmt)) {
+    result += TryCatchStatementComponent.transpile(stmt, indent);
   } else if (ast.isContinue(stmt)) {
     result += "continue;";
   } else if (ast.isBreak(stmt)) {
@@ -113,39 +111,32 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
   if (expr == undefined) return result;
   if (ast.isAssignment(expr)) {
     result += AssignmentComponent.transpile(expr, indent);
-  } else if (ast.isIfExpression(expr)) {
-    result += IfExpressionComponent.transpile(expr, indent);
-  } else if (ast.isMatchExpression(expr)) {
-    result += MatchExpressionComponent.transpile(expr, indent);
   } else if (ast.isLambdaCall(expr)) {
     result += LambdaCallComponent.transpile(expr, indent);
   } else if (ast.isMethodCall(expr)) {
     result += MethodCallComponent.transpile(expr, indent);
+  } else if (ast.isIfExpression(expr)) {
+    result += IfExpressionComponent.transpile(expr, indent);
+  } else if (ast.isMatchExpression(expr)) {
+    result += MatchExpressionComponent.transpile(expr, indent);
   } else if (ast.isUnaryExpression(expr)) {
     result += UnaryExpressionComponent.transpile(expr, indent);
   } else if (ast.isBinaryExpression(expr)) {
     result += BinaryExpressionComponent.transpile(expr, indent);
-  } else if (ast.isArrayExpression(expr)) {
-    result += ArrayExpressionComponent.transpile(expr, indent);
   } else if (ast.isGroupExpression(expr)) {
     result += "(" + generateExpression(expr.value, indent) + ")";
-  } else if (ast.isLiteral(expr)) {
-    result += expr.value;
-  } else if (ast.isArrayLiteral(expr)) {
-    result += ArrayLiteralComponent.transpile(expr, indent);
-  } else if (ast.isObjectLiteral(expr)) {
-    result += "{\n";
-    expr.items.forEach((item) => {
-      result += applyIndent(
-        indent + 1,
-        item.name + ": " + (item.value ? generateExpression(item.value, indent) : "") + ",\n"
-      );
-    });
-    result += "}";
   } else if (ast.isInfixExpression(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
   } else if (ast.isReturnExpression(expr)) {
     result = `return ${generateExpression(expr.value, indent)};`;
+  } else if (ast.isArrayExpression(expr)) {
+    result += ArrayExpressionComponent.transpile(expr, indent);
+  } else if (ast.isArrayLiteral(expr)) {
+    result += ArrayLiteralComponent.transpile(expr, indent);
+  } else if (ast.isClassLiteral(expr)) {
+    result += ClassLiteralComponent.transpile(expr, indent);
+  } else if (ast.isLiteral(expr)) {
+    result += expr.value;
   } else {
     console.log("ERROR in Expression:", expr);
   }

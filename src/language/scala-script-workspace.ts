@@ -12,7 +12,7 @@ import { URI } from "vscode-uri";
  *
  */
 const ScalaScriptBuiltinLibrary = `
-@NotTrans class string {
+@NotTrans def $string$ {
   length: number
   charAt(index: number)-> string
   charCodeAt(index: number)-> number
@@ -46,7 +46,7 @@ const ScalaScriptBuiltinLibrary = `
   trimEnd()-> string
   valueOf()-> string
 }
-@NotTrans class array {
+@NotTrans def $array$ {
   length: number
   at(index)-> string
   concat()-> string
@@ -81,7 +81,7 @@ const ScalaScriptBuiltinLibrary = `
   unshift()-> string
   values()-> string
 }
-@NotTrans class number {
+@NotTrans def $number$ {
   EPSILON: number
   MAX_SAFE_INTEGER: number
   MIN_SAFE_INTEGER: number
@@ -103,7 +103,7 @@ const ScalaScriptBuiltinLibrary = `
   toString()-> string
   valueOf()-> number
 }
-@NotTrans class Math {
+@NotTrans def Math {
   E: number
   PI: number
   LN2: number

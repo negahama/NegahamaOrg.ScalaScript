@@ -1,16 +1,16 @@
-@NotTrans class Console { log() }
+@NotTrans def Console => { log() }
 @NotTrans var console: Console
 
 %%/*
   Class
 */%%
-class ClassA {
+def ClassA => {
   b: ClassB
   getB(param: string)-> ClassB => {
     return this.b
   }
 }
-class ClassB {
+def ClassB => {
   c: string
 }
 var classA: ClassA
@@ -23,7 +23,7 @@ def fun(a: number) => {
   b = 1
 }
 
-class Person {
+def Person => {
   name: string = 'no name'
   gender: number
   age: number
@@ -31,7 +31,7 @@ class Person {
     console.log(this.name, this.gender, this.age)
   }
 }
-class Student extends Person {
+def Student extends Person => {
   grade: number
   registerClass(what:string) => {
     console.log("register class", what)
@@ -43,20 +43,20 @@ var boy: Student
 boy.display()
 
 %%//// object type
-type BasicInfo = { name: string, parts: string[] }
+def BasicInfo => { name: string parts: string[] }
 val car: BasicInfo = {
-	name: 'car',
-	parts: [
+	name = 'car'
+	parts = [
 		'engine',
 		'wheel',
 		'body'
 	]
 }
 val obj: {
-  name: string,
+  name: string
   age: number
 } = {
-  name: "samuel",
-  age: 50
+  name = "samuel"
+  age = 50
 }
 

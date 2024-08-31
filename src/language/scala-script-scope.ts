@@ -112,7 +112,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     if (TypeSystem.isClassType(prevTypeDesc)) {
       traceLog(1, `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
       exitLog(scopeLog.replace("Exit", "Exit2"));
-      return this.scopeClassMembers(prevTypeDesc.literal);
+      if (ast.isClass(prevTypeDesc.literal)) return this.scopeClassMembers(prevTypeDesc.literal);
     }
 
     // 문자열이면
@@ -275,7 +275,7 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
     }
 
     // 함수 중에 확장 함수가 있으면 이를 처리한다.
-    else if (ast.isMethod(node) && node.extension) {
+    else if (ast.isTFunction(node) && node.extension) {
       console.log("Not support...");
     }
 

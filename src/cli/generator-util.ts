@@ -48,7 +48,7 @@ export function generateBlock(
  */
 export function generateVariable(
   name: string,
-  type: ast.Type | undefined,
+  type: ast.AllTypes | undefined,
   value: ast.Expression | undefined,
   indent: number
 ): string {
@@ -62,10 +62,14 @@ export function generateVariable(
  * @param isClassMethod
  * @returns
  */
-export function generateFunction(fun: ast.Method, indent: number, isClassMethod: boolean = false): string {
+export function generateFunction(
+  fun: ast.TFunction | ast.Method,
+  indent: number,
+  isClassMethod: boolean = false
+): string {
   const params = fun.parameters.map((param) => param.name + generateType(param.type)).join(", ");
   let result = "";
-  if (fun.annotate == "NotTrans") return result;
+  if (ast.isTFunction(fun) && fun.annotate == "NotTrans") return result;
   if (!isClassMethod) result += "function ";
   result += `${fun.name}(${params})${generateType(fun.returnType)} `;
   // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
@@ -96,8 +100,8 @@ export function generateCondition(condition: ast.Expression): string {
  * @param includeColon
  * @returns
  */
-export function generateType(type: ast.Type | undefined, includeColon: boolean = true): string {
-  const typeonly = (t: ast.Type | undefined) => {
+export function generateType(type: ast.AllTypes | undefined, includeColon: boolean = true): string {
+  const typeonly = (t: ast.AllTypes | undefined) => {
     if (t == undefined) return "";
     if (ast.isSimpleType(t)) {
       if (t.reference) {
@@ -121,13 +125,17 @@ export function generateType(type: ast.Type | undefined, includeColon: boolean =
   if (ast.isLambdaType(type)) {
     const list = type.bindings.map((bind) => bind.name + ": " + typeonly(bind.type)).join(", ");
     result += `(${list})` + (type.returnType ? ` => ${typeonly(type.returnType)}` : "");
-  } else if (ast.isTupleType(type)) {
-    const list = type.types.map((t) => typeonly(t)).join(", ");
-    result += `[${list}]`;
-  } else if (ast.isObjectType(type)) {
-    const list = type.elements.map((e) => e.name + ": " + typeonly(e.type)).join(", ");
-    result += `{${list}}`;
-  } else result += typeonly(type);
+  } else if (ast.isArrayType(type)) {
+    result += typeonly(type);
+  } else if (ast.isSimpleType(type)) {
+    if (ast.isTupleType(type)) {
+      const list = type.types.map((t) => typeonly(t)).join(", ");
+      result += `[${list}]`;
+    } else if (ast.isClassType(type)) {
+      const list = type.elements.map((e) => e.name + ": " + typeonly(e.type)).join(", ");
+      result += `{${list}}`;
+    } else result += typeonly(type);
+  }
   return result;
 }
 

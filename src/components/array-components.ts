@@ -15,11 +15,8 @@ export class ArrayTypeComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.Expression, indent: number): string {
-    let result = "";
-    if (!ast.isArrayType(expr)) return result;
-
-    return result;
+  static transpile(expr: ast.ArrayType, indent: number): string {
+    return "";
   }
 
   /**
@@ -29,12 +26,9 @@ export class ArrayTypeComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isArrayType(node)) return type;
-
+  static inferType(node: ast.ArrayType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     const log = enterLog("isArrayType", node.elementType.$cstNode?.text, indent);
-    type = TypeSystem.createArrayType(TypeSystem.inferType(node.elementType, cache, indent));
+    const type = TypeSystem.createArrayType(TypeSystem.inferType(node.elementType, cache, indent));
     exitLog(log);
     return type;
   }
@@ -51,12 +45,8 @@ export class ArrayLiteralComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.Expression, indent: number): string {
-    let result = "";
-    if (!ast.isArrayLiteral(expr)) return result;
-
-    result += "[" + expr.items.map((item) => item.value).join(", ") + "]";
-    return result;
+  static transpile(expr: ast.ArrayLiteral, indent: number): string {
+    return "[" + expr.items.map((item) => item.value).join(", ") + "]";
   }
 
   /**
@@ -67,10 +57,8 @@ export class ArrayLiteralComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.ArrayLiteral, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isArrayLiteral(node)) return type;
-
     const log = enterLog("isArrayLiteral", node.items.toString(), indent);
     if (node.items.length > 0) {
       type = TypeSystem.createArrayType(TypeSystem.inferType(node.items[0], cache, indent));
@@ -91,12 +79,8 @@ export class ArrayExpressionComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.Expression, indent: number): string {
-    let result = "";
-    if (!ast.isArrayExpression(expr)) return result;
-
-    result += `${expr.element.$refText}[(${generateExpression(expr.index, indent)}) - 1]`;
-    return result;
+  static transpile(expr: ast.ArrayExpression, indent: number): string {
+    return `${expr.element.$refText}[(${generateExpression(expr.index, indent)}) - 1]`;
   }
 
   /**
@@ -107,10 +91,8 @@ export class ArrayExpressionComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.ArrayExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isArrayExpression(node)) return type;
-
     // 다른 것들은 node의 타입을 통해서 타입을 추론하지만 이것은 이름을 이용해서 추론해야만 한다.
     const log = enterLog("isArrayExpression", node.element.$refText, indent);
     type = TypeSystem.inferTypeByName(node, node.element.$refText, cache, indent + 1);

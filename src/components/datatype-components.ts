@@ -14,10 +14,8 @@ export class LambdaCallComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.Expression, indent: number): string {
+  static transpile(expr: ast.LambdaCall, indent: number): string {
     let result = "";
-    if (!ast.isLambdaCall(expr)) return result;
-
     result += "(" + expr.bindings.map((bind) => bind.name + generateType(bind.type)).join(", ");
     result += ")" + generateType(expr.returnType) + " => ";
     result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
@@ -35,11 +33,8 @@ export class LambdaCallComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isLambdaCall(node)) return type;
-
-    return type;
+  static inferType(node: ast.LambdaCall, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    return TypeSystem.createErrorType("internal error");
   }
 }
 
@@ -53,11 +48,8 @@ export class SimpleTypeComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.Expression, indent: number): string {
-    let result = "";
-    if (!ast.isSimpleType(expr)) return result;
-
-    return result;
+  static transpile(expr: ast.SimpleType, indent: number): string {
+    return "";
   }
 
   /**
@@ -67,24 +59,14 @@ export class SimpleTypeComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.SimpleType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isSimpleType(node)) return type;
-
     const log = enterLog("isSimpleType", undefined, indent);
     if (ast.isTupleType(node)) {
       traceLog(indent + 1, "it's TupleType");
-      // type = { $type: "tuple" };
-    } else if (ast.isObjectType(node)) {
-      traceLog(indent + 1, "it's ObjectType");
-      // type = { $type: "object" };
-      // } else if (node.returnType) {
-      //   const returnType = inferType(node.returnType, cache);
-      //   const parameters = node.parameters.map((e, i) => ({
-      //     name: e.name ?? `$${i}`,
-      //     type: inferType(e.type, cache, indent + 1),
-      //   }));
-      //   type = createFunctionType(returnType, parameters);
+      console.log("it's TupleType, Not support yet");
+    } else if (ast.isClassType(node)) {
+      type = TypeSystem.createClassType(node);
     } else if (ast.isPrimitiveType(node)) {
       traceLog(indent + 1, "Type is primitive");
       if (node.type === "number") {
@@ -102,18 +84,11 @@ export class SimpleTypeComponent {
         const ref = node.reference.ref;
         if (ast.isClass(ref)) {
           type = TypeSystem.createClassType(ref);
-        } else if (ast.isTypeDeclaration(ref)) {
-          traceLog(indent + 1, "it's TypeDeclaration");
-          // type = {
-          //   $type: "type-dec",
-          //   object: ref.value,
-          // };
         } else {
-          traceLog(indent + 1, "it's other-ref");
-          // type = { $type: "other-ref" };
+          traceLog(indent + 1, "node.reference.ref is not class");
         }
       } else {
-        traceLog(indent + 1, "it's not node.reference.ref");
+        traceLog(indent + 1, "node.reference.ref is not valid");
       }
     } else type = TypeSystem.createErrorType("Could not infer type for this reference", node);
     exitLog(log);

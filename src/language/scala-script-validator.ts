@@ -1,8 +1,9 @@
-import { AstNode, AstUtils, type ValidationAcceptor, type ValidationChecks } from "langium";
+import { AstNode, type ValidationAcceptor, type ValidationChecks } from "langium";
 import * as ast from "./generated/ast.js";
 import type { ScalaScriptServices } from "./scala-script-module.js";
-import { TypeSystem, TypeDescription } from "./scala-script-types.js";
+import { TypeDescription, TypeSystem } from "./scala-script-types.js";
 import { ClassComponent } from "../components/class-components.js";
+import { FunctionComponent } from "../components/methodcall-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import { BinaryExpressionComponent, UnaryExpressionComponent } from "../components/expression-components.js";
 
@@ -14,7 +15,7 @@ export function registerValidationChecks(services: ScalaScriptServices) {
   const validator = services.validation.ScalaScriptValidator;
   const checks: ValidationChecks<ast.ScalaScriptAstType> = {
     Class: validator.checkClassDeclaration,
-    Method: validator.checkMethodReturnType,
+    TFunction: validator.checkFunctionReturnType,
     Variable: validator.checkVariableDeclaration,
     Assignment: validator.checkAssignment,
     UnaryExpression: validator.checkUnaryOperationAllowed,
@@ -78,33 +79,8 @@ export class ScalaScriptValidator {
    * @param accept
    * @returns
    */
-  checkMethodReturnType(method: ast.Method, accept: ValidationAcceptor): void {
-    // console.log("checkMethodReturnType");
-    if (method.body && method.returnType) {
-      const map = getTypeCache();
-      const returnStatements = AstUtils.streamAllContents(method.body).filter(ast.isReturnExpression).toArray();
-      const expectedType = TypeSystem.inferType(method.returnType, map);
-      if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
-        accept("error", "A function whose declared type is not 'void' must return a value.", {
-          node: method.returnType,
-        });
-        return;
-      }
-      for (const returnStatement of returnStatements) {
-        const returnValueType = TypeSystem.inferType(returnStatement, map);
-        if (!isAssignable(returnValueType, expectedType)) {
-          accept(
-            "error",
-            `Type '${TypeSystem.typeToString(returnValueType)}' is not assignable to type '${TypeSystem.typeToString(
-              expectedType
-            )}'.`,
-            {
-              node: returnStatement,
-            }
-          );
-        }
-      }
-    }
+  checkFunctionReturnType(method: ast.TFunction, accept: ValidationAcceptor): void {
+    FunctionComponent.validationChecks(method, accept);
   }
 }
 
@@ -115,19 +91,22 @@ export class ScalaScriptValidator {
  * @returns
  */
 export function isAssignable(from: TypeDescription, to: TypeDescription): boolean {
+  console.log("isAssignable:", from.$type, to.$type);
   if (TypeSystem.isClassType(from)) {
     if (!TypeSystem.isClassType(to)) {
       return false;
     }
-    const fromLit = from.literal;
-    const fromChain = TypeSystem.getClassChain(fromLit);
-    const toClass = to.literal;
-    for (const fromClass of fromChain) {
-      if (fromClass === toClass) {
-        return true;
-      }
-    }
-    return false;
+    // const fromLit = from.literal;
+    // if (ast.isClass(fromLit)) {
+    //   const fromChain = TypeSystem.getClassChain(fromLit);
+    //   const toClass = to.literal;
+    //   for (const fromClass of fromChain) {
+    //     if (fromClass === toClass) {
+    //       return true;
+    //     }
+    //   }
+    // }
+    // return false;
   }
   if (TypeSystem.isVoidType(from)) {
     return TypeSystem.isClassType(to);
@@ -152,7 +131,6 @@ export function isAssignable(from: TypeDescription, to: TypeDescription): boolea
     return true;
   }
 
-  // console.log("isAssignable:", from.$type, to.$type);
   return from.$type === to.$type;
 }
 

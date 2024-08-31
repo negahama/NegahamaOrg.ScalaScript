@@ -2,7 +2,8 @@ import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
 import { applyIndent, generateFunction, generateVariable } from "../cli/generator-util.js";
-import { generateStatement } from "../cli/generator.js";
+import { generateExpression, generateStatement } from "../cli/generator.js";
+import { checkMethodReturnType } from "./methodcall-components.js";
 
 /**
  *
@@ -14,11 +15,22 @@ export class ClassComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Statement, indent: number): string {
+  static transpile(stmt: ast.Class, indent: number): string {
     let result = "";
-    if (!ast.isClass(stmt)) return result;
-
     if (stmt.annotate == "NotTrans") return result;
+    let isInterface = true;
+    if (stmt.statements.find((m) => ast.isMethod(m))) isInterface = false;
+    if (isInterface) {
+      result += `interface ${stmt.name} {\n`;
+      stmt.statements.forEach((m) => {
+        if (ast.isField(m)) {
+          result += applyIndent(indent + 1, generateVariable(m.name, m.type, m.value, indent) + ";");
+        }
+        result += "\n";
+      });
+      result += "}";
+      return result;
+    }
     result += `class ${stmt.name} `;
     result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
     stmt.statements.forEach((m) => {
@@ -42,12 +54,9 @@ export class ClassComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isClass(node)) return type;
-
+  static inferType(node: ast.Class, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     const log = enterLog("isClass", node.name, indent);
-    type = TypeSystem.createClassType(node);
+    const type = TypeSystem.createClassType(node);
     exitLog(log);
     return type;
   }
@@ -77,11 +86,8 @@ export class FieldComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Statement, indent: number): string {
-    let result = "";
-    if (!ast.isField(stmt)) return result;
-
-    return result;
+  static transpile(stmt: ast.Field, indent: number): string {
+    return "";
   }
 
   /**
@@ -91,10 +97,8 @@ export class FieldComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.Field, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isField(node)) return type;
-
     const log = enterLog("isField", node.name, indent);
     if (node.type) {
       type = TypeSystem.inferType(node.type, cache, indent + 1);
@@ -114,11 +118,58 @@ export class MethodComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Statement, indent: number): string {
-    let result = "";
-    if (!ast.isMethod(stmt)) return result;
+  static transpile(stmt: ast.Method, indent: number): string {
+    return generateFunction(stmt, indent);
+  }
 
-    result += generateFunction(stmt, indent);
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
+  static inferType(node: ast.Method, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    const log = enterLog("isMethod", node.name, indent);
+    const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
+    const parameters = node.parameters.map((e) => ({
+      name: e.name,
+      type: TypeSystem.inferType(e.type, cache, indent + 2),
+    }));
+    const type = TypeSystem.createFunctionType(returnType, parameters);
+    exitLog(log);
+    return type;
+  }
+
+  /**
+   *
+   * @param method
+   * @param accept
+   */
+  static validationChecks(method: ast.Method, accept: ValidationAcceptor): void {
+    checkMethodReturnType(method, accept);
+  }
+}
+
+/**
+ *
+ */
+export class ClassLiteralComponent {
+  /**
+   *
+   * @param expr
+   * @param indent
+   * @returns
+   */
+  static transpile(expr: ast.ClassLiteral, indent: number): string {
+    let result = "{\n";
+    expr.items.forEach((item) => {
+      result += applyIndent(
+        indent + 1,
+        item.name + ": " + (item.value ? generateExpression(item.value, indent) : "") + ",\n"
+      );
+    });
+    result += "}";
     return result;
   }
 
@@ -129,17 +180,10 @@ export class MethodComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isMethod(node)) return type;
-
-    const log = enterLog("isMethod", node.name, indent);
-    const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
-    const parameters = node.parameters.map((e) => ({
-      name: e.name,
-      type: TypeSystem.inferType(e.type, cache, indent + 2),
-    }));
-    type = TypeSystem.createFunctionType(returnType, parameters);
+  static inferType(node: ast.ClassLiteral, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    const log = enterLog("isClassLiteral", undefined, indent);
+    // console.log("object literal:", node.$cstNode?.text);
+    const type = TypeSystem.createClassType(node);
     exitLog(log);
     return type;
   }

@@ -14,10 +14,8 @@ export class ForStatementComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Statement, indent: number): string {
+  static transpile(stmt: ast.ForStatement, indent: number): string {
     let result = "";
-    if (!ast.isForStatement(stmt)) return result;
-
     let forIndent = indent;
     stmt.iterators.forEach((iter, idx) => {
       const name = iter.name;
@@ -61,10 +59,8 @@ export class ForStatementComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.ForStatement, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isForStatement(node)) return type;
-
     const log = enterLog("isForStatement", node.$type, indent);
     exitLog(log);
     return type;
@@ -81,11 +77,8 @@ export class ForOfComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Statement, indent: number): string {
-    let result = "";
-    if (!ast.isForOf(stmt)) return result;
-
-    return result;
+  static transpile(stmt: ast.ForOf, indent: number): string {
+    return "";
   }
 
   /**
@@ -96,12 +89,9 @@ export class ForOfComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isForOf(node)) return type;
-
+  static inferType(node: ast.ForOf, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     const log = enterLog("isForOf", node.name, indent);
-    type = TypeSystem.inferType(node.of, cache, indent + 1);
+    let type = TypeSystem.inferType(node.of, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
     exitLog(log);
     return type;
@@ -118,11 +108,8 @@ export class ForToComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Statement, indent: number): string {
-    let result = "";
-    if (!ast.isForTo(stmt)) return result;
-
-    return result;
+  static transpile(stmt: ast.ForTo, indent: number): string {
+    return "";
   }
 
   /**
@@ -133,12 +120,9 @@ export class ForToComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isForTo(node)) return type;
-
+  static inferType(node: ast.ForTo, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     const log = enterLog("isForTo", node.name, indent);
-    type = TypeSystem.inferType(node.e1, cache, indent + 1);
+    let type = TypeSystem.inferType(node.e1, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
     exitLog(log);
     return type;
@@ -155,11 +139,8 @@ export class ForUntilComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Statement, indent: number): string {
-    let result = "";
-    if (!ast.isForUntil(stmt)) return result;
-
-    return result;
+  static transpile(stmt: ast.ForUntil, indent: number): string {
+    return "";
   }
 
   /**
@@ -170,12 +151,9 @@ export class ForUntilComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isForUntil(node)) return type;
-
+  static inferType(node: ast.ForUntil, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     const log = enterLog("isForUntil", node.name, indent);
-    type = TypeSystem.inferType(node.e1, cache, indent + 1);
+    let type = TypeSystem.inferType(node.e1, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
     exitLog(log);
     return type;
@@ -185,17 +163,15 @@ export class ForUntilComponent {
 /**
  *
  */
-export class CatchStatementComponent {
+export class TryCatchStatementComponent {
   /**
    *
    * @param stmt
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Statement, indent: number): string {
+  static transpile(stmt: ast.TryCatchStatement, indent: number): string {
     let result = "";
-    if (!ast.isCatchStatement(stmt)) return result;
-
     result += `try ${generateBlock(stmt.body, indent)}`;
     result += applyIndent(indent, "catch {\n");
     stmt.cases.forEach((mc) => {
@@ -224,10 +200,8 @@ export class CatchStatementComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.TryCatchStatement, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isCatchStatement(node)) return type;
-
     const log = enterLog("isCatchStatement", node.$type, indent);
     exitLog(log);
     return type;

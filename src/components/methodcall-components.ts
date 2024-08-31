@@ -1,7 +1,84 @@
-import { AstNode } from "langium";
+import { AstNode, AstUtils, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog, traceLog } from "../language/scala-script-types.js";
 import { generateExpression } from "../cli/generator.js";
+import { generateFunction } from "../cli/generator-util.js";
+import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
+
+/**
+ *
+ */
+export class FunctionComponent {
+  /**
+   *
+   * @param stmt
+   * @param indent
+   * @returns
+   */
+  static transpile(stmt: ast.TFunction, indent: number): string {
+    return generateFunction(stmt, indent);
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
+  static inferType(node: ast.TFunction, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    const log = enterLog("isFunction", node.name, indent);
+    const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
+    const parameters = node.parameters.map((e) => ({
+      name: e.name,
+      type: TypeSystem.inferType(e.type, cache, indent + 2),
+    }));
+    const type = TypeSystem.createFunctionType(returnType, parameters);
+    exitLog(log);
+    return type;
+  }
+
+  /**
+   *
+   * @param method
+   * @param accept
+   */
+  static validationChecks(method: ast.TFunction, accept: ValidationAcceptor): void {
+    checkMethodReturnType(method, accept);
+  }
+}
+
+/**
+ *
+ * @param method
+ * @param accept
+ * @returns
+ */
+export function checkMethodReturnType(method: ast.TFunction | ast.Method, accept: ValidationAcceptor): void {
+  // console.log("checkMethodReturnType");
+  if (method.body && method.returnType) {
+    const map = getTypeCache();
+    const returnStatements = AstUtils.streamAllContents(method.body).filter(ast.isReturnExpression).toArray();
+    const expectedType = TypeSystem.inferType(method.returnType, map);
+    if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
+      accept("error", "A function whose declared type is not 'void' must return a value.", {
+        node: method.returnType,
+      });
+      return;
+    }
+    for (const returnStatement of returnStatements) {
+      const returnValueType = TypeSystem.inferType(returnStatement, map);
+      if (!isAssignable(returnValueType, expectedType)) {
+        const msg = `Type '${TypeSystem.typeToString(
+          returnValueType
+        )}' is not assignable to type '${TypeSystem.typeToString(expectedType)}'.`;
+        accept("error", msg, {
+          node: returnStatement,
+        });
+      }
+    }
+  }
+}
 
 /**
  *
@@ -13,10 +90,8 @@ export class MethodCallComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.Expression, indent: number): string {
+  static transpile(expr: ast.MethodCall, indent: number): string {
     let result = "";
-    if (!ast.isMethodCall(expr)) return result;
-
     if (expr.previous) {
       result += generateExpression(expr.previous, indent);
       result += expr.element ? "." + expr.element.$refText : "";
@@ -60,10 +135,8 @@ export class MethodCallComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.MethodCall, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isMethodCall(node)) return type;
-
     const id = node.element?.$refText;
     const log = enterLog("isMethodCall", id, indent);
     traceLog(indent + 1, "ref 참조전:", id);

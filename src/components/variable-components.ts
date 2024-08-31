@@ -15,10 +15,8 @@ export class VariableComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Statement, indent: number): string {
+  static transpile(stmt: ast.Variable, indent: number): string {
     let result = "";
-    if (!ast.isVariable(stmt)) return result;
-
     if (stmt.annotate == "NotTrans") return result;
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
@@ -33,10 +31,8 @@ export class VariableComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.Variable, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isVariable(node)) return type;
-
     const log = enterLog("isVariable", node.names.toString(), indent);
     if (node.type) {
       type = TypeSystem.inferType(node.type, cache, indent + 1);
@@ -111,10 +107,8 @@ export class AssignmentComponent {
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.Expression, indent: number): string {
+  static transpile(expr: ast.Assignment, indent: number): string {
     let result = "";
-    if (!ast.isAssignment(expr)) return result;
-
     const name = generateExpression(expr.assign, indent);
     result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`;
     result += ast.isAssignment(expr.value) ? "" : ";";
@@ -129,10 +123,8 @@ export class AssignmentComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: AstNode, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.Assignment, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    if (!ast.isAssignment(node)) return type;
-
     const log = enterLog("isAssignment", node.operator, indent);
     if (node.assign) {
       type = TypeSystem.inferType(node.assign, cache, indent + 1);
@@ -141,7 +133,6 @@ export class AssignmentComponent {
     } else {
       type = TypeSystem.createErrorType("No type hint for this element", node);
     }
-    // console.log("AssignmentComponent.inferType:", type.$type);
     exitLog(log);
     return type;
   }
@@ -153,22 +144,19 @@ export class AssignmentComponent {
    */
   static validationChecks(expr: ast.Assignment, accept: ValidationAcceptor): void {
     // console.log("checkAssignment");
-    const map = getTypeCache();
     // console.log(`    left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`);
-    const left = TypeSystem.inferType(expr.assign, map);
-    // console.log(`    left: ${left.$type}`);
     // console.log(`    right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`);
+    const map = getTypeCache();
+    const left = TypeSystem.inferType(expr.assign, map);
     const right = TypeSystem.inferType(expr.value, map);
-    // console.log(`    right: ${right.$type}`);
     if (!isAssignable(right, left)) {
-      accept(
-        "error",
-        `Type '${TypeSystem.typeToString(right)}' is not assignable to type '${TypeSystem.typeToString(left)}'.`,
-        {
-          node: expr,
-          property: "value",
-        }
-      );
+      const msg = `Type '${TypeSystem.typeToString(right)}' is not assignable to type '${TypeSystem.typeToString(
+        left
+      )}'.`;
+      accept("error", msg, {
+        node: expr,
+        property: "value",
+      });
     }
   }
 }

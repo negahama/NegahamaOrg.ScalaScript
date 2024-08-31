@@ -1,9 +1,14 @@
 import { AstNode, AstUtils } from "langium";
 import * as ast from "./generated/ast.js";
 import { SimpleTypeComponent } from "../components/datatype-components.js";
-import { MethodCallComponent } from "../components/methodcall-components.js";
+import { FunctionComponent, MethodCallComponent } from "../components/methodcall-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
-import { ClassComponent, FieldComponent, MethodComponent } from "../components/class-components.js";
+import {
+  ClassComponent,
+  ClassLiteralComponent,
+  FieldComponent,
+  MethodComponent,
+} from "../components/class-components.js";
 import { ForOfComponent, ForToComponent, ForUntilComponent } from "../components/statement-components.js";
 import { BinaryExpressionComponent, UnaryExpressionComponent } from "../components/expression-components.js";
 import { ArrayExpressionComponent, ArrayLiteralComponent, ArrayTypeComponent } from "../components/array-components.js";
@@ -117,7 +122,7 @@ export interface FunctionParameter {
  */
 export interface ClassTypeDescription {
   readonly $type: "class";
-  readonly literal: ast.Class;
+  readonly literal: ast.Class | ast.ClassType | ast.ClassLiteral;
 }
 
 /**
@@ -264,7 +269,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createClassType(literal: ast.Class): ClassTypeDescription {
+  static createClassType(literal: ast.Class | ast.ClassType | ast.ClassLiteral): ClassTypeDescription {
     return {
       $type: "class",
       literal,
@@ -310,7 +315,7 @@ export class TypeSystem {
    */
   static typeToString(item: TypeDescription): string {
     if (this.isClassType(item)) {
-      return item.literal.name;
+      return item.literal.$cstNode?.text ?? "unknown";
     } else if (this.isFunctionType(item)) {
       const params = item.parameters.map((e) => `${e.name}: ${this.typeToString(e.type)}`).join(", ");
       return `(${params}) => ${this.typeToString(item.returnType)}`;
@@ -348,16 +353,20 @@ export class TypeSystem {
     // Prevent recursive inference errors
     cache.set(node, this.createErrorType("Recursive definition", node));
 
-    if (ast.isMethodCall(node)) {
-      type = MethodCallComponent.inferType(node, cache, indent);
-    } else if (ast.isVariable(node)) {
+    if (ast.isVariable(node)) {
       type = VariableComponent.inferType(node, cache, indent);
+    } else if (ast.isTFunction(node)) {
+      type = FunctionComponent.inferType(node, cache, indent);
+    } else if (ast.isMethodCall(node)) {
+      type = MethodCallComponent.inferType(node, cache, indent);
     } else if (ast.isClass(node)) {
       type = ClassComponent.inferType(node, cache, indent);
     } else if (ast.isField(node)) {
       type = FieldComponent.inferType(node, cache, indent);
     } else if (ast.isMethod(node)) {
       type = MethodComponent.inferType(node, cache, indent);
+    } else if (ast.isClassLiteral(node)) {
+      type = ClassLiteralComponent.inferType(node, cache, indent);
     } else if (ast.isParameter(node)) {
       const log = enterLog("isParameter", node.name, indent);
       if (node.type) {
@@ -372,6 +381,16 @@ export class TypeSystem {
         type = TypeSystem.inferType(node.type, cache, indent + 1);
       }
       exitLog(log);
+    } else if (ast.isForOf(node)) {
+      type = ForOfComponent.inferType(node, cache, indent);
+    } else if (ast.isForTo(node)) {
+      type = ForToComponent.inferType(node, cache, indent);
+    } else if (ast.isForUntil(node)) {
+      type = ForUntilComponent.inferType(node, cache, indent);
+    } else if (ast.isLambdaType(node)) {
+      const log = enterLog("isLambdaType", undefined, indent);
+      //type = { $type: "lambda" };
+      exitLog(log);
     } else if (ast.isSimpleType(node)) {
       type = SimpleTypeComponent.inferType(node, cache, indent);
     } else if (ast.isArrayType(node)) {
@@ -381,18 +400,8 @@ export class TypeSystem {
       type = ArrayLiteralComponent.inferType(node, cache, indent);
     } else if (ast.isArrayExpression(node)) {
       type = ArrayExpressionComponent.inferType(node, cache, indent);
-    } else if (ast.isForOf(node)) {
-      type = ForOfComponent.inferType(node, cache, indent);
-    } else if (ast.isForTo(node)) {
-      type = ForToComponent.inferType(node, cache, indent);
-    } else if (ast.isForUntil(node)) {
-      type = ForUntilComponent.inferType(node, cache, indent);
     } else if (ast.isAssignment(node)) {
       type = AssignmentComponent.inferType(node, cache, indent);
-    } else if (ast.isLambdaType(node)) {
-      const log = enterLog("isLambdaType", undefined, indent);
-      //type = { $type: "lambda" };
-      exitLog(log);
     } else if (ast.isStringExpression(node)) {
       const log = enterLog("isStringExpression", node.value, indent);
       type = this.createStringType(node);
