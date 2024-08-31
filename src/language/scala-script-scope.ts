@@ -16,48 +16,6 @@ import { enterLog, traceLog, exitLog, TypeSystem } from "./scala-script-types.js
 /**
  *
  */
-interface ExtensionFunction {
-  type: string;
-  name: string;
-  node: ast.Method | ast.Field;
-}
-
-const stringExtensionFunctions: ExtensionFunction[] = [];
-const arrayExtensionFunctions: ExtensionFunction[] = [];
-
-/**
- *
- * @returns
- */
-function getExtensionAll(kind: string): (ast.Method | ast.Field)[] {
-  switch (kind) {
-    case "string":
-      return stringExtensionFunctions.map((e) => e.node);
-    case "array":
-      return arrayExtensionFunctions.map((e) => e.node);
-    default:
-      console.log("internal error");
-      return arrayExtensionFunctions.map((e) => e.node);
-  }
-}
-
-// function getExtensionByType(kind: string, type: string): (Method | Field)[] {
-//   const extensionFunctions = kind == "string" ? stringExtensionFunctions : arrayExtensionFunctions
-//   const result = extensionFunctions.filter((e) => type == e.type);
-//   if (result.length > 0) return result.map((e) => e.node);
-//   return [];
-// }
-
-// function getExtensionByName(kind: string, name: string): Method | Field | undefined {
-//   const extensionFunctions = kind == "string" ? stringExtensionFunctions : arrayExtensionFunctions
-//   const result = extensionFunctions.find((e) => name == e.name);
-//   if (result) return result.node;
-//   return undefined;
-// }
-
-/**
- *
- */
 export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   constructor(services: LangiumServices) {
     super(services);
@@ -152,34 +110,25 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 클래스이면
     // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
     if (TypeSystem.isClassType(prevTypeDesc)) {
-      traceLog(
-        1,
-        `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}, ${ast.isClass(prevTypeDesc.literal)}`
-      );
+      traceLog(1, `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
       exitLog(scopeLog.replace("Exit", "Exit2"));
       return this.scopeClassMembers(prevTypeDesc.literal);
     }
 
     // 문자열이면
-    // 문자열 확장 함수로 등록된 모든 멤버를 리턴한다.
+    // 문자열이나 배열 관련 빌트인 함수들은 전역으로 class string { ... } 형태로 저장되어져 있기 때문에
+    // 전역 클래스 중 이름이 string인 것의 멤버들을 scope로 구성해서 리턴한다.
     else if (TypeSystem.isStringType(prevTypeDesc)) {
-      traceLog(1, `FIND string: ${previous.$type}`);
-      const allMembers = getExtensionAll("string");
-      const allMemberNames = allMembers.map((m) => m.name);
-      traceLog(0, "", allMemberNames);
-      console.log("FIND string:", allMemberNames);
-      return this.createScopeForNodes(allMembers);
+      traceLog(1, `FIND string: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
+      exitLog(scopeLog.replace("Exit", "Exit2"));
+      return this.scopeSpecificClassMembers(context, "string");
     }
 
     // 배열이면
-    // 배열의 확장 함수로 등록된 모든 멤버를 리턴한다.
     else if (TypeSystem.isArrayType(prevTypeDesc)) {
       traceLog(1, `FIND array: ${previous.$type}, element-type:${prevTypeDesc.elementType.$type}`);
-      const allMembers = getExtensionAll("array");
-      const allMemberNames = allMembers.map((m) => m.name);
-      traceLog(0, "", allMemberNames);
-      console.log("FIND array:", allMemberNames);
-      return this.createScopeForNodes(allMembers);
+      exitLog(scopeLog.replace("Exit", "Exit2"));
+      return this.scopeSpecificClassMembers(context, "array");
     }
 
     // When the target of our member call isn't a class
@@ -205,6 +154,26 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       } else console.error("error");
     });
     return this.createScopeForNodes(removedBypass);
+  }
+
+  /**
+   *
+   * @param context
+   * @param className
+   * @returns
+   */
+  private scopeSpecificClassMembers(context: ReferenceInfo, className: string): Scope {
+    const scope: Scope = this.getGlobalScope("Class", context);
+    const sc = scope.getAllElements().find((d) => d.name == className);
+    if (ast.isClass(sc?.node)) {
+      const allMembers = sc?.node.statements;
+      if (allMembers) {
+        // const names = allMembers.map((m) => m.$cstNode?.text ?? "unknown");
+        // console.log("FIND string:", names);
+        return this.createScopeForNodes(allMembers);
+      }
+    }
+    return super.getScope(context);
   }
 }
 
@@ -307,36 +276,7 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
 
     // 함수 중에 확장 함수가 있으면 이를 처리한다.
     else if (ast.isMethod(node) && node.extension) {
-      // 현재는 extension으로 string이 명시된 경우만 확장함수로 등록된다.
-      if (ast.isPrimitiveType(node.extension)) {
-        traceLog(0, "extension function:", node.extension.type, node.name);
-        switch (node.extension.type) {
-          case "string":
-            stringExtensionFunctions.push({ type: node.extension.type, name: node.name, node: node });
-            break;
-        }
-        isProcessed = true;
-      } else {
-        console.log("Not support...");
-      }
-    }
-
-    // 클래스 중에 클래스 이름이 string, array가 있으면 이를 확장함수로 처리한다
-    else if (ast.isClass(node) && (node.name == "string" || node.name == "array")) {
-      traceLog(0, "extension class:", node.name);
-      node.statements.forEach((s) => {
-        if (ast.isField(s) || ast.isMethod(s)) {
-          switch (node.name) {
-            case "string":
-              stringExtensionFunctions.push({ type: node.name, name: s.name, node: s });
-              break;
-            case "array":
-              arrayExtensionFunctions.push({ type: node.name, name: s.name, node: s });
-              break;
-          }
-        }
-      });
-      isProcessed = true;
+      console.log("Not support...");
     }
 
     if (!isProcessed) {

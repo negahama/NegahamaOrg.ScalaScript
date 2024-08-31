@@ -3,75 +3,139 @@
 
 @NotTrans class string {
   length: number
+  charAt(index: number)-> string
+  charCodeAt(index: number)-> number
+  codePointAt(pos: number)-> number
+  concat(str: string)-> string
+  includes(searchString: string, position: number)-> boolean
+  endsWith(searchString: string, endPosition: number)-> boolean
+  indexOf(searchValue: string, fromIndex: number)-> number
+  lastIndexOf(searchValue: string, fromIndex: number)-> number
+  localeCompare(compareString: string)-> number
+  //match(regexp: string)-> string
+  matchAll(regexp: string)-> string[]
+  normalize(form: string)-> string
+  padEnd(targetLength: number, padString: string)-> string
+  padStart(targetLength: number, padString: string)-> string
+  repeat(count: number)-> string
+  replace(searchFor: string, replaceWith: string)-> string
+  replaceAll(searchFor: string, replaceWith: string)-> string
+  search(regexp: string)-> string
+  slice(beginIndex: number, endIndex: number)-> string
+  split(sep: string, limit: number)-> string[]
+  startsWith(searchString: string, position: number)-> boolean
+  substring(indexStart: number, indexEnd: number)-> string
+  toLocaleLowerCase(locale: string)-> string
+  toLocaleUpperCase(locale: string)-> string
+  toLowerCase()-> string
+  toUpperCase()-> string
+  toString()-> string
+  trim()-> string
+  trimStart()-> string
+  trimEnd()-> string
+  valueOf()-> string
 }
-@NotTrans def string.charAt(index: number)-> string
-@NotTrans def string.charCodeAt(index: number)-> number
-@NotTrans def string.codePointAt(pos: number)-> number
-@NotTrans def string.concat(str: string)-> string
-@NotTrans def string.includes(searchString: string, position: number)-> boolean
-@NotTrans def string.endsWith(searchString: string, endPosition: number)-> boolean
-@NotTrans def string.indexOf(searchValue: string, fromIndex: number)-> number
-@NotTrans def string.lastIndexOf(searchValue: string, fromIndex: number)-> number
-@NotTrans def string.localeCompare(compareString: string)-> number
-//@NotTrans def string.match(regexp: string)-> string
-@NotTrans def string.matchAll(regexp: string)-> string[]
-@NotTrans def string.normalize(form: string)-> string
-@NotTrans def string.padEnd(targetLength: number, padString: string)-> string
-@NotTrans def string.padStart(targetLength: number, padString: string)-> string
-@NotTrans def string.repeat(count: number)-> string
-@NotTrans def string.replace(searchFor: string, replaceWith: string)-> string
-@NotTrans def string.replaceAll(searchFor: string, replaceWith: string)-> string
-@NotTrans def string.search(regexp: string)-> string
-@NotTrans def string.slice(beginIndex: number, endIndex: number)-> string
-@NotTrans def string.split(sep: string, limit: number)-> string[]
-@NotTrans def string.startsWith(searchString: string, position: number)-> boolean
-@NotTrans def string.substring(indexStart: number, indexEnd: number)-> string
-@NotTrans def string.toLocaleLowerCase(locale: string)-> string
-@NotTrans def string.toLocaleUpperCase(locale: string)-> string
-@NotTrans def string.toLowerCase()-> string
-@NotTrans def string.toUpperCase()-> string
-@NotTrans def string.toString()-> string
-@NotTrans def string.trim()-> string
-@NotTrans def string.trimStart()-> string
-@NotTrans def string.trimEnd()-> string
-@NotTrans def string.valueOf()-> string
-
 @NotTrans class array {
   length: number
-  forEach()-> string
+  at(index)-> string
+  concat()-> string
+  copyWithin()-> string
+  every(callbackFn)-> string
+  fill(value, start, end)-> string
+  filter(callbackFn)-> string
+  find(callbackFn)-> string
+  findIndex(callbackFn)-> string
+  findLast(callbackFn)-> string
+  findLastIndex(callbackFn)-> string
+  flat(depth)-> string
+  flatMap(callbackFn)-> string
+  forEach(callbackFn)-> string
+  includes(searchElement, fromIndex)-> string
+  indexOf(searchElement, fromIndex)-> string
+  join(separate)-> string
+  keys()-> string
+  lastIndexOf(searchElement, fromIndex)-> string
+  map(callbackFn)-> string
+  pop()-> string
+  push(element)-> string
+  reduce(callbackFn)-> string
+  reduceRight(callbackFn)-> string
+  reverse()-> string
+  shift()-> string
+  slice()-> string
+  some(callbackFn)-> string
+  sort(callbackFn)-> string
+  splice()-> string
+  toString()-> string
+  unshift()-> string
+  values()-> string
 }
-@NotTrans def string.at(index)-> string
-@NotTrans def string.concat()-> string
-@NotTrans def string.copyWithin()-> string
-@NotTrans def string.every(callbackFn)-> string
-@NotTrans def string.fill(value, start, end)-> string
-@NotTrans def string.filter(callbackFn)-> string
-@NotTrans def string.find(callbackFn)-> string
-@NotTrans def string.findIndex(callbackFn)-> string
-@NotTrans def string.findLast(callbackFn)-> string
-@NotTrans def string.findLastIndex(callbackFn)-> string
-@NotTrans def string.flat(depth)-> string
-@NotTrans def string.flatMap(callbackFn)-> string
-@NotTrans def string.forEach(callbackFn)-> string
-@NotTrans def string.includes(searchElement, fromIndex)-> string
-@NotTrans def string.indexOf(searchElement, fromIndex)-> string
-@NotTrans def string.join(separate)-> string
-@NotTrans def string.keys()-> string
-@NotTrans def string.lastIndexOf(searchElement, fromIndex)-> string
-@NotTrans def string.map(callbackFn)-> string
-@NotTrans def string.pop()-> string
-@NotTrans def string.push(element)-> string
-@NotTrans def string.reduce(callbackFn)-> string
-@NotTrans def string.reduceRight(callbackFn)-> string
-@NotTrans def string.reverse()-> string
-@NotTrans def string.shift()-> string
-@NotTrans def string.slice()-> string
-@NotTrans def string.some(callbackFn)-> string
-@NotTrans def string.sort(callbackFn)-> string
-@NotTrans def string.splice()-> string
-@NotTrans def string.toString()-> string
-@NotTrans def string.unshift()-> string
-@NotTrans def string.values()-> string
+@NotTrans class number {
+  EPSILON: number
+  MAX_SAFE_INTEGER: number
+  MIN_SAFE_INTEGER: number
+  MAX_VALUE: number
+  MIN_VALUE: number
+  NaN: number
+  NEGATIVE_INFINITY: number
+  POSITIVE_INFINITY: number
+  isNaN()-> boolean
+  isFinite()-> boolean
+  isInteger()-> boolean
+  isSafeInteger()-> boolean
+  parseFloat(x: string)-> number
+  parseInt(x: string)-> number
+  toExponential(fractionDigits: number)-> number
+  toFixed(digits: number)-> number
+  toLocaleString(locales: string)-> string
+  toPrecision(precision: number)-> number
+  toString()-> string
+  valueOf()-> number
+}
+@NotTrans class Math {
+  E: number
+  PI: number
+  LN2: number
+  LN10: number
+  LOG2E: number
+  LOG10E: number
+  SQRT1_2: number
+  SQRT2: number
+  abs(x: number)-> number
+  acos(x: number)-> number
+  acosh(x: number)-> number
+  asin(x: number)-> number
+  asinh(x: number)-> number
+  atan(x: number)-> number
+  atanh(x: number)-> number
+  atan2(y: number, x: number)-> number
+  cbrt(x: number)-> number
+  ceil(x: number)-> number
+  clz32(x: number)-> number
+  cos(x: number)-> number
+  cosh(x: number)-> number
+  exp(x: number)-> number
+  expm1(x: number)-> number
+  floor(x: number)-> number
+  fround(x: number)-> number
+  imul(x: number, y)-> number
+  log(x: number)-> number
+  log1p(x: number)-> number
+  log10(x: number)-> number
+  log2(x: number)-> number
+  max(x: number, y: number)-> number
+  min(x: number, y: number)-> number
+  pow(x: number, y)-> number
+  random()-> number
+  round(x: number)-> number
+  sign(x: number)-> number
+  sin(x: number)-> number
+  sinh(x: number)-> number
+  sqrt(x: number)-> number
+  tan(x: number)-> number
+  tanh(x: number)-> number
+  trunc(x: number)-> number
+}
 
 @NotTrans def setTimeout()
 
