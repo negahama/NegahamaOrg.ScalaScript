@@ -1,9 +1,9 @@
 @NotTrans class Console { log() }
 @NotTrans var console: Console
-@NotTrans class string {
+@NotTrans class $string$ {
   length: number
 }
-@NotTrans class array {
+@NotTrans class $array$ {
   length: number
 }
 

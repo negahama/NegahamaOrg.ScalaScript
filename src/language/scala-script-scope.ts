@@ -116,19 +116,19 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     }
 
     // 문자열이면
-    // 문자열이나 배열 관련 빌트인 함수들은 전역으로 class string { ... } 형태로 저장되어져 있기 때문에
-    // 전역 클래스 중 이름이 string인 것의 멤버들을 scope로 구성해서 리턴한다.
+    // 문자열이나 배열 관련 빌트인 함수들은 전역으로 class $string$ { ... } 형태로 저장되어져 있기 때문에
+    // 전역 클래스 중 이름이 $string$인 것의 멤버들을 scope로 구성해서 리턴한다.
     else if (TypeSystem.isStringType(prevTypeDesc)) {
       traceLog(1, `FIND string: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
       exitLog(scopeLog.replace("Exit", "Exit2"));
-      return this.scopeSpecificClassMembers(context, "string");
+      return this.scopeSpecificClassMembers(context, "$string$");
     }
 
     // 배열이면
     else if (TypeSystem.isArrayType(prevTypeDesc)) {
       traceLog(1, `FIND array: ${previous.$type}, element-type:${prevTypeDesc.elementType.$type}`);
       exitLog(scopeLog.replace("Exit", "Exit2"));
-      return this.scopeSpecificClassMembers(context, "array");
+      return this.scopeSpecificClassMembers(context, "$array$");
     }
 
     // When the target of our member call isn't a class

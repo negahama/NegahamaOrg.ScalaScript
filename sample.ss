@@ -1,7 +1,7 @@
 @NotTrans class Console { log() }
 @NotTrans var console: Console
 
-@NotTrans class string {
+@NotTrans class $string$ {
   length: number
   charAt(index: number)-> string
   charCodeAt(index: number)-> number
@@ -35,7 +35,7 @@
   trimEnd()-> string
   valueOf()-> string
 }
-@NotTrans class array {
+@NotTrans class $array$ {
   length: number
   at(index)-> string
   concat()-> string
@@ -70,7 +70,7 @@
   unshift()-> string
   values()-> string
 }
-@NotTrans class number {
+@NotTrans class $number$ {
   EPSILON: number
   MAX_SAFE_INTEGER: number
   MIN_SAFE_INTEGER: number
