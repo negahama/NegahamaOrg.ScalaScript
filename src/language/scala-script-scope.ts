@@ -146,7 +146,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   private scopeClassMembers(classItem: ast.Class): Scope {
     // Since Lox allows class-inheritance,
     // we also need to look at all members of possible super classes for scoping
-    const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.statements);
+    const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.elements);
     const removedBypass = allMembers.filter((e) => !ast.isBypass(e));
     removedBypass.forEach((e) => {
       if (ast.isMethod(e) || ast.isField(e)) {
@@ -166,7 +166,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const scope: Scope = this.getGlobalScope("Class", context);
     const sc = scope.getAllElements().find((d) => d.name == className);
     if (ast.isClass(sc?.node)) {
-      const allMembers = sc?.node.statements;
+      const allMembers = sc?.node.elements;
       if (allMembers) {
         // const names = allMembers.map((m) => m.$cstNode?.text ?? "unknown");
         // console.log("FIND string:", names);

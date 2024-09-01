@@ -1,8 +1,7 @@
 import { AstNode, AstUtils, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog, traceLog } from "../language/scala-script-types.js";
-import { generateExpression } from "../cli/generator.js";
-import { generateFunction } from "../cli/generator-util.js";
+import { generateExpression, generateFunction } from "../cli/generator.js";
 import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
 
 /**

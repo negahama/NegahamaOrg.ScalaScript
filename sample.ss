@@ -330,3 +330,31 @@ def generateBypassElement(bypass: string[])-> string => {
   })
   return result
 }
+
+def Work => {
+  name: string
+  kind: string
+  wage: number
+}
+def Person => {
+  name: string
+  work: Work
+  calc(hour: number, bonus: Bonus)-> number => {
+    return this.work.wage * hour + bonus.amount
+  }
+}
+def Bonus => {
+  amount: number
+}
+
+var alba: Work = {
+  name = "alba"
+  kind = "..."
+  wage = 10000
+}
+
+var somebody: Person 
+%%//somebody = new Person
+somebody.name = "Jessica"
+somebody.work = alba
+somebody.calc(3, { amount = 10 })

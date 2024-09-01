@@ -5,6 +5,7 @@ import { FunctionComponent, MethodCallComponent } from "../components/methodcall
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import {
   ClassComponent,
+  ClassTypeComponent,
   ClassLiteralComponent,
   FieldComponent,
   MethodComponent,
@@ -365,6 +366,8 @@ export class TypeSystem {
       type = FieldComponent.inferType(node, cache, indent);
     } else if (ast.isMethod(node)) {
       type = MethodComponent.inferType(node, cache, indent);
+    } else if (ast.isClassType(node)) {
+      type = ClassTypeComponent.inferType(node, cache, indent);
     } else if (ast.isClassLiteral(node)) {
       type = ClassLiteralComponent.inferType(node, cache, indent);
     } else if (ast.isParameter(node)) {

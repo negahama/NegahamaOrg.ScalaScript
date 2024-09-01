@@ -1,8 +1,8 @@
 import { AstNode } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog, traceLog } from "../language/scala-script-types.js";
-import { generateExpression, generateStatement } from "../cli/generator.js";
-import { generateBlock, generateType } from "../cli/generator-util.js";
+import { generateBlock, generateExpression, generateStatement } from "../cli/generator.js";
+import { ClassTypeComponent } from "./class-components.js";
 
 /**
  *
@@ -16,8 +16,8 @@ export class LambdaCallComponent {
    */
   static transpile(expr: ast.LambdaCall, indent: number): string {
     let result = "";
-    result += "(" + expr.bindings.map((bind) => bind.name + generateType(bind.type)).join(", ");
-    result += ")" + generateType(expr.returnType) + " => ";
+    result += "(" + expr.bindings.map((bind) => bind.name + AllTypesComponent.transpile(bind.type, indent)).join(", ");
+    result += ")" + AllTypesComponent.transpile(expr.returnType, indent) + " => ";
     result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
       if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
       else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
@@ -41,6 +41,64 @@ export class LambdaCallComponent {
 /**
  *
  */
+export class AllTypesComponent {
+  /**
+   *
+   * @param expr
+   * @param indent
+   * @returns
+   */
+  static transpile(expr: ast.AllTypes | undefined, indent: number): string {
+    const typeonly = (t: ast.AllTypes | undefined) => {
+      if (t == undefined) return "";
+      if (ast.isSimpleType(t)) {
+        if (t.reference) {
+          return t.reference.$refText;
+        } else if (ast.isPrimitiveType(t)) {
+          return t.type;
+        }
+      } else if (ast.isArrayType(t)) {
+        if (t.elementType.reference) {
+          return t.elementType.reference.$refText + "[]";
+        } else if (ast.isPrimitiveType(t.elementType)) {
+          return t.elementType.type + "[]";
+        }
+      }
+      return "";
+    };
+
+    let result = "";
+    if (expr == undefined) return result;
+    result += ": ";
+    if (ast.isLambdaType(expr)) {
+      const list = expr.bindings.map((bind) => bind.name + ": " + typeonly(bind.type)).join(", ");
+      result += `(${list})` + (expr.returnType ? ` => ${typeonly(expr.returnType)}` : "");
+    } else if (ast.isArrayType(expr)) {
+      result += typeonly(expr);
+    } else if (ast.isSimpleType(expr)) {
+      result += SimpleTypeComponent.transpile(expr, 0);
+    }
+    return result;
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
+  static inferType(node: ast.AllTypes, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    const log = enterLog("isAllTypes", undefined, indent);
+    exitLog(log);
+    return type;
+  }
+}
+
+/**
+ *
+ */
 export class SimpleTypeComponent {
   /**
    *
@@ -49,7 +107,32 @@ export class SimpleTypeComponent {
    * @returns
    */
   static transpile(expr: ast.SimpleType, indent: number): string {
-    return "";
+    const typeonly = (t: ast.AllTypes | undefined) => {
+      if (t == undefined) return "";
+      if (ast.isSimpleType(t)) {
+        if (t.reference) {
+          return t.reference.$refText;
+        } else if (ast.isPrimitiveType(t)) {
+          return t.type;
+        }
+      } else if (ast.isArrayType(t)) {
+        if (t.elementType.reference) {
+          return t.elementType.reference.$refText + "[]";
+        } else if (ast.isPrimitiveType(t.elementType)) {
+          return t.elementType.type + "[]";
+        }
+      }
+      return "";
+    };
+
+    let result = "";
+    if (ast.isTupleType(expr)) {
+      const list = expr.types.map((t) => typeonly(t)).join(", ");
+      result += `[${list}]`;
+    } else if (ast.isClassType(expr)) {
+      result += ClassTypeComponent.transpile(expr, indent);
+    } else result += typeonly(expr);
+    return result;
   }
 
   /**
@@ -66,7 +149,7 @@ export class SimpleTypeComponent {
       traceLog(indent + 1, "it's TupleType");
       console.log("it's TupleType, Not support yet");
     } else if (ast.isClassType(node)) {
-      type = TypeSystem.createClassType(node);
+      type = ClassTypeComponent.inferType(node, cache, indent);
     } else if (ast.isPrimitiveType(node)) {
       traceLog(indent + 1, "Type is primitive");
       if (node.type === "number") {

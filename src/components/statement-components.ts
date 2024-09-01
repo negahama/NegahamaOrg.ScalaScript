@@ -1,8 +1,7 @@
 import { AstNode } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
-import { generateExpression, generateStatement } from "../cli/generator.js";
-import { applyIndent, generateBlock } from "../cli/generator-util.js";
+import { generateExpression, generateStatement, applyIndent, generateBlock } from "../cli/generator.js";
 
 /**
  *

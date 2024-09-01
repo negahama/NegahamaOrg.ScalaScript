@@ -147,7 +147,7 @@ fragment ClassSignature:
   ('extends' superClass=[Class:Id])? '=>' ClassBody;
 
 fragment ClassBody:
-  '{' statements+=(Bypass | Field | Method)* '}';
+  '{' elements+=(Bypass | Field | Method)* '}';
 
 Field: VarSignature;
 
@@ -155,13 +155,13 @@ Method: name=Id FunSignature;
 
 // Class Type
 // ex) var obj: { name: string age: number }
-ClassType: '{' elements+=TypedId* '}';
+ClassType: ClassBody;
 
 // Class literal
 // ex) var obj = { name = "samuel" age = 20 }
 // ClassLiteral은 expression이다.
 ClassLiteral:
-  '{' items+=(MemberBinding)* '}';
+  '{' elements+=(MemberBinding)* '}';
 
 MemberBinding: name=Id ('=' value=Expression)?;
 

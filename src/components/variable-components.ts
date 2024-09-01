@@ -3,7 +3,7 @@ import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
 import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
 import { generateExpression } from "../cli/generator.js";
-import { generateVariable } from "../cli/generator-util.js";
+import { AllTypesComponent } from "./datatype-components.js";
 
 /**
  *
@@ -16,11 +16,19 @@ export class VariableComponent {
    * @returns
    */
   static transpile(stmt: ast.Variable, indent: number): string {
+    const generateVariable = (name: string, v: ast.Variable, indent: number) => {
+      return (
+        name +
+        AllTypesComponent.transpile(v.type, indent) +
+        (v.value ? " = " + generateExpression(v.value, indent) : "")
+      );
+    };
+
     let result = "";
     if (stmt.annotate == "NotTrans") return result;
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
-    result += stmt.names.map((name) => generateVariable(name, stmt.type, stmt.value, indent)).join(", ") + ";";
+    result += stmt.names.map((name) => generateVariable(name, stmt, indent)).join(", ") + ";";
     return result;
   }
 

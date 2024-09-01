@@ -91,7 +91,7 @@ export class ScalaScriptValidator {
  * @returns
  */
 export function isAssignable(from: TypeDescription, to: TypeDescription): boolean {
-  console.log("isAssignable:", from.$type, to.$type);
+  // console.log("isAssignable:", from.$type, to.$type);
   if (TypeSystem.isClassType(from)) {
     if (!TypeSystem.isClassType(to)) {
       return false;

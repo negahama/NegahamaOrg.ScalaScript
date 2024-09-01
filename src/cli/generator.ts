@@ -3,8 +3,7 @@ import * as path from "node:path";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as ast from "../language/generated/ast.js";
 import { extractDestinationAndName } from "./cli-util.js";
-import { generateBlock, generateCondition } from "./generator-util.js";
-import { LambdaCallComponent } from "../components/datatype-components.js";
+import { AllTypesComponent, LambdaCallComponent } from "../components/datatype-components.js";
 import { FunctionComponent, MethodCallComponent } from "../components/methodcall-components.js";
 import { ClassComponent, ClassLiteralComponent } from "../components/class-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
@@ -141,4 +140,90 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
     console.log("ERROR in Expression:", expr);
   }
   return result;
+}
+
+/**
+ *
+ * @param body
+ * @param indent
+ * @param doItForLastCode
+ * @returns
+ */
+export function generateBlock(
+  body: ast.Block,
+  indent: number,
+  doItForLastCode?: (lastCode: ast.Code, indent: number) => string
+): string {
+  const defaultDoIt = (lastCode: ast.Code, indent: number) => {
+    if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
+    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
+    else return "";
+  };
+
+  // 단일 expression으로 되어져 있어도 괄호로 둘러싸인 형태로 변환된다.
+  // 괄호 내부의 모든 코드는 indent가 하나 증가되어진 상태로 처리되어야 한다.
+  let result = "{\n";
+  body.codes.forEach((code, index) => {
+    let element = "";
+    if (index == body.codes.length - 1) {
+      if (doItForLastCode == undefined) element += defaultDoIt(code, indent + 1);
+      else element += doItForLastCode(code, indent + 1);
+    } else {
+      if (ast.isStatement(code)) element += generateStatement(code, indent + 1);
+      else if (ast.isExpression(code)) element += generateExpression(code, indent + 1);
+      else console.log("ERROR in Block:", code);
+    }
+    result += applyIndent(indent + 1, element + "\n");
+  });
+  result += applyIndent(indent, "}");
+  return result;
+}
+
+/**
+ *
+ * @param fun
+ * @param indent
+ * @param isClassMethod
+ * @returns
+ */
+export function generateFunction(
+  fun: ast.TFunction | ast.Method,
+  indent: number,
+  isClassMethod: boolean = false
+): string {
+  const params = fun.parameters.map((param) => param.name + AllTypesComponent.transpile(param.type, indent)).join(", ");
+  let result = "";
+  if (ast.isTFunction(fun) && fun.annotate == "NotTrans") return result;
+  if (!isClassMethod) result += "function ";
+  result += `${fun.name}(${params})${AllTypesComponent.transpile(fun.returnType, indent)} `;
+  // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
+  // 그래서 익명 함수가 받는 indent는 +1되어진 것이다.
+  result += fun.body
+    ? generateBlock(fun.body, indent, (lastCode: ast.Code, indent: number) => {
+        if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
+        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
+        else return "";
+      })
+    : "";
+  return result;
+}
+
+/**
+ *
+ * @param condition
+ * @returns
+ */
+export function generateCondition(condition: ast.Expression): string {
+  const e = generateExpression(condition, 0);
+  return ast.isGroupExpression(condition) ? e : "(" + e + ")";
+}
+
+/**
+ *
+ * @param lv
+ * @param s
+ * @returns
+ */
+export function applyIndent(lv: number, s: string) {
+  return "  ".repeat(lv) + s;
 }

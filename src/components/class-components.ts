@@ -1,9 +1,9 @@
 import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
-import { applyIndent, generateFunction, generateVariable } from "../cli/generator-util.js";
-import { generateExpression, generateStatement } from "../cli/generator.js";
+import { applyIndent, generateExpression, generateFunction, generateStatement } from "../cli/generator.js";
 import { checkMethodReturnType } from "./methodcall-components.js";
+import { AllTypesComponent } from "./datatype-components.js";
 
 /**
  *
@@ -19,27 +19,22 @@ export class ClassComponent {
     let result = "";
     if (stmt.annotate == "NotTrans") return result;
     let isInterface = true;
-    if (stmt.statements.find((m) => ast.isMethod(m))) isInterface = false;
+    if (stmt.elements.find((m) => ast.isMethod(m))) isInterface = false;
     if (isInterface) {
       result += `interface ${stmt.name} {\n`;
-      stmt.statements.forEach((m) => {
-        if (ast.isField(m)) {
-          result += applyIndent(indent + 1, generateVariable(m.name, m.type, m.value, indent) + ";");
-        }
-        result += "\n";
-      });
-      result += "}";
-      return result;
+    } else {
+      result += `class ${stmt.name} `;
+      result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
     }
-    result += `class ${stmt.name} `;
-    result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
-    stmt.statements.forEach((m) => {
+    stmt.elements.forEach((m) => {
       if (ast.isMethod(m)) {
-        result += applyIndent(indent + 1, generateFunction(m, indent + 1, true));
+        result += applyIndent(indent + 1, MethodComponent.transpile(m, indent + 1));
       } else if (ast.isField(m)) {
-        result += applyIndent(indent + 1, generateVariable(m.name, m.type, m.value, indent) + ";");
+        result += applyIndent(indent + 1, FieldComponent.transpile(m, indent) + ";");
       } else if (ast.isBypass(m)) {
         result += applyIndent(indent + 1, generateStatement(m, indent + 1));
+      } else {
+        console.log("internal error");
       }
       result += "\n";
     });
@@ -87,7 +82,9 @@ export class FieldComponent {
    * @returns
    */
   static transpile(stmt: ast.Field, indent: number): string {
-    return "";
+    let result = stmt.name + AllTypesComponent.transpile(stmt.type, indent);
+    result += stmt.value ? " = " + generateExpression(stmt.value, indent) : "";
+    return result;
   }
 
   /**
@@ -119,7 +116,7 @@ export class MethodComponent {
    * @returns
    */
   static transpile(stmt: ast.Method, indent: number): string {
-    return generateFunction(stmt, indent);
+    return generateFunction(stmt, indent, true);
   }
 
   /**
@@ -154,6 +151,48 @@ export class MethodComponent {
 /**
  *
  */
+export class ClassTypeComponent {
+  /**
+   *
+   * @param expr
+   * @param indent
+   * @returns
+   */
+  static transpile(expr: ast.ClassType, indent: number): string {
+    let result = "";
+    expr.elements.forEach((e) => {
+      if (ast.isMethod(e)) {
+        result += MethodComponent.transpile(e, 1);
+      } else if (ast.isField(e)) {
+        result += FieldComponent.transpile(e, 1) + ";";
+      } else if (ast.isBypass(e)) {
+        result += generateStatement(e, 1);
+      } else {
+        console.log("internal error");
+      }
+    });
+    return result;
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
+  static inferType(node: ast.ClassType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    const log = enterLog("isClassType", undefined, indent);
+    // console.log("class type:", node.$cstNode?.text);
+    const type = TypeSystem.createClassType(node);
+    exitLog(log);
+    return type;
+  }
+}
+
+/**
+ *
+ */
 export class ClassLiteralComponent {
   /**
    *
@@ -163,7 +202,7 @@ export class ClassLiteralComponent {
    */
   static transpile(expr: ast.ClassLiteral, indent: number): string {
     let result = "{\n";
-    expr.items.forEach((item) => {
+    expr.elements.forEach((item) => {
       result += applyIndent(
         indent + 1,
         item.name + ": " + (item.value ? generateExpression(item.value, indent) : "") + ",\n"

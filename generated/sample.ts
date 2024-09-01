@@ -214,3 +214,30 @@ function generateBypassElement(bypass: string[]): string {
   })
   return result;
 }
+interface Work {
+  name: string;
+  kind: string;
+  wage: number;
+}
+class Person {
+  name: string;
+  work: Work;
+  calc(hour: number, bonus: Bonus): number {
+    return this.work.wage * hour + bonus.amount;
+  }
+}
+interface Bonus {
+  amount: number;
+}
+let alba: Work = {
+  name: "alba",
+  kind: "...",
+  wage: 10000,
+};
+let somebody: Person;
+somebody = new Person
+somebody.name = "Jessica";
+somebody.work = alba;
+somebody.calc(3, {
+  amount: 10,
+})
