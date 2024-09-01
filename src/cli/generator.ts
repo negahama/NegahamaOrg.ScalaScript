@@ -3,8 +3,8 @@ import * as path from "node:path";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as ast from "../language/generated/ast.js";
 import { extractDestinationAndName } from "./cli-util.js";
-import { AllTypesComponent, LambdaCallComponent } from "../components/datatype-components.js";
-import { FunctionComponent, MethodCallComponent } from "../components/methodcall-components.js";
+import { AllTypesComponent } from "../components/datatype-components.js";
+import { FunctionComponent, LambdaCallComponent, MethodCallComponent } from "../components/methodcall-components.js";
 import { ClassComponent, ClassLiteralComponent } from "../components/class-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import { TryCatchStatementComponent, ForStatementComponent } from "../components/statement-components.js";
@@ -118,12 +118,12 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
     result += IfExpressionComponent.transpile(expr, indent);
   } else if (ast.isMatchExpression(expr)) {
     result += MatchExpressionComponent.transpile(expr, indent);
+  } else if (ast.isGroupExpression(expr)) {
+    result += "(" + generateExpression(expr.value, indent) + ")";
   } else if (ast.isUnaryExpression(expr)) {
     result += UnaryExpressionComponent.transpile(expr, indent);
   } else if (ast.isBinaryExpression(expr)) {
     result += BinaryExpressionComponent.transpile(expr, indent);
-  } else if (ast.isGroupExpression(expr)) {
-    result += "(" + generateExpression(expr.value, indent) + ")";
   } else if (ast.isInfixExpression(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
   } else if (ast.isReturnExpression(expr)) {

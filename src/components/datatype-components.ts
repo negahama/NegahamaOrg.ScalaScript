@@ -1,42 +1,8 @@
 import { AstNode } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog, traceLog } from "../language/scala-script-types.js";
-import { generateBlock, generateExpression, generateStatement } from "../cli/generator.js";
 import { ClassTypeComponent } from "./class-components.js";
-
-/**
- *
- */
-export class LambdaCallComponent {
-  /**
-   *
-   * @param expr
-   * @param indent
-   * @returns
-   */
-  static transpile(expr: ast.LambdaCall, indent: number): string {
-    let result = "";
-    result += "(" + expr.bindings.map((bind) => bind.name + AllTypesComponent.transpile(bind.type, indent)).join(", ");
-    result += ")" + AllTypesComponent.transpile(expr.returnType, indent) + " => ";
-    result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
-      if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-      else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
-      else return "";
-    });
-    return result;
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferType(node: ast.LambdaCall, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    return TypeSystem.createErrorType("internal error");
-  }
-}
+import { ArrayTypeComponent } from "./array-components.js";
 
 /**
  *
@@ -91,6 +57,16 @@ export class AllTypesComponent {
   static inferType(node: ast.AllTypes, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
     const log = enterLog("isAllTypes", undefined, indent);
+    if (ast.isLambdaType(node)) {
+      const log = enterLog("isLambdaType", undefined, indent);
+      //type = { $type: "lambda" };
+      exitLog(log);
+    } else if (ast.isSimpleType(node)) {
+      type = SimpleTypeComponent.inferType(node, cache, indent);
+    } else if (ast.isArrayType(node)) {
+      // isArrayType은 isSimpleType보다 나중에 검사되어야 한다.
+      type = ArrayTypeComponent.inferType(node, cache, indent);
+    }
     exitLog(log);
     return type;
   }

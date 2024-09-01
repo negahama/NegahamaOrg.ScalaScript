@@ -136,7 +136,7 @@ Binding: name=Id (':' type=AllTypes)?;
 //-----------------------------------------------------------------------------
 // Class의 선언은 Class 타입에 이름을 부여하는 것이다.
 // 아래 규칙은 MethodMember의 파라메터로 초기값을 가질 수 있고 FieldMember로 타입이 없을 수도 있다.
-// class ClassName extends SuperClass {
+// def ClassName extends SuperClass => {
 //   display(msg: string = "hello")
 //   message
 // }
