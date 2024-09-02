@@ -4,7 +4,7 @@ import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as ast from "../language/generated/ast.js";
 import { extractDestinationAndName } from "./cli-util.js";
 import { AllTypesComponent } from "../components/datatype-components.js";
-import { FunctionComponent, LambdaCallComponent, MethodCallComponent } from "../components/methodcall-components.js";
+import { FunctionComponent, LambdaCallComponent, CallChainComponent } from "../components/methodcall-components.js";
 import { ClassComponent, ClassLiteralComponent } from "../components/class-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import { TryCatchStatementComponent, ForStatementComponent } from "../components/statement-components.js";
@@ -14,6 +14,7 @@ import {
   BinaryExpressionComponent,
   IfExpressionComponent,
   MatchExpressionComponent,
+  NewExpressionComponent,
 } from "../components/expression-components.js";
 
 /**
@@ -112,8 +113,8 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
     result += AssignmentComponent.transpile(expr, indent);
   } else if (ast.isLambdaCall(expr)) {
     result += LambdaCallComponent.transpile(expr, indent);
-  } else if (ast.isMethodCall(expr)) {
-    result += MethodCallComponent.transpile(expr, indent);
+  } else if (ast.isCallChain(expr)) {
+    result += CallChainComponent.transpile(expr, indent);
   } else if (ast.isIfExpression(expr)) {
     result += IfExpressionComponent.transpile(expr, indent);
   } else if (ast.isMatchExpression(expr)) {
@@ -127,7 +128,9 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
   } else if (ast.isInfixExpression(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
   } else if (ast.isReturnExpression(expr)) {
-    result = `return ${generateExpression(expr.value, indent)};`;
+    result += `return ${generateExpression(expr.value, indent)};`;
+  } else if (ast.isNewExpression(expr)) {
+    result += NewExpressionComponent.transpile(expr, indent);
   } else if (ast.isArrayExpression(expr)) {
     result += ArrayExpressionComponent.transpile(expr, indent);
   } else if (ast.isArrayLiteral(expr)) {
@@ -135,7 +138,8 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
   } else if (ast.isClassLiteral(expr)) {
     result += ClassLiteralComponent.transpile(expr, indent);
   } else if (ast.isLiteral(expr)) {
-    result += expr.value;
+    // nil 만 undefined로 변경한다.
+    result += expr.value == "nil" ? "undefined" : expr.value;
   } else {
     console.log("ERROR in Expression:", expr);
   }
@@ -193,7 +197,7 @@ export function generateFunction(
 ): string {
   const params = fun.parameters.map((param) => param.name + AllTypesComponent.transpile(param.type, indent)).join(", ");
   let result = "";
-  if (ast.isTFunction(fun) && fun.annotate == "NotTrans") return result;
+  if (fun.annotate == "NotTrans") return result;
   if (!isClassMethod) result += "function ";
   result += `${fun.name}(${params})${AllTypesComponent.transpile(fun.returnType, indent)} `;
   // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.

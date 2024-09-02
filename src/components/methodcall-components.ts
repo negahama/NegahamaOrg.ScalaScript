@@ -83,14 +83,14 @@ export function checkMethodReturnType(method: ast.TFunction | ast.Method, accept
 /**
  *
  */
-export class MethodCallComponent {
+export class CallChainComponent {
   /**
    *
    * @param expr
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.MethodCall, indent: number): string {
+  static transpile(expr: ast.CallChain, indent: number): string {
     let result = "";
     if (expr.previous) {
       result += generateExpression(expr.previous, indent);
@@ -99,7 +99,7 @@ export class MethodCallComponent {
       result += expr.this ? expr.this : "";
       result += expr.element ? expr.element.$refText : "";
     }
-    if (expr.explicitCall) {
+    if (expr.isFunction) {
       // endsWith()의 endPosition은 1부터 카운트되므로 제외
       const methodsUsingArrayIndex = [
         { methodName: "charAt", argIndices: [0] },
@@ -125,6 +125,9 @@ export class MethodCallComponent {
         result += "(" + expr.args.map((arg) => generateExpression(arg, indent)).join(", ") + ")";
       }
     }
+    if (expr.isArray) {
+      result += "[" + generateExpression(expr.index, indent) + "]";
+    }
     return result;
   }
 
@@ -135,7 +138,7 @@ export class MethodCallComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: ast.MethodCall, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.CallChain, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
     const id = node.element?.$refText;
     const log = enterLog("isMethodCall", id, indent);
@@ -144,12 +147,15 @@ export class MethodCallComponent {
     traceLog(indent + 1, "ref 참조후:", id);
     if (element) {
       type = TypeSystem.inferType(element, cache, indent + 1);
-    } else if (node.explicitCall && node.previous) {
+    } else if (node.isFunction && node.previous) {
       const previousType = TypeSystem.inferType(node.previous, cache, indent + 1);
       if (TypeSystem.isFunctionType(previousType)) type = previousType.returnType;
       else type = TypeSystem.createErrorType("Cannot call operation on non-function type", node);
+    } else if (node.isArray) {
+      //todo 해당 배열의 자료형이 무엇인지 어떻게 알아낼 수 있을까
+      type = TypeSystem.createArrayType(TypeSystem.createAnyType());
     } else type = TypeSystem.createErrorType("Could not infer type for element " + node.element?.$refText, node);
-    if (node.explicitCall) {
+    if (node.isFunction) {
       if (TypeSystem.isFunctionType(type)) type = type.returnType;
     }
     exitLog(log);

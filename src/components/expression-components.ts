@@ -1,7 +1,7 @@
 import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
-import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
+import { getTypeCache, isAssignable, isLegalOperation } from "../language/scala-script-validator.js";
 import {
   generateExpression,
   generateStatement,
@@ -166,33 +166,6 @@ export class BinaryExpressionComponent {
 }
 
 /**
- * 연산자가 적법한 타입을 취하는지 확인한다.
- *
- * @param operator
- * @param left
- * @param right
- * @returns
- */
-export function isLegalOperation(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
-  if (operator === "+") {
-    if (!right) return left.$type === "number";
-    return left.$type === "number" && right.$type === "number";
-  } else if (operator === "..") {
-    if (!right) return left.$type === "string";
-    return left.$type === "string" && right.$type === "string";
-  } else if (["-", "+", "**", "*", "/", "%", "<", "<=", ">", ">="].includes(operator)) {
-    if (!right) return left.$type === "number";
-    return left.$type === "number" && right.$type === "number";
-  } else if (["and", "or", "&&", "||"].includes(operator)) {
-    return left.$type === "boolean" && right?.$type === "boolean";
-  } else if (["not", "!"].includes(operator)) {
-    // 부정(논리적 NOT) 단항 연산자는 문자열과 숫자에도 적용되는데 빈 문자열과 0 을 거짓으로 취급한다.
-    return left.$type === "boolean" || left.$type === "string" || left.$type === "number";
-  }
-  return true;
-}
-
-/**
  *
  */
 export class IfExpressionComponent {
@@ -292,6 +265,44 @@ export class MatchExpressionComponent {
   static inferType(node: ast.MatchExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
     const log = enterLog("isMatchExpression", node.$type, indent);
+    exitLog(log);
+    return type;
+  }
+}
+
+/**
+ *
+ */
+export class NewExpressionComponent {
+  /**
+   *
+   * @param expr
+   * @param indent
+   * @returns
+   */
+  static transpile(expr: ast.NewExpression, indent: number): string {
+    let result = `new ${expr.class.$refText}(`;
+    expr.args.map((arg, index) => {
+      if (index != 0) result += ", ";
+      result += generateExpression(arg, indent);
+    });
+    result += ")";
+    return result;
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
+  static inferType(node: ast.NewExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    const log = enterLog("isNewExpression", node.$type, indent);
+    if (node.class.ref) {
+      type = TypeSystem.createClassType(node.class.ref);
+    }
     exitLog(log);
     return type;
   }

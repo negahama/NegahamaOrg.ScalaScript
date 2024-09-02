@@ -8,6 +8,8 @@ import {
   PrecomputedScopes,
   ReferenceInfo,
   Scope,
+  stream,
+  StreamScope,
 } from "langium";
 import * as ast from "./generated/ast.js";
 import { LangiumServices } from "langium/lsp";
@@ -86,18 +88,18 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       }
     }
 
-    // (explicitCall?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 Arguments를 그대로 대입한
+    // (isFunction?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 Arguments를 그대로 대입한
     // args+=Expression ... 과 동작이 동일할 것 같은데 그렇지 않다. 실제로는 Arguments는 타입은 존재하진 않아도
     // args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해 함수의 인수가 있는 경우 즉
-    // methodCall.args가 있는 경우에 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고
+    // callChain.args가 있는 경우에 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고
     // 이 코드는 이를 확인하기 위한 것이다.
-    const methodCall = context.container as ast.MethodCall;
-    if (methodCall.args == undefined) {
-      traceLog(1, "MethodCall.args is undefined");
+    const callChain = context.container as ast.CallChain;
+    if (callChain.args == undefined) {
+      traceLog(1, "CallChain.args is undefined");
     }
 
-    const previous = methodCall.previous;
-    traceLog(1, `MethodCall.previous is ${previous?.$type}`);
+    const previous = callChain.previous;
+    traceLog(1, `CallChain.previous is ${previous?.$type}`);
     if (!previous) {
       const scope = super.getScope(context);
       exitLog(scopeLog.replace("Exit", "Exit1"));
@@ -129,6 +131,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       traceLog(1, `FIND array: ${previous.$type}, element-type:${prevTypeDesc.elementType.$type}`);
       exitLog(scopeLog.replace("Exit", "Exit2"));
       return this.scopeSpecificClassMembers(context, "$array$");
+    }
+
+    // any 타입이면
+    else if (TypeSystem.isAnyType(prevTypeDesc)) {
+      traceLog(1, `FIND any-type: ${previous.$type}`);
+      exitLog(scopeLog.replace("Exit", "Exit2"));
+      return this.scopeAnytypeMembers(context, previous);
     }
 
     // When the target of our member call isn't a class
@@ -174,6 +183,24 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       }
     }
     return super.getScope(context);
+  }
+
+  /**
+   * any type의 경우 member 검사를 하지 않는다. 엄밀하게는 무조건 멤버를 생성하고 리턴한다.
+   *
+   * @param context
+   * @returns
+   */
+  private scopeAnytypeMembers(context: ReferenceInfo, previous: ast.Expression): Scope {
+    const elements: AstNode[] = [previous];
+    const s = stream(elements)
+      .map((e) => {
+        const name = this.nameProvider.getName(e);
+        if (name) return this.descriptions.createDescription(e, name);
+        return this.descriptions.createDescription(e, context.reference.$refText);
+      })
+      .nonNullable();
+    return new StreamScope(s);
   }
 }
 

@@ -30,7 +30,7 @@ export class ClassComponent {
       if (ast.isMethod(m)) {
         result += applyIndent(indent + 1, MethodComponent.transpile(m, indent + 1));
       } else if (ast.isField(m)) {
-        result += applyIndent(indent + 1, FieldComponent.transpile(m, indent) + ";");
+        result += applyIndent(indent + 1, FieldComponent.transpile(m, indent));
       } else if (ast.isBypass(m)) {
         result += applyIndent(indent + 1, generateStatement(m, indent + 1));
       } else {
@@ -82,8 +82,9 @@ export class FieldComponent {
    * @returns
    */
   static transpile(stmt: ast.Field, indent: number): string {
+    if (stmt.annotate == "NotTrans") return "";
     let result = stmt.name + AllTypesComponent.transpile(stmt.type, indent);
-    result += stmt.value ? " = " + generateExpression(stmt.value, indent) : "";
+    result += stmt.value ? " = " + generateExpression(stmt.value, indent) : "" + ";";
     return result;
   }
 
@@ -159,18 +160,19 @@ export class ClassTypeComponent {
    * @returns
    */
   static transpile(expr: ast.ClassType, indent: number): string {
-    let result = "";
+    let result = "{ ";
     expr.elements.forEach((e) => {
       if (ast.isMethod(e)) {
         result += MethodComponent.transpile(e, 1);
       } else if (ast.isField(e)) {
-        result += FieldComponent.transpile(e, 1) + ";";
+        result += FieldComponent.transpile(e, 1);
       } else if (ast.isBypass(e)) {
         result += generateStatement(e, 1);
       } else {
         console.log("internal error");
       }
     });
+    result += " }";
     return result;
   }
 

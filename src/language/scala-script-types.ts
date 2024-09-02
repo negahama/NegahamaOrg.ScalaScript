@@ -1,7 +1,7 @@
 import { AstNode, AstUtils } from "langium";
 import * as ast from "./generated/ast.js";
 import { AllTypesComponent } from "../components/datatype-components.js";
-import { FunctionComponent, MethodCallComponent } from "../components/methodcall-components.js";
+import { FunctionComponent, CallChainComponent } from "../components/methodcall-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import {
   ClassComponent,
@@ -10,7 +10,11 @@ import {
   ClassLiteralComponent,
 } from "../components/class-components.js";
 import { ForOfComponent, ForToComponent, ForUntilComponent } from "../components/statement-components.js";
-import { BinaryExpressionComponent, UnaryExpressionComponent } from "../components/expression-components.js";
+import {
+  UnaryExpressionComponent,
+  BinaryExpressionComponent,
+  NewExpressionComponent,
+} from "../components/expression-components.js";
 import { ArrayExpressionComponent, ArrayLiteralComponent } from "../components/array-components.js";
 
 /**
@@ -52,10 +56,12 @@ export function exitLog(log: string) {
  *
  */
 export type TypeDescription =
-  | VoidTypeDescription
-  | BooleanTypeDescription
+  | AnyTypeDescription
+  | NilTypeDescription
   | StringTypeDescription
   | NumberTypeDescription
+  | BooleanTypeDescription
+  | VoidTypeDescription
   | ArrayTypeDescription
   | FunctionTypeDescription
   | ClassTypeDescription
@@ -64,16 +70,15 @@ export type TypeDescription =
 /**
  *
  */
-export interface VoidTypeDescription {
-  readonly $type: "void";
+export interface AnyTypeDescription {
+  readonly $type: "any";
 }
 
 /**
  *
  */
-export interface BooleanTypeDescription {
-  readonly $type: "boolean";
-  readonly literal?: ast.BooleanExpression;
+export interface NilTypeDescription {
+  readonly $type: "nil";
 }
 
 /**
@@ -90,6 +95,21 @@ export interface StringTypeDescription {
 export interface NumberTypeDescription {
   readonly $type: "number";
   readonly literal?: ast.NumberExpression;
+}
+
+/**
+ *
+ */
+export interface BooleanTypeDescription {
+  readonly $type: "boolean";
+  readonly literal?: ast.BooleanExpression;
+}
+
+/**
+ *
+ */
+export interface VoidTypeDescription {
+  readonly $type: "void";
 }
 
 /**
@@ -142,9 +162,9 @@ export class TypeSystem {
    *
    * @returns
    */
-  static createVoidType(): VoidTypeDescription {
+  static createAnyType(): AnyTypeDescription {
     return {
-      $type: "void",
+      $type: "any",
     };
   }
 
@@ -153,19 +173,17 @@ export class TypeSystem {
    * @param item
    * @returns
    */
-  static isVoidType(item: TypeDescription): item is VoidTypeDescription {
-    return item.$type === "void";
+  static isAnyType(item: TypeDescription): item is AnyTypeDescription {
+    return item.$type === "any";
   }
 
   /**
    *
-   * @param literal
    * @returns
    */
-  static createBooleanType(literal?: ast.BooleanExpression): BooleanTypeDescription {
+  static createNilType(): NilTypeDescription {
     return {
-      $type: "boolean",
-      literal,
+      $type: "nil",
     };
   }
 
@@ -174,8 +192,8 @@ export class TypeSystem {
    * @param item
    * @returns
    */
-  static isBooleanType(item: TypeDescription): item is BooleanTypeDescription {
-    return item.$type === "boolean";
+  static isNilType(item: TypeDescription): item is NilTypeDescription {
+    return item.$type === "nil";
   }
 
   /**
@@ -218,6 +236,46 @@ export class TypeSystem {
    */
   static isNumberType(item: TypeDescription): item is NumberTypeDescription {
     return item.$type === "number";
+  }
+
+  /**
+   *
+   * @param literal
+   * @returns
+   */
+  static createBooleanType(literal?: ast.BooleanExpression): BooleanTypeDescription {
+    return {
+      $type: "boolean",
+      literal,
+    };
+  }
+
+  /**
+   *
+   * @param item
+   * @returns
+   */
+  static isBooleanType(item: TypeDescription): item is BooleanTypeDescription {
+    return item.$type === "boolean";
+  }
+
+  /**
+   *
+   * @returns
+   */
+  static createVoidType(): VoidTypeDescription {
+    return {
+      $type: "void",
+    };
+  }
+
+  /**
+   *
+   * @param item
+   * @returns
+   */
+  static isVoidType(item: TypeDescription): item is VoidTypeDescription {
+    return item.$type === "void";
   }
 
   /**
@@ -359,8 +417,8 @@ export class TypeSystem {
       type = VariableComponent.inferType(node, cache, indent);
     } else if (ast.isTFunction(node)) {
       type = FunctionComponent.inferType(node, cache, indent);
-    } else if (ast.isMethodCall(node)) {
-      type = MethodCallComponent.inferType(node, cache, indent);
+    } else if (ast.isCallChain(node)) {
+      type = CallChainComponent.inferType(node, cache, indent);
     } else if (ast.isClass(node)) {
       type = ClassComponent.inferType(node, cache, indent);
     } else if (ast.isField(node)) {
@@ -368,17 +426,23 @@ export class TypeSystem {
     } else if (ast.isMethod(node)) {
       type = MethodComponent.inferType(node, cache, indent);
     } else if (ast.isParameter(node)) {
+      // Parameter를 type이나 value로 타입을 알 수 없을 경우는 any type으로 취급한다.
       const log = enterLog("isParameter", node.name, indent);
       if (node.type) {
         type = TypeSystem.inferType(node.type, cache, indent + 1);
       } else if (node.value) {
         type = TypeSystem.inferType(node.value, cache, indent + 1);
+      } else {
+        type = TypeSystem.createAnyType();
       }
       exitLog(log);
     } else if (ast.isBinding(node)) {
       const log = enterLog("isBinding", node.name, indent);
+      // Binding에 type 정보가 없으면 any type으로 취급한다.
       if (node.type) {
         type = TypeSystem.inferType(node.type, cache, indent + 1);
+      } else {
+        type = TypeSystem.createAnyType();
       }
       exitLog(log);
     } else if (ast.isForOf(node)) {
@@ -389,10 +453,6 @@ export class TypeSystem {
       type = ForUntilComponent.inferType(node, cache, indent);
     } else if (ast.isAssignment(node)) {
       type = AssignmentComponent.inferType(node, cache, indent);
-    } else if (ast.isClassLiteral(node)) {
-      type = ClassLiteralComponent.inferType(node, cache, indent);
-    } else if (ast.isArrayLiteral(node)) {
-      type = ArrayLiteralComponent.inferType(node, cache, indent);
     } else if (ast.isArrayExpression(node)) {
       type = ArrayExpressionComponent.inferType(node, cache, indent);
     } else if (ast.isGroupExpression(node)) {
@@ -411,6 +471,12 @@ export class TypeSystem {
         type = TypeSystem.inferType(node.value, cache, indent + 1);
       }
       exitLog(log);
+    } else if (ast.isNewExpression(node)) {
+      type = NewExpressionComponent.inferType(node, cache, indent);
+    } else if (ast.isClassLiteral(node)) {
+      type = ClassLiteralComponent.inferType(node, cache, indent);
+    } else if (ast.isArrayLiteral(node)) {
+      type = ArrayLiteralComponent.inferType(node, cache, indent);
     } else if (ast.isLiteral(node)) {
       if (ast.isStringExpression(node)) {
         const log = enterLog("isStringExpression", node.value, indent);

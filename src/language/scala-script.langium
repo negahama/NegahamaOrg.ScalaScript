@@ -32,7 +32,7 @@ SimpleType:
 TupleType: '[' types+=SimpleType (',' types+=SimpleType)* ']';
 
 PrimitiveType:
-  type=("string" | "number" | "boolean" | "void");
+  type=('any' | 'nil' | 'string' | 'number' | 'boolean' | 'void');
 
 // Array Type
 // ex) number[]
@@ -41,9 +41,9 @@ ArrayType:
   elementType=SimpleType '[' ']';
 
 // Array Literal
-// ex) [ 1, 2, 3 ]
+// ex) [ 1, 2, 3 ], []
 ArrayLiteral:
-  '[' items+=Literal (',' items+=Literal )* ']';
+  '[' items+=Literal? (',' items+=Literal )* ']';
 
 // Array Expression
 // ex) array[ 1 ]
@@ -118,7 +118,8 @@ fragment FunctionBody:
 fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
 
-Parameter: VarSignature;
+Parameter:
+  name=Id (nullable?='?')? (':' type=AllTypes)? ('=' value=Expression)?;
 
 Block:
   ('{' codes+=Code* '}') | codes+=Expression;
@@ -149,9 +150,9 @@ fragment ClassSignature:
 fragment ClassBody:
   '{' elements+=(Bypass | Field | Method)* '}';
 
-Field: VarSignature;
+Field: (Annotation)? VarSignature;
 
-Method: name=Id FunSignature;
+Method: (Annotation)? name=Id FunSignature;
 
 // Class Type
 // ex) var obj: { name: string age: number }
@@ -196,8 +197,8 @@ TryCatchStatement:
   ('catch' '{' cases+=CaseClause+ '}')?
   ('finally' finally=Expression)?;
 
-Continue: dummy?='continue';
-Break: dummy?='break';
+Continue: dummy='continue';
+Break: dummy='break';
 
 // Bypass
 Bypass: bypass=BYPASS;
@@ -207,27 +208,12 @@ terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
 // Expressions
 //-----------------------------------------------------------------------------
 
-// Logical rule은 많은 rule을 내포하고 있다.
-// 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
-// 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, FeatureCall를 포함한다.
-Expression:
-  LogicalNot
-  | Logical
-  | Assignment
-  | LambdaCall
-  | IfExpression
-  | MatchExpression
-  | ArrayLiteral
-  | ClassLiteral
-  | InfixExpression
-  | ReturnExpression;
-
 SimpleExpression infers Expression:
   UnaryExpression
   | ArrayExpression
   | GroupExpression
-  | Literal
-  | FeatureCall;
+  | FeatureCall
+  | Literal;
 
 // Unary operators
 UnaryExpression:
@@ -241,18 +227,38 @@ GroupExpression:
 // There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
 // The syntax of these literals is in each case as in Java.
 Literal:
-  BooleanExpression
-  | NumberExpression
+  AnyExpression
+  | NilExpression
   | StringExpression
+  | NumberExpression
+  | BooleanExpression
   | VoidExpression;
 
-BooleanExpression: value?='true' | 'false';
-NumberExpression: value=NumberLiteral;
+AnyExpression: value='any';
+NilExpression: value='nil';
 StringExpression: value=StringLiteral;
+NumberExpression: value=NumberLiteral;
+BooleanExpression: value?='true' | 'false';
 VoidExpression: value='void';
 
 // ValueLiteral:
 //   StringLiteral | NumberLiteral | BooleanLiteral | ArrayLiteral;
+
+// Logical rule은 많은 rule을 내포하고 있다.
+// 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
+// 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, FeatureCall를 포함한다.
+Expression:
+  LogicalNot
+  | Logical
+  | Assignment
+  | LambdaCall
+  | IfExpression
+  | MatchExpression
+  | InfixExpression
+  | ReturnExpression
+  | NewExpression
+  | ArrayLiteral
+  | ClassLiteral;
 
 // 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
 // ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은
@@ -272,12 +278,12 @@ VoidExpression: value='void';
 // 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
 // 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 //
-// (explicitCall?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 args+=Expression ... 과 동일할 것 같은데
+// (isFunction?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 args+=Expression ... 과 동일할 것 같은데
 // 실제로는 Arguments는 타입은 존재하진 않아도 args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해
 // 함수의 인수가 있는 경우 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고
-FeatureCall infers Expression: {infer MethodCall}
+FeatureCall infers Expression: {infer CallChain}
 	(element=[NamedElement:Id] | this='this' | this='super')
-  (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
+  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
 // fragment Arguments:
 //   args+=Expression (',' args+=Expression)*;
 
@@ -291,7 +297,7 @@ LogicalNot infers UnaryExpression:
 // 또 다른 문제는 이 좌결합성 때문에 다중 대입문에서 세미콜론을 제대로 표시할 수 없다.
 // 따라서 assignment는 따로 정의되며 좌변에 MethodCall을 사용해 a.b = 0를 처리한다.
 Assignment:
-  assign=MethodCall operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
+  assign=CallChain operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
 // Binary Operators
 Logical infers Expression:
@@ -307,16 +313,32 @@ Multiplication infers Expression:
   Exponentiation ({infer BinaryExpression.left=current} operator=('*' | '/' | '%') right=Exponentiation)*;
 
 Exponentiation infers Expression:
-  MethodCall     ({infer BinaryExpression.left=current} operator=('**') right=MethodCall)*;
+  CallChain      ({infer BinaryExpression.left=current} operator=('**') right=CallChain)*;
 
 // Member call and Chaining of Member calls
 // 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수도 있다.
 // 즉 다음과 같은 것들을 파싱할 수 있다. ()안에는 인수들이 있을 수도 있다.
 // a, a(), a.b, a().b, a.b(), a().b(), ...
-MethodCall infers Expression:
-  SimpleExpression ({infer MethodCall.previous=current}
-  "." element=[NamedElement:Id] (explicitCall?='(' (args+=Expression (',' args+=Expression)*)? ')')?
-  )*;
+// CallChain infers Expression:
+//   SimpleExpression ({infer CallChain.previous=current}
+//   "." element=[NamedElement:Id] (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?
+//   )*;
+
+// CallChain infers Expression:
+//   SimpleExpression ({infer CallChain.previous=current}
+//   "." element=[NamedElement:Id]
+//     (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | 
+//     isArray?='[' index=Expression ']')?
+//   )*;
+
+CallChain infers Expression:
+  SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
+
+fragment CallableElements infers Expression:
+  element=[NamedElement:Id] isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')'
+  | element=[NamedElement:Id] isArray?='[' index=Expression ']'
+  | element=[NamedElement:Id];
+
 
 // Conditional Expressions
 // ConditionClause는 if, while, do-while등에서 사용되는데 single expression 이면 괄호를 생략할 수 있다.
@@ -348,8 +370,12 @@ CasePattern: Literal;
 InfixExpression:
   e1=Id name=Id e2=Literal;
 
+// return 할 것이 없으면 세미콜론으로 없음을 표시해야 한다.
 ReturnExpression:
-  'return' (value=Expression)?;
+  'return' (value=Expression | ";");
+
+NewExpression:
+  'new' class=[Class:Id] '(' (args+=Expression (',' args+=Expression)*)? ')';
 
 //-----------------------------------------------------------------------------
 // terminal & literal
@@ -425,7 +451,7 @@ terminal ID: /[_$a-zA-Zㄱ-ㅎ가-힣][\w$ㄱ-ㅎ가-힣]*/;
 
 // Identifiers
 terminal Id returns string: ID;
-TypedId: name=Id ':' type=AllTypes;
+// TypedId: name=Id ':' type=AllTypes;
 
 // Whitespace and Comments
 hidden terminal WS: /\s+/;

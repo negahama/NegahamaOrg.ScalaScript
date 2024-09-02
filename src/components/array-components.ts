@@ -60,9 +60,10 @@ export class ArrayLiteralComponent {
   static inferType(node: ast.ArrayLiteral, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
     const log = enterLog("isArrayLiteral", node.items.toString(), indent);
+    // item이 없는 경우 즉 [] 으로 표현되는 빈 배열의 경우 any type으로 취급한다.
     if (node.items.length > 0) {
       type = TypeSystem.createArrayType(TypeSystem.inferType(node.items[0], cache, indent));
-    }
+    } else type = TypeSystem.createAnyType();
     exitLog(log);
     return type;
   }

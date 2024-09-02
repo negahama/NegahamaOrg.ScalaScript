@@ -85,13 +85,56 @@ export class ScalaScriptValidator {
 }
 
 /**
+ * 연산자가 적법한 타입을 취하는지 확인한다.
+ * any type은 모든 타입과 연산이 가능하며 nil type은 모든 타입과 가능한 연산이 없다.
+ *
+ * @param operator
+ * @param left
+ * @param right
+ * @returns
+ */
+export function isLegalOperation(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
+  if (TypeSystem.isAnyType(left) || (right != undefined && TypeSystem.isAnyType(right))) {
+    return true;
+  }
+  if (TypeSystem.isNilType(left) || (right != undefined && TypeSystem.isNilType(right))) {
+    return false;
+  }
+
+  if (operator === "+") {
+    if (!right) return left.$type === "number";
+    return left.$type === "number" && right.$type === "number";
+  } else if (operator === "..") {
+    if (!right) return left.$type === "string";
+    return left.$type === "string" && right.$type === "string";
+  } else if (["-", "+", "**", "*", "/", "%", "<", "<=", ">", ">="].includes(operator)) {
+    if (!right) return left.$type === "number";
+    return left.$type === "number" && right.$type === "number";
+  } else if (["and", "or", "&&", "||"].includes(operator)) {
+    return left.$type === "boolean" && right?.$type === "boolean";
+  } else if (["not", "!"].includes(operator)) {
+    // 부정(논리적 NOT) 단항 연산자는 문자열과 숫자에도 적용되는데 빈 문자열과 0 을 거짓으로 취급한다.
+    return left.$type === "boolean" || left.$type === "string" || left.$type === "number";
+  }
+  return true;
+}
+
+/**
+ * any type은 모든 타입과 연산이 가능하며 nil type은 모든 타입과 가능한 연산이 없다.
  *
  * @param from
  * @param to
  * @returns
  */
 export function isAssignable(from: TypeDescription, to: TypeDescription): boolean {
-  // console.log("isAssignable:", from.$type, to.$type);
+  // console.log(`isAssignable: ${to.$type} = ${from.$type}`);
+  if (TypeSystem.isAnyType(from) || TypeSystem.isAnyType(to)) {
+    return true;
+  }
+  if (TypeSystem.isNilType(from) || TypeSystem.isNilType(to)) {
+    return false;
+  }
+
   if (TypeSystem.isClassType(from)) {
     if (!TypeSystem.isClassType(to)) {
       return false;

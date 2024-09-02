@@ -61,8 +61,8 @@ const ScalaScriptBuiltinLibrary = `
   flat(depth)-> string
   flatMap(callbackFn)-> string
   forEach(callbackFn)-> string
-  includes(searchElement, fromIndex)-> string
-  indexOf(searchElement, fromIndex)-> string
+  includes(searchElement, fromIndex)-> boolean
+  indexOf(searchElement, fromIndex)-> number
   join(separate)-> string
   keys()-> string
   lastIndexOf(searchElement, fromIndex)-> string

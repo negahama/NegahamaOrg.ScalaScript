@@ -6,4 +6,5 @@ node_modules/
 out/
 src/language/generated/
 syntaxes/
+samples/
 ScalaScript-0.0.1.vsix

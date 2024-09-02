@@ -21,6 +21,8 @@ export class AllTypesComponent {
         if (t.reference) {
           return t.reference.$refText;
         } else if (ast.isPrimitiveType(t)) {
+          // nil 만 undefined로 바꿔준다.
+          if (t.type == "nil") return "undefined";
           return t.type;
         }
       } else if (ast.isArrayType(t)) {
@@ -56,9 +58,9 @@ export class AllTypesComponent {
    */
   static inferType(node: ast.AllTypes, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    const log = enterLog("isAllTypes", undefined, indent);
+    const log = enterLog("isAllTypes", node.$cstNode?.text, indent);
     if (ast.isLambdaType(node)) {
-      const log = enterLog("isLambdaType", undefined, indent);
+      const log = enterLog("isLambdaType", node.$cstNode?.text, indent);
       //type = { $type: "lambda" };
       exitLog(log);
     } else if (ast.isSimpleType(node)) {
@@ -89,6 +91,8 @@ export class SimpleTypeComponent {
         if (t.reference) {
           return t.reference.$refText;
         } else if (ast.isPrimitiveType(t)) {
+          // nil 만 undefined로 바꿔준다.
+          if (t.type == "nil") return "undefined";
           return t.type;
         }
       } else if (ast.isArrayType(t)) {
@@ -120,7 +124,7 @@ export class SimpleTypeComponent {
    */
   static inferType(node: ast.SimpleType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    const log = enterLog("isSimpleType", undefined, indent);
+    const log = enterLog("isSimpleType", node.$cstNode?.text, indent);
     if (ast.isTupleType(node)) {
       traceLog(indent + 1, "it's TupleType");
       console.log("it's TupleType, Not support yet");
@@ -128,10 +132,14 @@ export class SimpleTypeComponent {
       type = ClassTypeComponent.inferType(node, cache, indent);
     } else if (ast.isPrimitiveType(node)) {
       traceLog(indent + 1, "Type is primitive");
-      if (node.type === "number") {
-        type = TypeSystem.createNumberType();
+      if (node.type === "any") {
+        type = TypeSystem.createAnyType();
+      } else if (node.type === "nil") {
+        type = TypeSystem.createNilType();
       } else if (node.type === "string") {
         type = TypeSystem.createStringType();
+      } else if (node.type === "number") {
+        type = TypeSystem.createNumberType();
       } else if (node.type === "boolean") {
         type = TypeSystem.createBooleanType();
       } else if (node.type === "void") {
