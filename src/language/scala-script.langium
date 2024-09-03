@@ -17,7 +17,6 @@ Code: Statement | Expression;
 // 또한 스칼라스크립트는 오브젝트와 클래스가 하나로 합쳐져 있다.
 // 메서드를 가지지 않는 클래스는 오브젝트(인터페이스)로 변환되며 타입으로 사용할 수 있고 값을 할당할 수도 있다.
 
-
 // 타입으로 사용될 수 있는 모든 타입들
 AllTypes: LambdaType | ArrayType | SimpleType;
 
@@ -27,13 +26,15 @@ SimpleType:
   | PrimitiveType
   | reference=[Class:Id];
 
-TupleType: '[' types+=SimpleType (',' types+=SimpleType)* ']';
+TupleType:
+  '[' types+=SimpleType (',' types+=SimpleType)* ']';
 
 PrimitiveType:
   type=('any' | 'nil' | 'string' | 'number' | 'boolean' | 'void');
 
 // Array Type
-// ex) number[]
+// 해당 개체의 타입이 배열형임을 나타내기 위해 사용된다.
+// ex) var ary: number[]
 ArrayType:
   // SimpleType ({infer ArrayType.elementType=current} '[' ']')? ;
   elementType=SimpleType '[' ']';
@@ -96,10 +97,12 @@ Statement:
 // var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
 VariableDeclaration infers Variable:
   (Annotation)? kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=AllTypes)? ('=' value=Expression)?;
+
 fragment Annotation:
   '@' annotate=Id;
 
-fragment VariableDeclSignature: (':' type=AllTypes)? ('=' value=Expression)?;
+fragment VariableDeclSignature:
+  (':' type=AllTypes)? ('=' value=Expression)?;
 
 // Function Declarations
 //-----------------------------------------------------------------------------
@@ -130,14 +133,17 @@ fragment FunctionCallSignature:
 fragment Arguments:
   args+=Expression (',' args+=Expression)*;
 
-LambdaType: '(' Bindings? ')' '->' returnType=AllTypes;
+LambdaType:
+  '(' Bindings? ')' '->' returnType=AllTypes;
 
 // LambdaCall은 expression이다.
 // 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다.
 // 인수는 괄호를 사용해서 묶어야 하지만 인수가 하나인 경우에는 괄호없이 사용할 수도 있다.
-LambdaCall: ('(' Bindings? ')' ('->' returnType=AllTypes)? | bindings+=Binding) '=>' body=Block;
+LambdaCall:
+  ('(' Bindings? ')' ('->' returnType=AllTypes)? | bindings+=Binding) '=>' body=Block;
 
-fragment Bindings: bindings+=Binding (',' bindings+=Binding)*;
+fragment Bindings:
+  bindings+=Binding (',' bindings+=Binding)*;
 
 Binding: name=Id (':' type=AllTypes)?;
 
@@ -215,13 +221,13 @@ terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
 //-----------------------------------------------------------------------------
 // Expressions
 //-----------------------------------------------------------------------------
-
 // Logical rule은 많은 rule을 내포하고 있다.
-// 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
-// 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, FeatureCall를 포함한다.
+// 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며
+// CallChain을 거쳐 SimpleExpression까지 포함한다. SimpleExpression은 Literal,
+// GroupExpression, FunctionCall(괄호가 없은 경우도 포함)등이 포함된다.
 Expression:
-  LogicalNot
-  | Logical
+  Logical
+  | LogicalNot
   | Assignment
   | LambdaCall
   | IfExpression
@@ -232,57 +238,6 @@ Expression:
   | ArrayLiteral
   | ClassLiteral
   ;
-
-SimpleExpression infers Expression:
-  UnaryExpression
-  | ArrayExpression
-  | GroupExpression
-  | FeatureCall
-  | Literal;
-
-// Unary operators
-UnaryExpression:
-  operator=('-' | '+') value=Expression;
-
-// grouped expression with parentheses
-GroupExpression:
-  '(' value=Expression ')';
-
-// FunctionCall:
-// 	element=[NamedElement:Id] (FunctionCallSignature)?;
-
-// Literals
-// There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
-// The syntax of these literals is in each case as in Java.
-Literal:
-  AnyExpression
-  | NilExpression
-  | StringExpression
-  | NumberExpression
-  | BooleanExpression
-  | VoidExpression;
-
-AnyExpression: value='any';
-NilExpression: value='nil';
-StringExpression: value=StringLiteral;
-NumberExpression: value=NumberLiteral;
-BooleanExpression: value?='true' | 'false';
-VoidExpression: value='void';
-
-// ValueLiteral:
-//   StringLiteral | NumberLiteral | BooleanLiteral | ArrayLiteral;
-
-LogicalNot infers UnaryExpression:
-  operator=('not' | '!') value=Expression;
-
-// Assignment를 아래와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.
-// Assignment infers Expression:
-//   Logical ({infer BinaryExpression.left=current} operator=('=') right=Logical)*;
-// 우선 대입 연산의 순서가 왼쪽에서 오른쪽으로 가기 때문에 a = b = 0 은 a = b가 먼저 처리된다.
-// 또 다른 문제는 이 좌결합성 때문에 다중 대입문에서 세미콜론을 제대로 표시할 수 없다.
-// 따라서 assignment는 따로 정의되며 좌변에 MethodCall을 사용해 a.b = 0를 처리한다.
-Assignment:
-  assign=CallChain operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
 // Binary Operators
 Logical infers Expression:
@@ -302,21 +257,7 @@ Exponentiation infers Expression:
 
 // Member call and Chaining of Member calls
 // 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수 있다.
-CallChain infers Expression:
-  (SimpleExpression | ThisOrSuper) ({infer CallChain.previous=current} "." CallableElements )*;
-  // FeatureCall ({infer CallChain.previous=current} "." CallableElements )*;
-
-// CallChain은 전역변수급에 해당하는 this, super를 가지고 있는데 사실 이것의 처리가 애매모호하다.
-// 먼저 이것의 위치는 CallChain에 있는 것이 좋아 보인다. 이전에는 FeatureCall에 있었지만 this() 와 같은 것이
-// 가능하다는 문제가 있어 별도로 처리된다. 현재는 SimpleExpression을 사용하는데 SimpleExpression의 literal은 문제가 있다.
-// this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
-// this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
-// 설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
-// 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
-// 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
-ThisOrSuper infers Expression: {infer CallChain}
-  this=('this' | 'super');
-
+//
 // CallableElement는 '.' 다음에 올 수 있는 것들로써 필드(프로퍼티), 메서드, 배열이 있다.
 // 여기서 isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')'는
 // FunctionCallSignature와 동일하지만 FunctionCallSignature를 사용할 수 없다.
@@ -324,10 +265,31 @@ ThisOrSuper infers Expression: {infer CallChain}
 // 정확한 이유는 모르지만 fragment는 외부적으로 들어나는 타입은 존재하진 않아도 내부적으로는 규칙을 호출하는데
 // 이것은 fragment를 사용하지 않는 경우와는 다르게 처리된다는 의미이다. 이로 인해 fragment로 사용하는 경우에는
 // AST node has no document 에러가 발생된다. 개발 노트를 참고
+//
+// CallChain은 전역변수급에 해당하는 this, super를 가지고 있는데 사실 이것의 처리가 애매모호하다.
+// 먼저 이것의 위치는 CallChain에 있는 것이 좋아 보인다. 이전에는 FeatureCall에 있었지만 this() 와 같은 것이
+// 가능하다는 문제가 있어 별도로 처리된다.
+//
+// this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
+// this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
+// 설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
+// 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
+// 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
+CallChain infers Expression:
+  SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
+
 fragment CallableElements:
   element=[NamedElement:Id] (
     isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | ArrayCallSignature
   )?;
+
+SimpleExpression infers Expression:
+  FunctionCall
+  | ThisOrSuper
+  | UnaryExpression
+  | ArrayExpression
+  | GroupExpression
+  | Literal;
 
 // 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
 // ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은
@@ -340,11 +302,52 @@ fragment CallableElements:
 // @NotTrans def string.repeat(count: number): string
 // @NotTrans def string.replace(searchFor: string, replaceWith: string): string
 // @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
-FeatureCall infers Expression: {infer CallChain}
-	element=[NamedElement:Id] (FunctionCallSignature)?;
-// FeatureCall infers Expression: {infer CallChain}
-//   (FunctionCall | this=('this' | 'super'));
+FunctionCall: {infer CallChain}
+  element=[NamedElement:Id] (FunctionCallSignature)?;
 
+ThisOrSuper: {infer CallChain} this=('this' | 'super');
+
+// Unary operators
+UnaryExpression:
+  operator=('-' | '+') value=Expression;
+
+// grouped expression with parentheses
+GroupExpression:
+  '(' value=Expression ')';
+
+// Literals
+// There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
+// The syntax of these literals is in each case as in Java.
+Literal:
+  AnyExpression
+  | NilExpression
+  | StringExpression
+  | NumberExpression
+  | BooleanExpression
+  | VoidExpression;
+
+AnyExpression: value='any';
+NilExpression: value='nil';
+StringExpression: value=StringLiteral;
+NumberExpression: value=NumberLiteral;
+BooleanExpression: value?='true' | 'false';
+VoidExpression: value='void';
+
+// 이 규칙이 UnaryExpression과 독립적인 것은 연산 우선 순위가 다르기 때문이다.
+LogicalNot infers UnaryExpression:
+  operator=('not' | '!') value=Expression;
+
+// Assignment를 아래와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.
+// Assignment infers Expression:
+//   Logical ({infer BinaryExpression.left=current} operator=('=') right=Logical)*;
+// 우선 대입 연산의 순서가 왼쪽에서 오른쪽으로 가기 때문에 a = b = 0 은 a = b가 먼저 처리된다.
+// 또 다른 문제는 이 좌결합성 때문에 다중 대입문에서 세미콜론을 제대로 표시할 수 없다.
+// 따라서 assignment는 따로 정의되며 좌변에 MethodCall을 사용해 a.b = 0를 처리한다.
+Assignment:
+  assign=CallChain operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
+
+// 기타
+//-----------------------------------------------------------------------------
 
 // Conditional Expressions
 // ConditionClause는 if, while, do-while등에서 사용되는데 single expression 이면 괄호를 생략할 수 있다.
@@ -365,7 +368,7 @@ IfElseExpression:
 
 // Match expression
 MatchExpression:
-  expr=SimpleExpression 'match' '{' cases+=CaseClause+ '}';
+  expr=CallChain 'match' '{' cases+=CaseClause+ '}';
 
 CaseClause:
   'case' pattern=(CaseDefalut | CasePattern) '=>' body=Block;

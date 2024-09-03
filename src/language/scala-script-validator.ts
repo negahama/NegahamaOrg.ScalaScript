@@ -105,8 +105,10 @@ export function isLegalOperation(operator: string, left: TypeDescription, right?
     if (!right) return left.$type === "number";
     return left.$type === "number" && right.$type === "number";
   } else if (operator === "..") {
+    // 문자열 접합 연산자이지만 문자열이 아닌 다른 자료형은 암묵적 형변환을 한다고 가정한다.
     if (!right) return left.$type === "string";
-    return left.$type === "string" && right.$type === "string";
+    // return left.$type === "string" && right.$type === "string";
+    return true;
   } else if (["-", "+", "**", "*", "/", "%", "<", "<=", ">", ">="].includes(operator)) {
     if (!right) return left.$type === "number";
     return left.$type === "number" && right.$type === "number";

@@ -9,22 +9,18 @@ import { NodeFileSystem } from "langium/node";
 import * as url from "node:url";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+
+import { URI } from "vscode-uri";
+import { WorkspaceFolder } from "vscode-languageserver";
+
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 
 const packagePath = path.resolve(__dirname, "..", "..", "package.json");
 const packageContent = await fs.readFile(packagePath, "utf-8");
 
-export const generateAction = async (fileName: string, opts: GenerateOptions): Promise<void> => {
-  const services = createScalaScriptServices(NodeFileSystem).ScalaScript;
-  const model = await extractAstNode<Program>(fileName, services);
-  const generatedFilePath = generateTypeScript(model, fileName, opts.destination);
-  console.log(chalk.green(`TypeScript code generated successfully: ${generatedFilePath}`));
-};
-
-export type GenerateOptions = {
-  destination?: string;
-};
-
+/**
+ *
+ */
 export default function (): void {
   const program = new Command();
 
@@ -40,3 +36,38 @@ export default function (): void {
 
   program.parse(process.argv);
 }
+
+/**
+ *
+ */
+export type GenerateOptions = {
+  destination?: string;
+};
+
+/**
+ *
+ * @param fileName
+ * @param opts
+ */
+export const generateAction = async (fileName: string, opts: GenerateOptions): Promise<void> => {
+  const services = createScalaScriptServices(NodeFileSystem).ScalaScript;
+
+  let root = path.dirname(fileName);
+  if (!path.isAbsolute(root)) {
+    root = path.resolve(process.cwd(), root);
+  }
+  const folders: WorkspaceFolder[] = [
+    {
+      name: path.basename(root),
+      uri: URI.file(root).toString(),
+    },
+  ];
+  await services.shared.workspace.WorkspaceManager.initializeWorkspace(folders);
+  services.shared.workspace.LangiumDocuments.all.forEach((d) => {
+    console.log(d.uri.toString());
+  });
+
+  const model = await extractAstNode<Program>(fileName, services);
+  const generatedFilePath = generateTypeScript(model, fileName, opts.destination);
+  console.log(chalk.green(`TypeScript code generated successfully: ${generatedFilePath}`));
+};
