@@ -21,8 +21,6 @@ Code: Statement | Expression;
 // 타입으로 사용될 수 있는 모든 타입들
 AllTypes: LambdaType | ArrayType | SimpleType;
 
-LambdaType: '(' Bindings? ')' '->' returnType=AllTypes;
-
 SimpleType:
   TupleType
   | ClassType
@@ -48,8 +46,10 @@ ArrayLiteral:
 // Array Expression
 // ex) array[ 1 ]
 ArrayExpression:
-  element=[NamedElement:Id] '[' index=Expression ']';
+  element=[NamedElement:Id] ArrayCallSignature;
 
+fragment ArrayCallSignature:
+  isArray?='[' index=Expression ']';
 
 type NamedElement =
   Variable
@@ -78,16 +78,14 @@ Statement:
   | Continue
   | Break;
 
+// Value and Variable Declarations and Definitions
+//-----------------------------------------------------------------------------
 // 모든 변수는 다음의 규칙을 가지고 있다.
 // 이름 : 타입 = 값
 // 이름은 유효한 식별자이어야 한다.
 // 타입이나 값을 통해서 변수의 타입을 정할 수 있어야 한다.
 // Rule 자체는 타입과 값이 모두 없을 수 있지만 둘 다 있거나 적어도 하나는 있어야 한다.
 // 타입과 값은 모두 있으면 값은 명시된 타입으로 변환되며 이 변환이 실패하면 에러가 된다.
-fragment VarSignature: name=Id (':' type=AllTypes)? ('=' value=Expression)?;
-
-// Value and Variable Declarations and Definitions
-//-----------------------------------------------------------------------------
 // 다중 대입문을 지원하기 위해서 아래와 같이 되어져 있다.
 // 하지만 이 방식은 어떻게 해도 Langium의 default 처리로는 cross-reference가 처리되지 않는다.
 // 이를 처리하기 위해서 DefaultScopeComputation의 processNode()를 override해서
@@ -101,19 +99,18 @@ VariableDeclaration infers Variable:
 fragment Annotation:
   '@' annotate=Id;
 
+fragment VariableDeclSignature: (':' type=AllTypes)? ('=' value=Expression)?;
+
 // Function Declarations
 //-----------------------------------------------------------------------------
 // 함수의 리턴 타입은 -> 으로 표시하고 함수의 바디는 => 으로 표시한다.
 // 이건 ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
 // parameter는 초기값을 가질 수 있으나 argument는 그렇지 않다.
 FunctionDeclaration infers TFunction:
-  (Annotation)? 'def' (extension=[Class:Id] '.')? name=Id FunSignature;
+  (Annotation)? 'def' (extension=[Class:Id] '.')? name=Id FunctionDeclSignature;
 
-fragment FunSignature:
+fragment FunctionDeclSignature:
   '(' Parameters? ')' ('->' returnType=AllTypes)? ('=>' FunctionBody)?;
-
-fragment FunctionBody:
-  body=Block;
 
 fragment Parameters:
   parameters+=Parameter (',' parameters+=Parameter)*;
@@ -121,8 +118,19 @@ fragment Parameters:
 Parameter:
   name=Id (nullable?='?')? (':' type=AllTypes)? ('=' value=Expression)?;
 
+fragment FunctionBody:
+  body=Block;
+
 Block:
   ('{' codes+=Code* '}') | codes+=Expression;
+
+fragment FunctionCallSignature:
+  isFunction?='(' Arguments? ')';
+
+fragment Arguments:
+  args+=Expression (',' args+=Expression)*;
+
+LambdaType: '(' Bindings? ')' '->' returnType=AllTypes;
 
 // LambdaCall은 expression이다.
 // 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다.
@@ -142,17 +150,17 @@ Binding: name=Id (':' type=AllTypes)?;
 //   message
 // }
 ClassDeclaration infers Class:
-  (Annotation)? 'def' name=Id ClassSignature;
+  (Annotation)? 'def' name=Id ClassDeclSignature;
 
-fragment ClassSignature:
+fragment ClassDeclSignature:
   ('extends' superClass=[Class:Id])? '=>' ClassBody;
 
 fragment ClassBody:
   '{' elements+=(Bypass | Field | Method)* '}';
 
-Field: (Annotation)? VarSignature;
+Field: (Annotation)? name=Id VariableDeclSignature;
 
-Method: (Annotation)? name=Id FunSignature;
+Method: (Annotation)? name=Id FunctionDeclSignature;
 
 // Class Type
 // ex) var obj: { name: string age: number }
@@ -208,6 +216,23 @@ terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
 // Expressions
 //-----------------------------------------------------------------------------
 
+// Logical rule은 많은 rule을 내포하고 있다.
+// 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
+// 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, FeatureCall를 포함한다.
+Expression:
+  LogicalNot
+  | Logical
+  | Assignment
+  | LambdaCall
+  | IfExpression
+  | MatchExpression
+  | InfixExpression
+  | ReturnExpression
+  | NewExpression
+  | ArrayLiteral
+  | ClassLiteral
+  ;
+
 SimpleExpression infers Expression:
   UnaryExpression
   | ArrayExpression
@@ -222,6 +247,9 @@ UnaryExpression:
 // grouped expression with parentheses
 GroupExpression:
   '(' value=Expression ')';
+
+// FunctionCall:
+// 	element=[NamedElement:Id] (FunctionCallSignature)?;
 
 // Literals
 // There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
@@ -243,49 +271,6 @@ VoidExpression: value='void';
 
 // ValueLiteral:
 //   StringLiteral | NumberLiteral | BooleanLiteral | ArrayLiteral;
-
-// Logical rule은 많은 rule을 내포하고 있다.
-// 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며 operator가 없을 경우도 포함된다.
-// 이 경우는 SimpleExpression이 되고 이것은 Liter, Group, FeatureCall를 포함한다.
-Expression:
-  LogicalNot
-  | Logical
-  | Assignment
-  | LambdaCall
-  | IfExpression
-  | MatchExpression
-  | InfixExpression
-  | ReturnExpression
-  | NewExpression
-  | ArrayLiteral
-  | ClassLiteral;
-
-// 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
-// ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은
-// 예를들면 console.log의 console은 정의되지 않았기 때문에 에러가 된다. 그래서 타입스크립트의 라이브러리를
-// 사용할때는 cross-reference를 처리하기 위해 다음과 같은 추가적인 코드가 필요하다.
-// 1) Console.log 의 경우
-// @NotTrans class Console { log(arg: string): void = {} }
-// @NotTrans var console: Console
-// 2) 문자열 관련 함수들의 경우
-// @NotTrans def string.repeat(count: number): string
-// @NotTrans def string.replace(searchFor: string, replaceWith: string): string
-// @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
-//
-// this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
-// this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
-// 설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
-// 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
-// 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
-//
-// (isFunction?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 args+=Expression ... 과 동일할 것 같은데
-// 실제로는 Arguments는 타입은 존재하진 않아도 args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해
-// 함수의 인수가 있는 경우 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고
-FeatureCall infers Expression: {infer CallChain}
-	(element=[NamedElement:Id] | this='this' | this='super')
-  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
-// fragment Arguments:
-//   args+=Expression (',' args+=Expression)*;
 
 LogicalNot infers UnaryExpression:
   operator=('not' | '!') value=Expression;
@@ -316,28 +301,49 @@ Exponentiation infers Expression:
   CallChain      ({infer BinaryExpression.left=current} operator=('**') right=CallChain)*;
 
 // Member call and Chaining of Member calls
-// 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수도 있다.
-// 즉 다음과 같은 것들을 파싱할 수 있다. ()안에는 인수들이 있을 수도 있다.
-// a, a(), a.b, a().b, a.b(), a().b(), ...
-// CallChain infers Expression:
-//   SimpleExpression ({infer CallChain.previous=current}
-//   "." element=[NamedElement:Id] (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?
-//   )*;
-
-// CallChain infers Expression:
-//   SimpleExpression ({infer CallChain.previous=current}
-//   "." element=[NamedElement:Id]
-//     (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | 
-//     isArray?='[' index=Expression ']')?
-//   )*;
-
+// 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수 있다.
 CallChain infers Expression:
-  SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
+  (SimpleExpression | ThisOrSuper) ({infer CallChain.previous=current} "." CallableElements )*;
+  // FeatureCall ({infer CallChain.previous=current} "." CallableElements )*;
 
-fragment CallableElements infers Expression:
-  element=[NamedElement:Id] isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')'
-  | element=[NamedElement:Id] isArray?='[' index=Expression ']'
-  | element=[NamedElement:Id];
+// CallChain은 전역변수급에 해당하는 this, super를 가지고 있는데 사실 이것의 처리가 애매모호하다.
+// 먼저 이것의 위치는 CallChain에 있는 것이 좋아 보인다. 이전에는 FeatureCall에 있었지만 this() 와 같은 것이
+// 가능하다는 문제가 있어 별도로 처리된다. 현재는 SimpleExpression을 사용하는데 SimpleExpression의 literal은 문제가 있다.
+// this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
+// this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
+// 설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
+// 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
+// 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
+ThisOrSuper infers Expression: {infer CallChain}
+  this=('this' | 'super');
+
+// CallableElement는 '.' 다음에 올 수 있는 것들로써 필드(프로퍼티), 메서드, 배열이 있다.
+// 여기서 isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')'는
+// FunctionCallSignature와 동일하지만 FunctionCallSignature를 사용할 수 없다.
+// 심지어 FunctionCallSignature의 내용인 isFunction?='(' Arguments? ')'을 사용하는 것도 안된다.
+// 정확한 이유는 모르지만 fragment는 외부적으로 들어나는 타입은 존재하진 않아도 내부적으로는 규칙을 호출하는데
+// 이것은 fragment를 사용하지 않는 경우와는 다르게 처리된다는 의미이다. 이로 인해 fragment로 사용하는 경우에는
+// AST node has no document 에러가 발생된다. 개발 노트를 참고
+fragment CallableElements:
+  element=[NamedElement:Id] (
+    isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | ArrayCallSignature
+  )?;
+
+// 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
+// ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은
+// 예를들면 console.log의 console은 정의되지 않았기 때문에 에러가 된다. 그래서 타입스크립트의 라이브러리를
+// 사용할때는 cross-reference를 처리하기 위해 다음과 같은 추가적인 코드가 필요하다.
+// 1) Console.log 의 경우
+// @NotTrans class Console { log(arg: string): void = {} }
+// @NotTrans var console: Console
+// 2) 문자열 관련 함수들의 경우
+// @NotTrans def string.repeat(count: number): string
+// @NotTrans def string.replace(searchFor: string, replaceWith: string): string
+// @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
+FeatureCall infers Expression: {infer CallChain}
+	element=[NamedElement:Id] (FunctionCallSignature)?;
+// FeatureCall infers Expression: {infer CallChain}
+//   (FunctionCall | this=('this' | 'super'));
 
 
 // Conditional Expressions
