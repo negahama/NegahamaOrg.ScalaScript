@@ -97,7 +97,7 @@ const ScalaScriptBuiltinLibrary = `
   parseFloat(x: string)-> number
   parseInt(x: string)-> number
   toExponential(fractionDigits: number)-> number
-  toFixed(digits: number)-> number
+  toFixed(digits: number)-> string
   toLocaleString(locales: string)-> string
   toPrecision(precision: number)-> number
   toString()-> string
@@ -147,6 +147,9 @@ const ScalaScriptBuiltinLibrary = `
   tanh(x: number)-> number
   trunc(x: number)-> number
 }
+
+@NotTrans def console => { log() }
+@NotTrans def assert => { equal() notEqual() }
 `.trim();
 
 /**

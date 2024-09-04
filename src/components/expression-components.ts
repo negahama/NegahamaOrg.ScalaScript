@@ -46,6 +46,8 @@ export class UnaryExpressionComponent {
     const log = enterLog("isUnaryExpression", node.operator, indent);
     if (node.operator === "!" || node.operator === "not") {
       type = TypeSystem.createBooleanType();
+    } else if (node.operator === "typeof" || node.operator === "instanceof") {
+      type = TypeSystem.createStringType();
     } else {
       type = TypeSystem.createNumberType();
     }
@@ -187,18 +189,18 @@ export class IfExpressionComponent {
       ast.isExpression(expr.else.codes[0]) &&
       (expr.elif == undefined || expr.elif.length == 0)
     ) {
-      result += `${generateCondition(expr.condition)} ? `;
+      result += `${generateCondition(expr.condition, indent)} ? `;
       result += generateExpression(expr.then.codes[0], indent) + " : ";
       result += generateExpression(expr.else.codes[0], indent);
       return result;
     }
 
-    result += "if " + generateCondition(expr.condition) + " ";
+    result += "if " + generateCondition(expr.condition, indent) + " ";
     if (expr.then) {
       result += generateBlock(expr.then, indent);
     }
     expr.elif.forEach((elif) => {
-      result += "\n" + applyIndent(indent, "else if " + generateCondition(elif.condition) + " ");
+      result += "\n" + applyIndent(indent, "else if " + generateCondition(elif.condition, indent) + " ");
       if (elif.elif) {
         result += generateBlock(elif.elif, indent);
       }

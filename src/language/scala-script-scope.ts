@@ -114,7 +114,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     if (TypeSystem.isClassType(prevTypeDesc)) {
       traceLog(1, `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
       exitLog(scopeLog.replace("Exit", "Exit2"));
-      if (ast.isClass(prevTypeDesc.literal)) return this.scopeClassMembers(prevTypeDesc.literal);
+      if (ast.isClass(prevTypeDesc.literal)) {
+        return this.scopeClassMembers(prevTypeDesc.literal);
+      } else if (ast.isClassType(prevTypeDesc.literal)) {
+        return this.scopeClassTypeMembers(prevTypeDesc.literal);
+      } else {
+        console.log("find class, but error:", prevTypeDesc.literal?.$type);
+      }
     }
 
     // 문자열이면
@@ -124,6 +130,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       traceLog(1, `FIND string: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
       exitLog(scopeLog.replace("Exit", "Exit2"));
       return this.scopeSpecificClassMembers(context, "$string$");
+    }
+
+    // number이면
+    else if (TypeSystem.isNumberType(prevTypeDesc)) {
+      traceLog(1, `FIND number: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
+      exitLog(scopeLog.replace("Exit", "Exit2"));
+      return this.scopeSpecificClassMembers(context, "$number$");
     }
 
     // 배열이면
@@ -153,10 +166,27 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns
    */
   private scopeClassMembers(classItem: ast.Class): Scope {
+    // console.log("find class, class name:", classItem.name);
     // Since Lox allows class-inheritance,
     // we also need to look at all members of possible super classes for scoping
     const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.elements);
     const removedBypass = allMembers.filter((e) => !ast.isBypass(e));
+    removedBypass.forEach((e) => {
+      if (ast.isMethod(e) || ast.isField(e)) {
+        traceLog(0, "scopeClassMembers", e.name);
+      } else console.error("error");
+    });
+    return this.createScopeForNodes(removedBypass);
+  }
+
+  /**
+   *
+   * @param classItem
+   * @returns
+   */
+  private scopeClassTypeMembers(classType: ast.ClassType): Scope {
+    // console.log("find class, class type:", classType.$cstNode?.text);
+    const removedBypass = classType.elements.filter((e) => !ast.isBypass(e));
     removedBypass.forEach((e) => {
       if (ast.isMethod(e) || ast.isField(e)) {
         traceLog(0, "scopeClassMembers", e.name);

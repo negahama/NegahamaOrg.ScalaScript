@@ -42,7 +42,10 @@ ArrayType:
 // Array Literal
 // ex) [ 1, 2, 3 ], []
 ArrayLiteral:
-  '[' items+=Literal? (',' items+=Literal )* ']';
+  '[' items+=ArrayItem? (',' items+=ArrayItem )* ']';
+
+ArrayItem:
+  item=Literal | '...' spread=[NamedElement:Id];
 
 // Array Expression
 // ex) array[ 1 ]
@@ -276,12 +279,16 @@ Exponentiation infers Expression:
 // 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
 // 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 CallChain infers Expression:
-  SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
-
-fragment CallableElements:
-  element=[NamedElement:Id] (
+  // SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
+  SimpleExpression ({infer CallChain.previous=current} "." (element=[NamedElement:Id] (
     isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | ArrayCallSignature
-  )?;
+  )?) )*;
+
+// fragment CallableElements:
+//   element=[NamedElement:Id] (
+//     // FunctionCallSignature | ArrayCallSignature
+//     isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | ArrayCallSignature
+//   )?;
 
 SimpleExpression infers Expression:
   FunctionCall
@@ -303,13 +310,14 @@ SimpleExpression infers Expression:
 // @NotTrans def string.replace(searchFor: string, replaceWith: string): string
 // @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
 FunctionCall: {infer CallChain}
-  element=[NamedElement:Id] (FunctionCallSignature)?;
+  // element=[NamedElement:Id] (FunctionCallSignature)?;
+  element=[NamedElement:Id] (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
 
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
 
 // Unary operators
 UnaryExpression:
-  operator=('-' | '+') value=Expression;
+  operator=('-' | '+' | 'typeof' | 'instanceof') value=Expression;
 
 // grouped expression with parentheses
 GroupExpression:
@@ -328,7 +336,7 @@ Literal:
 
 AnyExpression: value='any';
 NilExpression: value='nil';
-StringExpression: value=StringLiteral;
+StringExpression: value=(StringLiteral | RegExStringLiteral);
 NumberExpression: value=NumberLiteral;
 BooleanExpression: value?='true' | 'false';
 VoidExpression: value='void';
@@ -439,9 +447,11 @@ terminal Digit          returns number: /[0-9]/;
 
 // String Literals
 // terminal STRING: /"[^"]*"/;
-terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'|`(\\.|[^'\\])*`/;
+// terminal StringLiteral: /`[^`]*`|"[^"]*"|'[^']*'/;
+terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'|`(\\.|[^`\\])*`/;
 // terminal StringLiteral: '"' (StringElement)+ '"';
 // terminal StringElement: PrintableChar |  CharEscapeSeq;
+terminal RegExStringLiteral: /\/[^\/]*\/g/;
 
 // Identifiers
 // 이것은 BooleanLiteral 다음에 와야 한다.

@@ -46,7 +46,17 @@ export class ArrayLiteralComponent {
    * @returns
    */
   static transpile(expr: ast.ArrayLiteral, indent: number): string {
-    return "[" + expr.items.map((item) => item.value).join(", ") + "]";
+    return (
+      "[" +
+      expr.items
+        .map((item) => {
+          if (item.item) return item.item.value;
+          else if (item.spread) return "..." + item.spread.$refText;
+          else return "error";
+        })
+        .join(", ") +
+      "]"
+    );
   }
 
   /**

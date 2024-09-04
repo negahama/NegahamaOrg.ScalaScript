@@ -117,6 +117,8 @@ export function isLegalOperation(operator: string, left: TypeDescription, right?
   } else if (["not", "!"].includes(operator)) {
     // 부정(논리적 NOT) 단항 연산자는 문자열과 숫자에도 적용되는데 빈 문자열과 0 을 거짓으로 취급한다.
     return left.$type === "boolean" || left.$type === "string" || left.$type === "number";
+  } else if (["typeof", "instanceof"].includes(operator)) {
+    return true;
   }
   return true;
 }

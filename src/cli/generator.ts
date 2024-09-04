@@ -73,11 +73,11 @@ export function generateStatement(stmt: ast.Statement | undefined, indent: numbe
   } else if (ast.isClass(stmt)) {
     result += ClassComponent.transpile(stmt, indent);
   } else if (ast.isDoStatement(stmt)) {
-    result += `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition)}`;
+    result += `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition, indent)}`;
   } else if (ast.isForStatement(stmt)) {
     result += ForStatementComponent.transpile(stmt, indent);
   } else if (ast.isWhileStatement(stmt)) {
-    result += `while ${generateCondition(stmt.condition)} ${generateBlock(stmt.loop, indent)}`;
+    result += `while ${generateCondition(stmt.condition, indent)} ${generateBlock(stmt.loop, indent)}`;
   } else if (ast.isThrowStatement(stmt)) {
     result += `throw ${generateExpression(stmt.throw, indent)}`;
   } else if (ast.isTryCatchStatement(stmt)) {
@@ -217,8 +217,8 @@ export function generateFunction(
  * @param condition
  * @returns
  */
-export function generateCondition(condition: ast.Expression): string {
-  const e = generateExpression(condition, 0);
+export function generateCondition(condition: ast.Expression, indent: number): string {
+  const e = generateExpression(condition, indent);
   return ast.isGroupExpression(condition) ? e : "(" + e + ")";
 }
 

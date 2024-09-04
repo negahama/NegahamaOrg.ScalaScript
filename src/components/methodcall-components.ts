@@ -141,7 +141,7 @@ export class CallChainComponent {
   static inferType(node: ast.CallChain, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
     const id = node.element?.$refText;
-    const log = enterLog("isMethodCall", id, indent);
+    const log = enterLog("isCallChain", id, indent);
     traceLog(indent + 1, "ref 참조전:", id);
     const element = node.element?.ref;
     traceLog(indent + 1, "ref 참조후:", id);
