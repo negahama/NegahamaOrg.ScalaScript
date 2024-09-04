@@ -18,6 +18,7 @@ export class ClassComponent {
   static transpile(stmt: ast.Class, indent: number): string {
     let result = "";
     if (stmt.annotate == "NotTrans") return result;
+    if (stmt.export) result += "export ";
     let isInterface = true;
     if (stmt.elements.find((m) => ast.isMethod(m))) isInterface = false;
     if (isInterface) {
@@ -82,8 +83,11 @@ export class FieldComponent {
    * @returns
    */
   static transpile(stmt: ast.Field, indent: number): string {
+    let result = "";
     if (stmt.annotate == "NotTrans") return "";
-    let result = stmt.name + AllTypesComponent.transpile(stmt.type, indent);
+    if (stmt.private) result += "private ";
+    if (stmt.static) result += "static ";
+    result += stmt.name + AllTypesComponent.transpile(stmt.type, indent);
     result += stmt.value ? " = " + generateExpression(stmt.value, indent) : "" + ";";
     return result;
   }

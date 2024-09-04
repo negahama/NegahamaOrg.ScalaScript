@@ -198,6 +198,12 @@ export function generateFunction(
   const params = fun.parameters.map((param) => param.name + AllTypesComponent.transpile(param.type, indent)).join(", ");
   let result = "";
   if (fun.annotate == "NotTrans") return result;
+  if (ast.isTFunction(fun)) {
+    if (fun.export) result += "export ";
+  } else if (ast.isMethod(fun)) {
+    if (fun.private) result += "private ";
+    if (fun.static) result += "static ";
+  }
   if (!isClassMethod) result += "function ";
   result += `${fun.name}(${params})${AllTypesComponent.transpile(fun.returnType, indent)} `;
   // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.

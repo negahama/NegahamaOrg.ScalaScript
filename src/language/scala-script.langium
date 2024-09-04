@@ -113,7 +113,7 @@ fragment VariableDeclSignature:
 // 이건 ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
 // parameter는 초기값을 가질 수 있으나 argument는 그렇지 않다.
 FunctionDeclaration infers TFunction:
-  (Annotation)? 'def' (extension=[Class:Id] '.')? name=Id FunctionDeclSignature;
+  (Annotation)? (export?='export')? 'def' (extension=[Class:Id] '.')? name=Id FunctionDeclSignature;
 
 fragment FunctionDeclSignature:
   '(' Parameters? ')' ('->' returnType=AllTypes)? ('=>' FunctionBody)?;
@@ -159,7 +159,7 @@ Binding: name=Id (':' type=AllTypes)?;
 //   message
 // }
 ClassDeclaration infers Class:
-  (Annotation)? 'def' name=Id ClassDeclSignature;
+  (Annotation)? (export?='export')? 'def' name=Id ClassDeclSignature;
 
 fragment ClassDeclSignature:
   ('extends' superClass=[Class:Id])? '=>' ClassBody;
@@ -167,9 +167,9 @@ fragment ClassDeclSignature:
 fragment ClassBody:
   '{' elements+=(Bypass | Field | Method)* '}';
 
-Field: (Annotation)? name=Id VariableDeclSignature;
+Field: (Annotation)? (private?='private')? (static?='static')? name=Id VariableDeclSignature;
 
-Method: (Annotation)? name=Id FunctionDeclSignature;
+Method: (Annotation)? (private?='private')? (static?='static')? name=Id FunctionDeclSignature;
 
 // Class Type
 // ex) var obj: { name: string age: number }
@@ -310,8 +310,8 @@ SimpleExpression infers Expression:
 // @NotTrans def string.replace(searchFor: string, replaceWith: string): string
 // @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
 FunctionCall: {infer CallChain}
-  // element=[NamedElement:Id] (FunctionCallSignature)?;
-  element=[NamedElement:Id] (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
+  // (export?='export')? element=[NamedElement:Id] (FunctionCallSignature)?;
+  (export?='export')? element=[NamedElement:Id] (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
 
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
 

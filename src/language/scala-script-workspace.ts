@@ -82,14 +82,6 @@ const ScalaScriptBuiltinLibrary = `
   values()-> string
 }
 @NotTrans def $number$ {
-  EPSILON: number
-  MAX_SAFE_INTEGER: number
-  MIN_SAFE_INTEGER: number
-  MAX_VALUE: number
-  MIN_VALUE: number
-  NaN: number
-  NEGATIVE_INFINITY: number
-  POSITIVE_INFINITY: number
   isNaN()-> boolean
   isFinite()-> boolean
   isInteger()-> boolean
@@ -102,6 +94,16 @@ const ScalaScriptBuiltinLibrary = `
   toPrecision(precision: number)-> number
   toString()-> string
   valueOf()-> number
+}
+@NotTrans def Number => {
+  EPSILON: number
+  MAX_SAFE_INTEGER: number
+  MIN_SAFE_INTEGER: number
+  MAX_VALUE: number
+  MIN_VALUE: number
+  NaN: number
+  NEGATIVE_INFINITY: number
+  POSITIVE_INFINITY: number
 }
 @NotTrans def Math {
   E: number
