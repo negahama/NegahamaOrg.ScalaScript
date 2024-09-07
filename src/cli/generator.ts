@@ -4,7 +4,7 @@ import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as ast from "../language/generated/ast.js";
 import { extractDestinationAndName } from "./cli-util.js";
 import { TypesComponent } from "../components/datatype-components.js";
-import { FunctionComponent, CallChainComponent, FunctionValueComponent } from "../components/methodcall-components.js";
+import { FunctionComponent, CallChainComponent, FunctionValueComponent } from "../components/function-components.js";
 import { ObjectComponent, ObjectValueComponent } from "../components/class-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import { TryCatchStatementComponent, ForStatementComponent } from "../components/statement-components.js";

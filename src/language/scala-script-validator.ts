@@ -3,7 +3,7 @@ import * as ast from "./generated/ast.js";
 import type { ScalaScriptServices } from "./scala-script-module.js";
 import { TypeDescription, TypeSystem } from "./scala-script-types.js";
 import { ObjectComponent } from "../components/class-components.js";
-import { FunctionComponent } from "../components/methodcall-components.js";
+import { FunctionComponent } from "../components/function-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import { BinaryExpressionComponent, UnaryExpressionComponent } from "../components/expression-components.js";
 import chalk from "chalk";

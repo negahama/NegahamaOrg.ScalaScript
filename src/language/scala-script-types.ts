@@ -1,7 +1,7 @@
 import { AstNode } from "langium";
 import * as ast from "./generated/ast.js";
 import { TypesComponent, SimpleTypeComponent } from "../components/datatype-components.js";
-import { FunctionComponent, CallChainComponent, FunctionValueComponent } from "../components/methodcall-components.js";
+import { FunctionComponent, CallChainComponent, FunctionValueComponent } from "../components/function-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import { ObjectComponent, ObjectValueComponent } from "../components/class-components.js";
 import { ForOfComponent, ForToComponent, ForUntilComponent } from "../components/statement-components.js";

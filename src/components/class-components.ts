@@ -2,7 +2,7 @@ import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
 import { applyIndent, generateExpression, generateStatement } from "../cli/generator.js";
-import { FunctionComponent } from "./methodcall-components.js";
+import { FunctionComponent } from "./function-components.js";
 import { VariableComponent } from "./variable-components.js";
 import chalk from "chalk";
 
