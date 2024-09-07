@@ -2,8 +2,7 @@ import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
 import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
-import { generateExpression } from "../cli/generator.js";
-import { AllTypesComponent } from "./datatype-components.js";
+import { generateExpression, generateTypes } from "../cli/generator.js";
 
 /**
  *
@@ -15,20 +14,22 @@ export class VariableComponent {
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Variable, indent: number): string {
-    const generateVariable = (name: string, v: ast.Variable, indent: number) => {
-      return (
-        name +
-        AllTypesComponent.transpile(v.type, indent) +
-        (v.value ? " = " + generateExpression(v.value, indent) : "")
-      );
-    };
-
+  static transpile(stmt: ast.TVariable, indent: number, isClassMember: boolean = false): string {
     let result = "";
     if (stmt.annotate == "NotTrans") return result;
-    if (stmt.kind == "var") result += "let ";
-    if (stmt.kind == "val") result += "const ";
-    result += stmt.names.map((name) => generateVariable(name, stmt, indent)).join(", ") + ";";
+    if (stmt.private) result += "private ";
+    if (stmt.static) result += "static ";
+    if (!isClassMember) {
+      if (stmt.kind == "var") result += "let ";
+      if (stmt.kind == "val") result += "const ";
+    }
+    result += stmt.name + generateTypes(stmt.type, indent);
+    if (stmt.value) {
+      let i = indent;
+      if (ast.isObjectValue(stmt.value)) i++;
+      result += " = " + generateExpression(stmt.value, i);
+    }
+    result += ";";
     return result;
   }
 
@@ -39,9 +40,9 @@ export class VariableComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: ast.Variable, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferType(node: ast.TVariable, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    const log = enterLog("isVariable", node.names.toString(), indent);
+    const log = enterLog("isTVariable", node.name.toString(), indent);
     if (node.type) {
       type = TypeSystem.inferType(node.type, cache, indent + 1);
     } else if (node.value) {
@@ -58,7 +59,7 @@ export class VariableComponent {
    * @param expr
    * @param accept
    */
-  static validationChecks(expr: ast.Variable, accept: ValidationAcceptor): void {
+  static validationChecks(expr: ast.TVariable, accept: ValidationAcceptor): void {
     // console.log("checkVariableDeclaration");
     // const text = AstUtils.getDocument(expr).parseResult.value.$cstNode?.text;
     // const text = (AstUtils.getDocument(expr).parseResult.value.$cstNode as RootCstNode).fullText;
@@ -99,7 +100,7 @@ export class VariableComponent {
     } else if (!expr.type && !expr.value) {
       accept("error", "Variables require a type hint or an assignment at creation", {
         node: expr,
-        property: "names",
+        property: "name",
       });
     }
   }

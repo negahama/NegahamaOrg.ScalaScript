@@ -1,7 +1,7 @@
 import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
-import { getTypeCache, isAssignable, isLegalOperation } from "../language/scala-script-validator.js";
+import { getTypeCache, isLegalOperation } from "../language/scala-script-validator.js";
 import {
   generateExpression,
   generateStatement,
@@ -9,6 +9,7 @@ import {
   generateBlock,
   generateCondition,
 } from "../cli/generator.js";
+import { SimpleTypeComponent } from "./datatype-components.js";
 
 /**
  *
@@ -154,7 +155,7 @@ export class BinaryExpressionComponent {
         `'${TypeSystem.typeToString(left)}' and '${TypeSystem.typeToString(right)}'.`;
       accept("error", msg, { node: binary });
     } else if (["==", "!="].includes(binary.operator)) {
-      if (!isAssignable(right, left)) {
+      if (!isLegalOperation(binary.operator, left, right)) {
         const msg = `This comparison will always return '${
           binary.operator === "==" ? "false" : "true"
         }' as types '${TypeSystem.typeToString(left)}' and '${TypeSystem.typeToString(right)}' are not compatible.`;
@@ -181,10 +182,12 @@ export class IfExpressionComponent {
     let result = "";
     // 삼항 연산자 처리
     if (
-      expr.then != undefined &&
+      expr.then &&
+      !expr.then.isBracket &&
       expr.then.codes.length == 1 &&
       ast.isExpression(expr.then.codes[0]) &&
-      expr.else != undefined &&
+      expr.else &&
+      !expr.else.isBracket &&
       expr.else.codes.length == 1 &&
       ast.isExpression(expr.else.codes[0]) &&
       (expr.elif == undefined || expr.elif.length == 0)
@@ -283,7 +286,16 @@ export class NewExpressionComponent {
    * @returns
    */
   static transpile(expr: ast.NewExpression, indent: number): string {
-    let result = `new ${expr.class.$refText}(`;
+    let result = `new ${expr.class.$refText}`;
+    if (expr.generic) {
+      result += "<";
+      expr.generic.types.forEach((t, index) => {
+        if (index != 0) result += ", ";
+        result += SimpleTypeComponent.transpile(t, indent);
+      });
+      result += ">";
+    }
+    result += "(";
     expr.args.map((arg, index) => {
       if (index != 0) result += ", ";
       result += generateExpression(arg, indent);

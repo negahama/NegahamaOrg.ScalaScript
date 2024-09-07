@@ -1,11 +1,8 @@
 import {
   AstNode,
   AstUtils,
-  DefaultScopeComputation,
   DefaultScopeProvider,
   EMPTY_SCOPE,
-  LangiumDocument,
-  PrecomputedScopes,
   ReferenceInfo,
   Scope,
   stream,
@@ -14,6 +11,7 @@ import {
 import * as ast from "./generated/ast.js";
 import { LangiumServices } from "langium/lsp";
 import { enterLog, traceLog, exitLog, TypeSystem } from "./scala-script-types.js";
+import chalk from "chalk";
 
 /**
  *
@@ -39,49 +37,18 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const scopeId = `${context.container.$type}.${context.property} = '${context.reference.$refText}'`;
     const scopeLog = enterLog("getScope", scopeId, 0);
 
-    // DefaultScopeProvider의 getScope() 코드이다.
-    // Scope에 대한 default 처리가 어떻게 되는지 확인하기 위한 것이다.
-    // // const scopes: Array<Stream<AstNodeDescription>> = [];
-    // const referenceType = this.reflection.getReferenceType(context);
-    // const precomputed = AstUtils.getDocument(context.container).precomputedScopes;
-    // if (precomputed) {
-    //   let currentNode: AstNode | undefined = context.container;
-    //   console.log("precomputed:");
-    //   do {
-    //     console.log("  currNode:", currentNode.$type);
-    //     const allDescriptions = precomputed.get(currentNode);
-    //     if (allDescriptions.length > 0) {
-    //       allDescriptions.forEach((d) => {
-    //         console.log("    " + d.name);
-    //       });
-    //       // scopes.push(stream(allDescriptions).filter((desc) => this.reflection.isSubtype(desc.type, referenceType)));
-    //     }
-    //     currentNode = currentNode.$container;
-    //   } while (currentNode);
-    // }
-
-    // console.log("global-scope:");
-    // let result: Scope = this.getGlobalScope(referenceType, context);
-    // result.getAllElements().forEach((d) => {
-    //   console.log("  " + d.name);
-    // });
-    // // for (let i = scopes.length - 1; i >= 0; i--) {
-    // //   result = this.createScope(scopes[i], result);
-    // // }
-    // // return result;
-
     // target element of member calls
     if (context.property !== "element") {
-      exitLog(scopeLog.replace("Exit", "Exit4"));
+      exitLog(scopeLog.replace("Exit0", "Exit4"));
       return super.getScope(context);
     }
 
     // for now, `this` and `super` simply target the container class type
     if (context.reference.$refText === "this" || context.reference.$refText === "super") {
-      const classItem = AstUtils.getContainerOfType(context.container, ast.isClass);
+      const classItem = AstUtils.getContainerOfType(context.container, ast.isTObject);
       if (classItem) {
         traceLog(1, "this or super");
-        return this.scopeClassMembers(classItem);
+        return this.scopeTObject(context, classItem);
       } else {
         console.error("this or super: empty");
         return EMPTY_SCOPE;
@@ -102,7 +69,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     traceLog(1, `CallChain.previous is ${previous?.$type}`);
     if (!previous) {
       const scope = super.getScope(context);
-      exitLog(scopeLog.replace("Exit", "Exit1"));
+      exitLog(scopeLog.replace("Exit0", "Exit1"));
       return scope;
     }
 
@@ -113,13 +80,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
     if (TypeSystem.isClassType(prevTypeDesc)) {
       traceLog(1, `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
-      exitLog(scopeLog.replace("Exit", "Exit2"));
-      if (ast.isClass(prevTypeDesc.literal)) {
-        return this.scopeClassMembers(prevTypeDesc.literal);
-      } else if (ast.isClassType(prevTypeDesc.literal)) {
-        return this.scopeClassTypeMembers(prevTypeDesc.literal);
+      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      if (ast.isTObject(prevTypeDesc.literal)) {
+        return this.scopeTObject(context, prevTypeDesc.literal);
+      } else if (ast.isObjectType(prevTypeDesc.literal)) {
+        return this.scopeObjectType(context, prevTypeDesc.literal);
       } else {
-        console.log("find class, but error:", prevTypeDesc.literal?.$type);
+        console.log(chalk.red("find class, but error:", prevTypeDesc.literal?.$type));
       }
     }
 
@@ -127,70 +94,70 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 문자열이나 배열 관련 빌트인 함수들은 전역으로 class $string$ { ... } 형태로 저장되어져 있기 때문에
     // 전역 클래스 중 이름이 $string$인 것의 멤버들을 scope로 구성해서 리턴한다.
     else if (TypeSystem.isStringType(prevTypeDesc)) {
-      traceLog(1, `FIND string: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
-      exitLog(scopeLog.replace("Exit", "Exit2"));
-      return this.scopeSpecificClassMembers(context, "$string$");
+      traceLog(1, `FIND string type: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
+      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      return this.scopeSpecificClass(context, "$string$");
     }
 
     // number이면
     else if (TypeSystem.isNumberType(prevTypeDesc)) {
-      traceLog(1, `FIND number: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
-      exitLog(scopeLog.replace("Exit", "Exit2"));
-      return this.scopeSpecificClassMembers(context, "$number$");
+      traceLog(1, `FIND number type: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
+      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      return this.scopeSpecificClass(context, "$number$");
     }
 
     // 배열이면
     else if (TypeSystem.isArrayType(prevTypeDesc)) {
-      traceLog(1, `FIND array: ${previous.$type}, element-type:${prevTypeDesc.elementType.$type}`);
-      exitLog(scopeLog.replace("Exit", "Exit2"));
-      return this.scopeSpecificClassMembers(context, "$array$");
+      traceLog(1, `FIND array type: ${previous.$type}, element-type:${prevTypeDesc.elementType.$type}`);
+      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      return this.scopeSpecificClass(context, "$array$");
     }
 
     // any 타입이면
     else if (TypeSystem.isAnyType(prevTypeDesc)) {
       traceLog(1, `FIND any-type: ${previous.$type}`);
-      exitLog(scopeLog.replace("Exit", "Exit2"));
-      return this.scopeAnytypeMembers(context, previous);
+      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      return this.scopeAnytype(context, previous);
     }
 
     // When the target of our member call isn't a class
     // This means it is either a primitive type or a type resolution error
     // Simply return an empty scope
-    exitLog(scopeLog.replace("Exit", "Exit3"));
+    exitLog(scopeLog.replace("Exit0", "Exit3"));
     return super.getScope(context);
   }
 
   /**
    *
+   * @param context
    * @param classItem
    * @returns
    */
-  private scopeClassMembers(classItem: ast.Class): Scope {
+  private scopeTObject(context: ReferenceInfo, classItem: ast.TObject): Scope {
     // console.log("find class, class name:", classItem.name);
-    // Since Lox allows class-inheritance,
-    // we also need to look at all members of possible super classes for scoping
-    const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.elements);
+    const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.body.elements);
     const removedBypass = allMembers.filter((e) => !ast.isBypass(e));
     removedBypass.forEach((e) => {
-      if (ast.isMethod(e) || ast.isField(e)) {
-        traceLog(0, "scopeClassMembers", e.name);
-      } else console.error("error");
+      if (ast.isTVariable(e) || ast.isTFunction(e)) {
+        traceLog(0, "scopeTObject", e.name);
+      }
     });
     return this.createScopeForNodes(removedBypass);
   }
 
   /**
    *
-   * @param classItem
+   * @param context
+   * @param classType
    * @returns
    */
-  private scopeClassTypeMembers(classType: ast.ClassType): Scope {
-    // console.log("find class, class type:", classType.$cstNode?.text);
+  private scopeObjectType(context: ReferenceInfo, classType: ast.ObjectType): Scope {
+    // console.log("find object, object name:", classType.$cstNode?.text);
     const removedBypass = classType.elements.filter((e) => !ast.isBypass(e));
     removedBypass.forEach((e) => {
-      if (ast.isMethod(e) || ast.isField(e)) {
-        traceLog(0, "scopeClassMembers", e.name);
-      } else console.error("error");
+      if (ast.isTVariable(e) || ast.isTFunction(e)) {
+        traceLog(0, "scopeObjectType", e.name);
+      }
     });
     return this.createScopeForNodes(removedBypass);
   }
@@ -201,14 +168,15 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @param className
    * @returns
    */
-  private scopeSpecificClassMembers(context: ReferenceInfo, className: string): Scope {
-    const scope: Scope = this.getGlobalScope("Class", context);
+  private scopeSpecificClass(context: ReferenceInfo, className: string): Scope {
+    // console.log("find specific class, class name:", className);
+    const scope: Scope = this.getGlobalScope("TObject", context);
     const sc = scope.getAllElements().find((d) => d.name == className);
-    if (ast.isClass(sc?.node)) {
-      const allMembers = sc?.node.elements;
+    if (ast.isTObject(sc?.node)) {
+      const allMembers = sc?.node.body.elements;
       if (allMembers) {
         // const names = allMembers.map((m) => m.$cstNode?.text ?? "unknown");
-        // console.log("FIND string:", names);
+        // console.log(`FIND string: '${context.reference.$refText}' in`, names);
         return this.createScopeForNodes(allMembers);
       }
     }
@@ -219,9 +187,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * any type의 경우 member 검사를 하지 않는다. 엄밀하게는 무조건 멤버를 생성하고 리턴한다.
    *
    * @param context
+   * @param previous
    * @returns
    */
-  private scopeAnytypeMembers(context: ReferenceInfo, previous: ast.Expression): Scope {
+  private scopeAnytype(context: ReferenceInfo, previous: ast.Expression): Scope {
+    // console.log("find any type, ref text:", context.reference.$refText);
     const elements: AstNode[] = [previous];
     const s = stream(elements)
       .map((e) => {
@@ -231,113 +201,5 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       })
       .nonNullable();
     return new StreamScope(s);
-  }
-}
-
-/**
- *
- */
-export class ScalaScriptScopeComputation extends DefaultScopeComputation {
-  constructor(services: LangiumServices) {
-    super(services);
-  }
-
-  // override async computeExports(
-  //   document: LangiumDocument,
-  //   cancelToken = CancellationToken.None
-  // ): Promise<AstNodeDescription[]> {
-  //   const parentNode: AstNode = document.parseResult.value;
-  //   const children: (root: AstNode) => Iterable<AstNode> = AstUtils.streamContents;
-  //   const exports: AstNodeDescription[] = [];
-
-  //   console.log("computeExports:");
-  //   this.exportNode(parentNode, exports, document);
-  //   for (const node of children(parentNode)) {
-  //     await interruptAndCheck(cancelToken);
-  //     this.exportNode(node, exports, document);
-  //   }
-  //   return exports;
-  // }
-
-  /**
-   * Add a single node to the list of exports if it has a name. Override this method to change how
-   * symbols are exported, e.g. by modifying their exported name.
-   */
-  // override exportNode(node: AstNode, exports: AstNodeDescription[], document: LangiumDocument): void {
-  //   const name = this.nameProvider.getName(node);
-  //   console.log("  node:", node.$type, name);
-  //   if (name) {
-  //     exports.push(this.descriptions.createDescription(node, name, document));
-  //   }
-  // }
-
-  // override async computeLocalScopes(
-  //   document: LangiumDocument,
-  //   cancelToken = CancellationToken.None
-  // ): Promise<PrecomputedScopes> {
-  //   const rootNode = document.parseResult.value;
-  //   const scopes = new MultiMap<AstNode, AstNodeDescription>();
-
-  //   console.log("computeLocalScopes:");
-  //   // Here we navigate the full AST - local scopes shall be available in the whole document
-  //   for (const node of AstUtils.streamAllContents(rootNode)) {
-  //     await interruptAndCheck(cancelToken);
-  //     this.processNode(node, document, scopes);
-  //   }
-  //   return scopes;
-  // }
-
-  /**
-   * Process a single node during scopes computation. The default implementation makes the node visible
-   * in the subtree of its container (if the node has a name). Override this method to change this,
-   * e.g. by increasing the visibility to a higher level in the AST.
-   *
-   * 이 함수는 위의 computeLocalScopes()에서 rootNode부터 모든 contents에 대해서 호출된다.
-   * 디폴트 동작은 NameProvider에서 해당 AstNode의 이름을 받아서 기타 정보들과 함께 description을 구성하고
-   * 이를 precomputedScopes에 추가해 주는 것이다.
-   *
-   * 내 경우는 다중 대입문 지원으로 인해 변수 선언시 이름이 names에 있기 때문에 Langium의 디폴트 처리로는
-   * 변수명을 인식하지 못하기 때문에 여기서 names에 있는 모든 이름을 등록해 주고, 매서드나 클래스 구문 중에서
-   * 확장 함수가 있으면 이를 확장 함수 테이블에 등록해 준다.
-   *
-   * @param node
-   * @param document
-   * @param scopes
-   */
-  override processNode(node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes): void {
-    const defaultProcess = (node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes) => {
-      const container = node.$container;
-      if (container) {
-        const name = this.nameProvider.getName(node);
-        traceLog(0, `  node: ${node.$type} '${name}'`);
-        if (name) {
-          scopes.add(container, this.descriptions.createDescription(node, name, document));
-        }
-      }
-    };
-
-    const container = node.$container;
-    if (!container) return;
-
-    let isProcessed = false;
-
-    // 변수 선언문에서의 이름을 처리한다
-    if (ast.isVariable(node)) {
-      traceLog(0, "  node:", node.$type);
-      node.names.forEach((name) => {
-        traceLog(1, `'${name}'`);
-        scopes.add(container, this.descriptions.createDescription(node, name, document));
-      });
-      isProcessed = true;
-    }
-
-    // 함수 중에 확장 함수가 있으면 이를 처리한다.
-    else if (ast.isTFunction(node) && node.extension) {
-      console.log("Not support...");
-    }
-
-    if (!isProcessed) {
-      defaultProcess(node, document, scopes);
-    }
   }
 }

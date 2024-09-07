@@ -1,41 +1,42 @@
 import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
-import { applyIndent, generateExpression, generateFunction, generateStatement } from "../cli/generator.js";
-import { checkMethodReturnType } from "./methodcall-components.js";
-import { AllTypesComponent } from "./datatype-components.js";
+import { applyIndent, generateExpression, generateStatement } from "../cli/generator.js";
+import { FunctionComponent } from "./methodcall-components.js";
+import { VariableComponent } from "./variable-components.js";
+import chalk from "chalk";
 
 /**
  *
  */
-export class ClassComponent {
+export class ObjectComponent {
   /**
    *
    * @param stmt
    * @param indent
    * @returns
    */
-  static transpile(stmt: ast.Class, indent: number): string {
+  static transpile(stmt: ast.TObject, indent: number): string {
     let result = "";
     if (stmt.annotate == "NotTrans") return result;
     if (stmt.export) result += "export ";
     let isInterface = true;
-    if (stmt.elements.find((m) => ast.isMethod(m))) isInterface = false;
+    if (stmt.body.elements.find((m) => ast.isTFunction(m))) isInterface = false;
     if (isInterface) {
       result += `interface ${stmt.name} {\n`;
     } else {
       result += `class ${stmt.name} `;
       result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
     }
-    stmt.elements.forEach((m) => {
-      if (ast.isMethod(m)) {
-        result += applyIndent(indent + 1, MethodComponent.transpile(m, indent + 1));
-      } else if (ast.isField(m)) {
-        result += applyIndent(indent + 1, FieldComponent.transpile(m, indent));
+    stmt.body.elements.forEach((m) => {
+      if (ast.isTFunction(m)) {
+        result += applyIndent(indent + 1, FunctionComponent.transpile(m, indent + 1, true));
+      } else if (ast.isTVariable(m)) {
+        result += applyIndent(indent + 1, VariableComponent.transpile(m, indent, true));
       } else if (ast.isBypass(m)) {
         result += applyIndent(indent + 1, generateStatement(m, indent + 1));
       } else {
-        console.log("internal error");
+        console.log(chalk.red("internal error"));
       }
       result += "\n";
     });
@@ -50,8 +51,8 @@ export class ClassComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: ast.Class, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const log = enterLog("isClass", node.name, indent);
+  static inferType(node: ast.TObject, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    const log = enterLog("isTObject", node.name, indent);
     const type = TypeSystem.createClassType(node);
     exitLog(log);
     return type;
@@ -62,7 +63,7 @@ export class ClassComponent {
    * @param declaration
    * @param accept
    */
-  static validationChecks(declaration: ast.Class, accept: ValidationAcceptor): void {
+  static validationChecks(declaration: ast.TObject, accept: ValidationAcceptor): void {
     // TODO: implement classes
     // console.log("checkClassDeclaration");
     // accept("error", "Classes are currently unsupported.", {
@@ -75,105 +76,24 @@ export class ClassComponent {
 /**
  *
  */
-export class FieldComponent {
-  /**
-   *
-   * @param stmt
-   * @param indent
-   * @returns
-   */
-  static transpile(stmt: ast.Field, indent: number): string {
-    let result = "";
-    if (stmt.annotate == "NotTrans") return "";
-    if (stmt.private) result += "private ";
-    if (stmt.static) result += "static ";
-    result += stmt.name + AllTypesComponent.transpile(stmt.type, indent);
-    result += stmt.value ? " = " + generateExpression(stmt.value, indent) : "" + ";";
-    return result;
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferType(node: ast.Field, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    const log = enterLog("isField", node.name, indent);
-    if (node.type) {
-      type = TypeSystem.inferType(node.type, cache, indent + 1);
-    }
-    exitLog(log);
-    return type;
-  }
-}
-
-/**
- *
- */
-export class MethodComponent {
-  /**
-   *
-   * @param stmt
-   * @param indent
-   * @returns
-   */
-  static transpile(stmt: ast.Method, indent: number): string {
-    return generateFunction(stmt, indent, true);
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferType(node: ast.Method, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const log = enterLog("isMethod", node.name, indent);
-    const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
-    const parameters = node.parameters.map((e) => ({
-      name: e.name,
-      type: TypeSystem.inferType(e.type, cache, indent + 2),
-    }));
-    const type = TypeSystem.createFunctionType(returnType, parameters);
-    exitLog(log);
-    return type;
-  }
-
-  /**
-   *
-   * @param method
-   * @param accept
-   */
-  static validationChecks(method: ast.Method, accept: ValidationAcceptor): void {
-    checkMethodReturnType(method, accept);
-  }
-}
-
-/**
- *
- */
-export class ClassTypeComponent {
+export class ObjectTypeComponent {
   /**
    *
    * @param expr
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.ClassType, indent: number): string {
+  static transpile(expr: ast.ObjectType, indent: number): string {
     let result = "{ ";
     expr.elements.forEach((e) => {
-      if (ast.isMethod(e)) {
-        result += MethodComponent.transpile(e, 1);
-      } else if (ast.isField(e)) {
-        result += FieldComponent.transpile(e, 1);
+      if (ast.isTFunction(e)) {
+        result += FunctionComponent.transpile(e, indent, true);
+      } else if (ast.isTVariable(e)) {
+        result += VariableComponent.transpile(e, indent, true);
       } else if (ast.isBypass(e)) {
-        result += generateStatement(e, 1);
+        result += generateStatement(e, indent);
       } else {
-        console.log("internal error");
+        console.log(chalk.red("internal error"));
       }
     });
     result += " }";
@@ -187,9 +107,8 @@ export class ClassTypeComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: ast.ClassType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const log = enterLog("isClassType", undefined, indent);
-    // console.log("class type:", node.$cstNode?.text);
+  static inferType(node: ast.ObjectType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    const log = enterLog("isObjectType", node.$cstNode?.text, indent);
     const type = TypeSystem.createClassType(node);
     exitLog(log);
     return type;
@@ -199,22 +118,26 @@ export class ClassTypeComponent {
 /**
  *
  */
-export class ClassLiteralComponent {
+export class ObjectValueComponent {
   /**
    *
    * @param expr
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.ClassLiteral, indent: number): string {
+  static transpile(expr: ast.ObjectValue, indent: number): string {
     let result = "{\n";
     expr.elements.forEach((item) => {
-      result += applyIndent(
-        indent + 1,
-        item.name + ": " + (item.value ? generateExpression(item.value, indent) : "") + ",\n"
-      );
+      if (item.spread) {
+        result += applyIndent(indent + 1, `${item.$cstNode?.text},\n`);
+      } else {
+        result += applyIndent(
+          indent + 1,
+          item.name + ": " + (item.value ? generateExpression(item.value, indent + 1) : "") + ",\n"
+        );
+      }
     });
-    result += "}";
+    result += applyIndent(indent, "}");
     return result;
   }
 
@@ -225,9 +148,8 @@ export class ClassLiteralComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: ast.ClassLiteral, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const log = enterLog("isClassLiteral", undefined, indent);
-    // console.log("object literal:", node.$cstNode?.text);
+  static inferType(node: ast.ObjectValue, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    const log = enterLog("isObjectValue", node.$cstNode?.text, indent);
     const type = TypeSystem.createClassType(node);
     exitLog(log);
     return type;

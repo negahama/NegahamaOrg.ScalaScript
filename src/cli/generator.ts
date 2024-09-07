@@ -3,12 +3,12 @@ import * as path from "node:path";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 import * as ast from "../language/generated/ast.js";
 import { extractDestinationAndName } from "./cli-util.js";
-import { AllTypesComponent } from "../components/datatype-components.js";
-import { FunctionComponent, LambdaCallComponent, CallChainComponent } from "../components/methodcall-components.js";
-import { ClassComponent, ClassLiteralComponent } from "../components/class-components.js";
+import { TypesComponent } from "../components/datatype-components.js";
+import { FunctionComponent, CallChainComponent, FunctionValueComponent } from "../components/methodcall-components.js";
+import { ObjectComponent, ObjectValueComponent } from "../components/class-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import { TryCatchStatementComponent, ForStatementComponent } from "../components/statement-components.js";
-import { ArrayExpressionComponent, ArrayLiteralComponent } from "../components/array-components.js";
+import { ArrayExpressionComponent, ArrayValueComponent } from "../components/array-components.js";
 import {
   UnaryExpressionComponent,
   BinaryExpressionComponent,
@@ -16,6 +16,7 @@ import {
   MatchExpressionComponent,
   NewExpressionComponent,
 } from "../components/expression-components.js";
+import chalk from "chalk";
 
 /**
  *
@@ -53,7 +54,7 @@ export function generateCode(code: ast.Code): string {
   let result = "";
   if (ast.isStatement(code)) result += generateStatement(code, 0);
   else if (ast.isExpression(code)) result += generateExpression(code, 0);
-  else console.log("ERROR in Code:", code);
+  else console.log(chalk.red("ERROR in Code:", code));
   return result;
 }
 
@@ -66,12 +67,12 @@ export function generateCode(code: ast.Code): string {
 export function generateStatement(stmt: ast.Statement | undefined, indent: number): string {
   let result = "";
   if (stmt == undefined) return result;
-  if (ast.isVariable(stmt)) {
+  if (ast.isTVariable(stmt)) {
     result += VariableComponent.transpile(stmt, indent);
   } else if (ast.isTFunction(stmt)) {
     result += FunctionComponent.transpile(stmt, indent);
-  } else if (ast.isClass(stmt)) {
-    result += ClassComponent.transpile(stmt, indent);
+  } else if (ast.isTObject(stmt)) {
+    result += ObjectComponent.transpile(stmt, indent);
   } else if (ast.isDoStatement(stmt)) {
     result += `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition, indent)}`;
   } else if (ast.isForStatement(stmt)) {
@@ -95,7 +96,7 @@ export function generateStatement(stmt: ast.Statement | undefined, indent: numbe
         .replaceAll("%%", "");
     }
   } else {
-    console.log("ERROR in Statement");
+    console.log(chalk.red("ERROR in Statement"));
   }
   return result;
 }
@@ -111,8 +112,6 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
   if (expr == undefined) return result;
   if (ast.isAssignment(expr)) {
     result += AssignmentComponent.transpile(expr, indent);
-  } else if (ast.isLambdaCall(expr)) {
-    result += LambdaCallComponent.transpile(expr, indent);
   } else if (ast.isCallChain(expr)) {
     result += CallChainComponent.transpile(expr, indent);
   } else if (ast.isIfExpression(expr)) {
@@ -128,20 +127,23 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
   } else if (ast.isInfixExpression(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
   } else if (ast.isReturnExpression(expr)) {
-    result += `return ${generateExpression(expr.value, indent)};`;
+    if (expr.value) result += `return ${generateExpression(expr.value, indent)};`;
+    else result += "return";
   } else if (ast.isNewExpression(expr)) {
     result += NewExpressionComponent.transpile(expr, indent);
   } else if (ast.isArrayExpression(expr)) {
     result += ArrayExpressionComponent.transpile(expr, indent);
-  } else if (ast.isArrayLiteral(expr)) {
-    result += ArrayLiteralComponent.transpile(expr, indent);
-  } else if (ast.isClassLiteral(expr)) {
-    result += ClassLiteralComponent.transpile(expr, indent);
+  } else if (ast.isArrayValue(expr)) {
+    result += ArrayValueComponent.transpile(expr, indent);
+  } else if (ast.isObjectValue(expr)) {
+    result += ObjectValueComponent.transpile(expr, indent);
+  } else if (ast.isFunctionValue(expr)) {
+    result += FunctionValueComponent.transpile(expr, indent);
   } else if (ast.isLiteral(expr)) {
     // nil 만 undefined로 변경한다.
     result += expr.value == "nil" ? "undefined" : expr.value;
   } else {
-    console.log("ERROR in Expression:", expr);
+    console.log(chalk.red("ERROR in Expression:", expr));
   }
   return result;
 }
@@ -175,7 +177,7 @@ export function generateBlock(
     } else {
       if (ast.isStatement(code)) element += generateStatement(code, indent + 1);
       else if (ast.isExpression(code)) element += generateExpression(code, indent + 1);
-      else console.log("ERROR in Block:", code);
+      else console.log(chalk.red("ERROR in Block:", code));
     }
     result += applyIndent(indent + 1, element + "\n");
   });
@@ -185,42 +187,20 @@ export function generateBlock(
 
 /**
  *
- * @param fun
+ * @param type
  * @param indent
- * @param isClassMethod
  * @returns
  */
-export function generateFunction(
-  fun: ast.TFunction | ast.Method,
-  indent: number,
-  isClassMethod: boolean = false
-): string {
-  const params = fun.parameters.map((param) => param.name + AllTypesComponent.transpile(param.type, indent)).join(", ");
-  let result = "";
-  if (fun.annotate == "NotTrans") return result;
-  if (ast.isTFunction(fun)) {
-    if (fun.export) result += "export ";
-  } else if (ast.isMethod(fun)) {
-    if (fun.private) result += "private ";
-    if (fun.static) result += "static ";
-  }
-  if (!isClassMethod) result += "function ";
-  result += `${fun.name}(${params})${AllTypesComponent.transpile(fun.returnType, indent)} `;
-  // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
-  // 그래서 익명 함수가 받는 indent는 +1되어진 것이다.
-  result += fun.body
-    ? generateBlock(fun.body, indent, (lastCode: ast.Code, indent: number) => {
-        if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
-        else return "";
-      })
-    : "";
-  return result;
+export function generateTypes(type: ast.Types | undefined, indent: number): string {
+  if (!type) return "";
+  const result = TypesComponent.transpile(type, indent);
+  return result ? ": " + result : "";
 }
 
 /**
  *
  * @param condition
+ * @param indent
  * @returns
  */
 export function generateCondition(condition: ast.Expression, indent: number): string {

@@ -8,62 +8,105 @@ Code: Statement | Expression;
 // 스칼라스크립트의 자료형 관련
 //-----------------------------------------------------------------------------
 // 타입의 선언이란 클래스, 오브젝트, 함수 타입에 이름을 부여하는 것이다.
-// 클래스를 예로 들어서 설명하면 일반적으로 클래스의 선언이라고 하는 것은 클래스 타입에 이름을 부여하는 것을 말한다.
-// 우리가 보통 문자열의 선언 또는 숫자형 배열의 선언이라고 하면 이것은 var array: number[] 와 같이 해당 자료형을 가진
-// 변수를 선언하는 것을 말하지만 클래스, 오브젝트, 함수는 변수를 선언하는 것이 아니라 타입 자체를 선언하는 것이다.
-// 따라서 스칼라스크립트에서는 이것을 타입의 선언으로 보지 않고 별칭을 정의하는 것으로 본다.
-// 모든 클래스, 오브젝트, 함수는 def 와 => 으로 정의한다.
+// 선언 또는 정의에서 중요한 것은 대상이다. 선언의 대상은 변수일 수도 있고 타입 자체일 수도 있다.
+// 우리가 보통 var array: number[] 와 같이 선언하는 것은 숫자형 배열을 타입으로 가지는 array라는 변수를
+// 선언하는 것이며 class Person { ... } 은 Person이라는 이름을 가지는 타입을 선언하는 것이다.
+// Person은 타입이기 때문에 array처럼 값으로 사용될 수 없고 인스턴스화되어야만 사용할 수 있다.
+// 반면 function display(msg: string) { ... } 으로 선언되는 함수는 값에 가깝다.
+// 선언에 대한 애매한 구분은 편할지는 모르겠지만 언어에 대한 이해도를 떨어뜨린다.
+// 그래서 스칼라스크립트에서는 이를 명확히 구분하기로 했다.
+// 우선 다른 언어에 존재하는 함수의 정의가 존재하지 않는다.
+// 다른 언어에서의 함수 정의는 함수의 값에 이름을 부여한 것인데 다른 자료형은 모두 변수에 할당하는 방식을
+// 사용하면서 함수만 특수하게 값에 이름을 부여한 것이라고 할 수 있다. 물론 함수를 값으로 취급하는 함수형 언어들은
+// 기본적으로 함수를 변수에 할당할 수 있다. 함수 선언은 관행적으로 널리 사용되는 방법도 지원하기 위한 예외 사항일 뿐이다.
+// 하지만 스칼라스크립트에서는 (함수선언처럼) 값에 이름을 부여할 수 없다. 이유는 거의 필요하지 않기 때문이다.
+// 3.14159에 PI 라는 이름을 부여하는 것은 보다 일반적인 상수 선언이 있기 때문이다.
+// 상수 선언은 변경되지 않는 변수의 선언이지 값에 이름을 부여하는 것은 아니다.
+// 즉 값은 변수에 할당되므로써 고유한 이름을 가질 수 있다.
+// 반면 타입에는 이름을 부여할 수 있다. 이를 타입 별칭이라고도 할 수 있다.
+// 스칼라스크립트에서 def 로 시작하는 것은 모두 타입에 대해 이름을 부여하는 것이다.
+// 스칼라스크립트에서는 클래스, 오브젝트등의 사용자 정의 자료구조의 구분이 없기 때문에(모두 오브젝트라고 칭함)
+// def는 일반적으로 오브젝트의 선언인데 이것은 오브젝트 개체를 선언하는 것이 아니라 타입 자체를 선언하는 것이다.
+// 예를들어 name과 age를 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
+// 이 타입을 매번 이렇게 쓰기가 불편하기 때문에 이를 Person 이라는 이름으로 사용하는 것이다.
+// 즉 타입을 정의한 것이고 타입에 이름을 부여한 것일 뿐 오브젝트를 선언한 것이 아니다.
+// 이는 함수도 마찬가지이다.
+// display이라는 함수 이름은 (msg: string)을 파라메터로 가지고 void를 리턴하는 함수들의 이름으로 사용된다.
+// 이런 함수들이 하나가 아니고 이들을 모두 display라고 하는 것은 맞지 않기 때문에 스칼라스크립트에서 함수 이름은
+// 다른 언어와의 차이점을 극명하게 보여준다. 중요한 점은 display가 함수 타입의 이름이지 함수가 아니라는 점이다.
+// 스칼라스크립트의 이와 같은 특징은 타입은 원래 이름이 없다는 철학에 근거한다.
+// 우리가 유저가 정의한 수많은 이름들과 string, number와 같은 이름을 타입으로 사용해 왔기 때문에
+// 타입에 반드시 이름이 있어야 한다고 생각할 수 있으나 무명(익명, 람다) 함수, 문자열 리터럴 타입등
+// 요즘의 언어는 이름 없는 타입을 사용하는 경우가 많다.
+// Person이라고 오브젝트를 선언하는 것과 이런 타입을 Person이라고 쓸 수도 있다고 하는 것은 다르다.
 //
+// 모든 클래스, 오브젝트, 함수는 def 와 => 으로 정의한다.
 // 또한 스칼라스크립트는 오브젝트와 클래스가 하나로 합쳐져 있다.
 // 메서드를 가지지 않는 클래스는 오브젝트(인터페이스)로 변환되며 타입으로 사용할 수 있고 값을 할당할 수도 있다.
 
+// Union type
+//todo Union type이 모든 타입의 가장 최상위 타입이긴 하지만 아직 완전하지 않다.
+Types: 
+  types+=SimpleType ('|' types+=SimpleType)*;
+
 // 타입으로 사용될 수 있는 모든 타입들
-AllTypes: LambdaType | ArrayType | SimpleType;
-
+// ElementType은 하나의 항목만을 가지는 타입들이며 
+// CompoundType과 ArrayType은 두개 이상의 항목을 가지는 타입들이다.
+// ArrayType은 동일한 타입이 연속된 구조를 취하는 특수한 Compound 타입이다.
+// 이것을 CompoundType과 구분해서 처리하는 것은 표기 방법과 처리가 매우 다르기 때문이다.
+// 현재 CompoundType은 ObjectType 밖에 없기 때문에 이를 별도로 구분하지 않고 ObjectType으로 사용한다.
 SimpleType:
-  TupleType
-  | ClassType
-  | PrimitiveType
-  | reference=[Class:Id];
+  ArrayType | ObjectType | ElementType;
 
-TupleType:
-  '[' types+=SimpleType (',' types+=SimpleType)* ']';
+// 하나의 항목만을 가지는 타입들
+ElementType:
+  FunctionType
+  | PrimitiveType
+  | reference=[TObject:Id];
 
 PrimitiveType:
-  type=('any' | 'nil' | 'string' | 'number' | 'boolean' | 'void');
+  type=('any' | 'nil' | 'void' | 'string' | 'number' | 'boolean');
 
-// Array Type
 // 해당 개체의 타입이 배열형임을 나타내기 위해 사용된다.
 // ex) var ary: number[]
 ArrayType:
   // SimpleType ({infer ArrayType.elementType=current} '[' ']')? ;
-  elementType=SimpleType '[' ']';
+  elementType=(ObjectType | ElementType) '[' ']';
 
-// Array Literal
-// ex) [ 1, 2, 3 ], []
-ArrayLiteral:
+// ex) ary = [ 1, 2, 3 ], [], [ 1, ...ary ]
+ArrayValue:
   '[' items+=ArrayItem? (',' items+=ArrayItem )* ']';
 
 ArrayItem:
-  item=Literal | '...' spread=[NamedElement:Id];
+  item=Literal | Spread;
 
-// Array Expression
-// ex) array[ 1 ]
+fragment Spread:
+  '...' spread=[NamedElement:Id];
+
+// Array의 실제 사용... function의 function call 동일
+// ex) ary[ 1 ]
 ArrayExpression:
-  element=[NamedElement:Id] ArrayCallSignature;
+  element=[NamedElement:Id] isArray?='[' index=Expression ']';
 
-fragment ArrayCallSignature:
-  isArray?='[' index=Expression ']';
+//todo
+// TupleType:
+//   '[' types+=SimpleType (',' types+=SimpleType)* ']';
+
+Generic:
+  '<' types+=SimpleType (',' types+=SimpleType)* '>';
+
 
 type NamedElement =
-  Variable
+  TVariable
   | TFunction
-  | Class
-  | Field
-  | Method
+  | TObject
   | Iterator
   | Parameter
-  | Binding;
+  | TypeBinding
+  | AssignBinding;
+
+fragment Annotation:
+  '@' annotate=Id;
 
 //-----------------------------------------------------------------------------
 // Statements
@@ -71,9 +114,9 @@ type NamedElement =
 
 Statement:
   Bypass
-  | VariableDeclaration
-  | FunctionDeclaration
-  | ClassDeclaration
+  | VariableDefinition
+  | FunctionDefinition
+  | ObjectDefinition
   | DoStatement
   | ForStatement
   | WhileStatement
@@ -86,102 +129,84 @@ Statement:
 //-----------------------------------------------------------------------------
 // 모든 변수는 다음의 규칙을 가지고 있다.
 // 이름 : 타입 = 값
-// 이름은 유효한 식별자이어야 한다.
 // 타입이나 값을 통해서 변수의 타입을 정할 수 있어야 한다.
 // Rule 자체는 타입과 값이 모두 없을 수 있지만 둘 다 있거나 적어도 하나는 있어야 한다.
 // 타입과 값은 모두 있으면 값은 명시된 타입으로 변환되며 이 변환이 실패하면 에러가 된다.
-// 다중 대입문을 지원하기 위해서 아래와 같이 되어져 있다.
-// 하지만 이 방식은 어떻게 해도 Langium의 default 처리로는 cross-reference가 처리되지 않는다.
-// 이를 처리하기 위해서 DefaultScopeComputation의 processNode()를 override해서
-// 새로운 AstNodeDescription을 precomputedScope에 추가해 준다.
-// FunctionDeclaration과 Class의 Method가 동일한 것처럼
-// VariableDeclaration과 Class의 Field는 동일하지만 다중 대입문 때문에 따로 취급한다.
+//
+// 이전에 다중 선언문을 지원했지만 삭제하기로 했다.
+// 다중 선언문의 유용성에 비해 처리가 복잡해지기 시작했기 때문이다.
+// 다중 선언문을 처리하기 위해서는 DefaultScopeComputation의 processNode()를 override해서
+// 여러 개의 이름을 각각의 AstNodeDescription으로 만들어 precomputedScope에 추가해 주어야 한다.
+// 그런데 이것은 GlobalScope에서는 정상동작하지만 LocalScope에서는 동작하지 않았다.
+// 원인을 분석하고 계속 지원하기에는 다중 선언문 자체가 너무 유용성이 적어 포기했다.
+//
 // var, val 은 변수를 선언하는 것이지만 엄밀하게 말하면 변수의 성격을 결정하는 것으로써
 // var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
-VariableDeclaration infers Variable:
-  (Annotation)? kind=('val' | 'var') names+=Id (',' names+=Id)* (':' type=AllTypes)? ('=' value=Expression)?;
+VariableDefinition infers TVariable:
+  (Annotation)? (export?='export')? (private?='private')? (static?='static')?
+  kind=('val' | 'var') name=Id (':' type=Types)? ('=' value=Expression)?;
 
-fragment Annotation:
-  '@' annotate=Id;
-
-fragment VariableDeclSignature:
-  (':' type=AllTypes)? ('=' value=Expression)?;
-
-// Function Declarations
+// Function Defintion
 //-----------------------------------------------------------------------------
-// 함수의 리턴 타입은 -> 으로 표시하고 함수의 바디는 => 으로 표시한다.
-// 이건 ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
+// 스칼라스크립트에서는 함수의 정의가 없다. 함수는 다른 자료형과 동일하게 그냥 변수에 할당되어져 사용되어진다.
+// 함수는 파라메터와 리턴타입, 함수의 바디로 구성되고 함수를 표시할때 (msg: string) -> void => { ... } 와 같이
+// 리턴 타입은 -> 으로 표시하고 함수의 바디는 => 으로 표시한다. 함수의 리턴 타입을 -> 으로 표기하는 것은
+// ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
 // parameter는 초기값을 가질 수 있으나 argument는 그렇지 않다.
-FunctionDeclaration infers TFunction:
-  (Annotation)? (export?='export')? 'def' (extension=[Class:Id] '.')? name=Id FunctionDeclSignature;
 
-fragment FunctionDeclSignature:
-  '(' Parameters? ')' ('->' returnType=AllTypes)? ('=>' FunctionBody)?;
+// 함수 타입이란 함수의 파라메터와 리턴 타입을 명시한 것을 말한다.
+// 파라메터(또는 인수)의 이름과 타입을 매칭하는 것을 Binding이라고 표현한다.
+// 인수는 괄호를 사용해서 묶어야 하지만 인수가 하나인 경우에는 괄호없이 사용할 수도 있다.
+FunctionType:
+  '(' Bindings? ')' '->' returnType=Types;
 
-fragment Parameters:
-  parameters+=Parameter (',' parameters+=Parameter)*;
-
-Parameter:
-  name=Id (nullable?='?')? (':' type=AllTypes)? ('=' value=Expression)?;
-
-fragment FunctionBody:
-  body=Block;
+// 함수의 값이란 함수 타입과 함수 바디를 포함하는 것으로 람다 함수라고도 하며 expression이다.
+// 함수를 가지는 변수의 완전한 표현은 var f:(msg: string)-> void = (msg: string)-> void => { ... } 이다.
+// f 변수의 타입을 별도로 기술할 필요가 없기 때문에 var f = 함수값 형태로 표시할 수 있다. 
+// 함수의 값에 함수 타입이 포함되는 점은 혼란의 여지가 있지만 이것이 없는 함수 바디는 그냥 block일 뿐이다.
+FunctionValue:
+  ('(' Bindings? ')' ('->' returnType=Types)? | bindings+=TypeBinding) '=>' body=Block;
 
 Block:
-  ('{' codes+=Code* '}') | codes+=Expression;
-
-fragment FunctionCallSignature:
-  isFunction?='(' Arguments? ')';
-
-fragment Arguments:
-  args+=Expression (',' args+=Expression)*;
-
-LambdaType:
-  '(' Bindings? ')' '->' returnType=AllTypes;
-
-// LambdaCall은 expression이다.
-// 람다 함수 호출시 인수의 이름과 타입을 정하는 것은 변수의 생성이 아니라 Binding이라고 한다.
-// 인수는 괄호를 사용해서 묶어야 하지만 인수가 하나인 경우에는 괄호없이 사용할 수도 있다.
-LambdaCall:
-  ('(' Bindings? ')' ('->' returnType=AllTypes)? | bindings+=Binding) '=>' body=Block;
+  (isBracket?='{' codes+=Code* '}') | codes+=Expression;
 
 fragment Bindings:
-  bindings+=Binding (',' bindings+=Binding)*;
+  bindings+=TypeBinding (',' bindings+=TypeBinding)*;
 
-Binding: name=Id (':' type=AllTypes)?;
+TypeBinding: name=Id (':' type=Types)?;
 
-// Class Declarations
+// 함수의 정의 자체는 값에 대한 이름 부여이고 ScalaScript의 Type system에 부합되지 않지만
+// 편이를 위해 제공하고 있다. 실제로도 타입스크립트의 function으로 transpile되어지기는 하지만
+// 이것 대신 val function_name = FuncionValue를 사용해야 한다.
+FunctionDefinition infers TFunction:
+  (Annotation)? (export?='export')? (private?='private')? (static?='static')? 
+  'def' (extension=[TObject:Id] '.')? name=Id
+  '(' (params+=Parameter (',' params+=Parameter)*)? ')' ('->' returnType=Types)? ('=>' body=Block)?;
+
+Parameter:
+  name=Id (nullable?='?')? (':' type=Types)? ('=' value=Expression)?;
+
+// Object Definition
 //-----------------------------------------------------------------------------
-// Class의 선언은 Class 타입에 이름을 부여하는 것이다.
-// 아래 규칙은 MethodMember의 파라메터로 초기값을 가질 수 있고 FieldMember로 타입이 없을 수도 있다.
-// def ClassName extends SuperClass => {
-//   display(msg: string = "hello")
-//   message
-// }
-ClassDeclaration infers Class:
-  (Annotation)? (export?='export')? 'def' name=Id ClassDeclSignature;
+// Object는 유저가 정의하는 타입을 모두 포괄하는 단어이며 여기에는 일반적인 Class, Interface를 모두 포함한다.
+// Object의 정의란 Object의 타입에 이름을 부여하는 것이다.
+// Object는 복합타입 컨테이너로 자신을 제외한 모든 타입을 가질 수 있다.
+// 예를들면 단일타입, 다른 복합타입, 배열타입등을 모두 element로 가질 수 있다. 
+ObjectDefinition infers TObject:
+  (Annotation)? (export?='export')?
+  'def' name=Id ('extends' superClass=[TObject:Id])?
+  '=>' body=ObjectType;
 
-fragment ClassDeclSignature:
-  ('extends' superClass=[Class:Id])? '=>' ClassBody;
-
-fragment ClassBody:
-  '{' elements+=(Bypass | Field | Method)* '}';
-
-Field: (Annotation)? (private?='private')? (static?='static')? name=Id VariableDeclSignature;
-
-Method: (Annotation)? (private?='private')? (static?='static')? name=Id FunctionDeclSignature;
-
-// Class Type
 // ex) var obj: { name: string age: number }
-ClassType: ClassBody;
+ObjectType:
+  '{' elements+=(Bypass | VariableDefinition | FunctionDefinition)* '}';
 
-// Class literal
-// ex) var obj = { name = "samuel" age = 20 }
-// ClassLiteral은 expression이다.
-ClassLiteral:
-  '{' elements+=(MemberBinding)* '}';
+// ex) var obj = { name = "samuel" age = 20 ...ary }
+ObjectValue:
+  '{' elements+=(AssignBinding)* '}';
 
-MemberBinding: name=Id ('=' value=Expression)?;
+// AssignBinding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
+AssignBinding: name=Id ':' value=Expression | Spread;
 
 // 기타
 //-----------------------------------------------------------------------------
@@ -232,14 +257,14 @@ Expression:
   Logical
   | LogicalNot
   | Assignment
-  | LambdaCall
   | IfExpression
   | MatchExpression
   | InfixExpression
   | ReturnExpression
   | NewExpression
-  | ArrayLiteral
-  | ClassLiteral
+  | ArrayValue
+  | ObjectValue
+  | FunctionValue
   ;
 
 // Binary Operators
@@ -280,14 +305,13 @@ Exponentiation infers Expression:
 // 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 CallChain infers Expression:
   // SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
-  SimpleExpression ({infer CallChain.previous=current} "." (element=[NamedElement:Id] (
-    isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | ArrayCallSignature
-  )?) )*;
+  SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
+  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')? )*;
 
 // fragment CallableElements:
 //   element=[NamedElement:Id] (
 //     // FunctionCallSignature | ArrayCallSignature
-//     isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | ArrayCallSignature
+//     isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']'
 //   )?;
 
 SimpleExpression infers Expression:
@@ -350,7 +374,7 @@ LogicalNot infers UnaryExpression:
 //   Logical ({infer BinaryExpression.left=current} operator=('=') right=Logical)*;
 // 우선 대입 연산의 순서가 왼쪽에서 오른쪽으로 가기 때문에 a = b = 0 은 a = b가 먼저 처리된다.
 // 또 다른 문제는 이 좌결합성 때문에 다중 대입문에서 세미콜론을 제대로 표시할 수 없다.
-// 따라서 assignment는 따로 정의되며 좌변에 MethodCall을 사용해 a.b = 0를 처리한다.
+// 따라서 assignment는 따로 정의되며 좌변에 CallChain을 사용해 a.b = 0를 처리한다.
 Assignment:
   assign=CallChain operator=('=' | '+=' | '-=' | '*=' | '/=') value=Expression;
 
@@ -392,7 +416,7 @@ ReturnExpression:
   'return' (value=Expression | ";");
 
 NewExpression:
-  'new' class=[Class:Id] '(' (args+=Expression (',' args+=Expression)*)? ')';
+  'new' class=[TObject:Id] (generic=Generic)?'(' (args+=Expression (',' args+=Expression)*)? ')';
 
 //-----------------------------------------------------------------------------
 // terminal & literal
@@ -470,7 +494,7 @@ terminal ID: /[_$a-zA-Zㄱ-ㅎ가-힣][\w$ㄱ-ㅎ가-힣]*/;
 
 // Identifiers
 terminal Id returns string: ID;
-// TypedId: name=Id ':' type=AllTypes;
+// TypedId: name=Id ':' type=Types;
 
 // Whitespace and Comments
 hidden terminal WS: /\s+/;

@@ -8,7 +8,7 @@ import {
   type PartialLangiumServices,
 } from "langium/lsp";
 import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "./generated/module.js";
-import { ScalaScriptScopeProvider, ScalaScriptScopeComputation } from "./scala-script-scope.js";
+import { ScalaScriptScopeProvider } from "./scala-script-scope.js";
 import { ScalaScriptValidator, registerValidationChecks } from "./scala-script-validator.js";
 import { ScalaScriptWorkspaceManager } from "./scala-script-workspace.js";
 
@@ -48,7 +48,6 @@ export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServic
   },
   references: {
     ScopeProvider: (services) => new ScalaScriptScopeProvider(services),
-    ScopeComputation: (services) => new ScalaScriptScopeComputation(services),
   },
 };
 

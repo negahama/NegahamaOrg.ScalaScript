@@ -1,9 +1,8 @@
 import { AstNode, AstUtils, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
 import { TypeDescription, TypeSystem, enterLog, exitLog, traceLog } from "../language/scala-script-types.js";
-import { generateBlock, generateExpression, generateFunction, generateStatement } from "../cli/generator.js";
-import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
-import { AllTypesComponent } from "./datatype-components.js";
+import { generateBlock, generateExpression, generateStatement, generateTypes } from "../cli/generator.js";
+import { getTypeCache } from "../language/scala-script-validator.js";
 
 /**
  *
@@ -13,10 +12,37 @@ export class FunctionComponent {
    *
    * @param stmt
    * @param indent
+   * @param isClassMethod
    * @returns
    */
-  static transpile(stmt: ast.TFunction, indent: number): string {
-    return generateFunction(stmt, indent);
+  static transpile(stmt: ast.TFunction, indent: number, isClassMethod: boolean = false): string {
+    const params = stmt.params
+      .map((param) => {
+        let p = param.name + (param.nullable ? "?" : "") + generateTypes(param.type, indent);
+        p += param.value ? ` = ${generateExpression(param.value, indent)}` : "";
+        return p;
+      })
+      .join(", ");
+
+    let result = "";
+    if (stmt.annotate == "NotTrans") return result;
+    if (ast.isTFunction(stmt)) {
+      if (stmt.export) result += "export ";
+      if (stmt.private) result += "private ";
+      if (stmt.static) result += "static ";
+    }
+    if (!isClassMethod) result += "function ";
+    result += `${stmt.name}(${params})${generateTypes(stmt.returnType, indent)} `;
+    // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
+    // 그래서 익명 함수가 받는 indent는 +1되어진 것이다.
+    result += stmt.body
+      ? generateBlock(stmt.body, indent, (lastCode: ast.Code, indent: number) => {
+          if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
+          else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
+          else return "";
+        })
+      : "";
+    return result;
   }
 
   /**
@@ -29,7 +55,7 @@ export class FunctionComponent {
   static inferType(node: ast.TFunction, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     const log = enterLog("isFunction", node.name, indent);
     const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
-    const parameters = node.parameters.map((e) => ({
+    const parameters = node.params.map((e) => ({
       name: e.name,
       type: TypeSystem.inferType(e.type, cache, indent + 2),
     }));
@@ -54,7 +80,7 @@ export class FunctionComponent {
  * @param accept
  * @returns
  */
-export function checkMethodReturnType(method: ast.TFunction | ast.Method, accept: ValidationAcceptor): void {
+export function checkMethodReturnType(method: ast.TFunction, accept: ValidationAcceptor): void {
   // console.log("checkMethodReturnType");
   if (method.body && method.returnType) {
     const map = getTypeCache();
@@ -66,17 +92,18 @@ export function checkMethodReturnType(method: ast.TFunction | ast.Method, accept
       });
       return;
     }
-    for (const returnStatement of returnStatements) {
-      const returnValueType = TypeSystem.inferType(returnStatement, map);
-      if (!isAssignable(returnValueType, expectedType)) {
-        const msg = `Type '${TypeSystem.typeToString(
-          returnValueType
-        )}' is not assignable to type '${TypeSystem.typeToString(expectedType)}'.`;
-        accept("error", msg, {
-          node: returnStatement,
-        });
-      }
-    }
+    //todo
+    // for (const returnStatement of returnStatements) {
+    //   const returnValueType = TypeSystem.inferType(returnStatement, map);
+    //   if (!isAssignable(returnValueType, expectedType)) {
+    //     const msg = `Type '${TypeSystem.typeToString(
+    //       returnValueType
+    //     )}' is not assignable to type '${TypeSystem.typeToString(expectedType)}'.`;
+    //     accept("error", msg, {
+    //       node: returnStatement,
+    //     });
+    //   }
+    // }
   }
 }
 
@@ -166,17 +193,17 @@ export class CallChainComponent {
 /**
  *
  */
-export class LambdaCallComponent {
+export class FunctionValueComponent {
   /**
    *
    * @param expr
    * @param indent
    * @returns
    */
-  static transpile(expr: ast.LambdaCall, indent: number): string {
+  static transpile(expr: ast.FunctionValue, indent: number): string {
     let result = "";
-    result += "(" + expr.bindings.map((bind) => bind.name + AllTypesComponent.transpile(bind.type, indent)).join(", ");
-    result += ")" + AllTypesComponent.transpile(expr.returnType, indent) + " => ";
+    result += "(" + expr.bindings.map((bind) => bind.name + generateTypes(bind.type, indent)).join(", ");
+    result += ")" + generateTypes(expr.returnType, indent) + " => ";
     result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
       if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
       else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
@@ -192,7 +219,11 @@ export class LambdaCallComponent {
    * @param indent
    * @returns
    */
-  static inferType(node: ast.LambdaCall, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    return TypeSystem.createErrorType("internal error");
+  static inferType(node: ast.FunctionValue, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    const log = enterLog("isFunctionValue", node.$type, indent);
+    if (node.returnType) type = TypeSystem.inferType(node.returnType, cache, indent);
+    exitLog(log);
+    return type;
   }
 }

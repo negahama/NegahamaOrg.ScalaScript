@@ -13,145 +13,145 @@ import { URI } from "vscode-uri";
  */
 const ScalaScriptBuiltinLibrary = `
 @NotTrans def $string$ {
-  length: number
-  charAt(index: number)-> string
-  charCodeAt(index: number)-> number
-  codePointAt(pos: number)-> number
-  concat(str: string)-> string
-  includes(searchString: string, position: number)-> boolean
-  endsWith(searchString: string, endPosition: number)-> boolean
-  indexOf(searchValue: string, fromIndex: number)-> number
-  lastIndexOf(searchValue: string, fromIndex: number)-> number
-  localeCompare(compareString: string)-> number
-  //match(regexp: string)-> string
-  matchAll(regexp: string)-> string[]
-  normalize(form: string)-> string
-  padEnd(targetLength: number, padString: string)-> string
-  padStart(targetLength: number, padString: string)-> string
-  repeat(count: number)-> string
-  replace(searchFor: string, replaceWith: string)-> string
-  replaceAll(searchFor: string, replaceWith: string)-> string
-  search(regexp: string)-> string
-  slice(beginIndex: number, endIndex: number)-> string
-  split(sep: string, limit: number)-> string[]
-  startsWith(searchString: string, position: number)-> boolean
-  substring(indexStart: number, indexEnd: number)-> string
-  toLocaleLowerCase(locale: string)-> string
-  toLocaleUpperCase(locale: string)-> string
-  toLowerCase()-> string
-  toUpperCase()-> string
-  toString()-> string
-  trim()-> string
-  trimStart()-> string
-  trimEnd()-> string
-  valueOf()-> string
+  var length: number
+  def charAt(index: number)-> string
+  def charCodeAt(index: number)-> number
+  def codePointAt(pos: number)-> number
+  def concat(str: string)-> string
+  def includes(searchString: string, position: number)-> boolean
+  def endsWith(searchString: string, endPosition: number)-> boolean
+  def indexOf(searchValue: string, fromIndex: number)-> number
+  def lastIndexOf(searchValue: string, fromIndex: number)-> number
+  def localeCompare(compareString: string)-> number
+  //def match(regexp: string)-> string
+  def matchAll(regexp: string)-> string[]
+  def normalize(form: string)-> string
+  def padEnd(targetLength: number, padString: string)-> string
+  def padStart(targetLength: number, padString: string)-> string
+  def repeat(count: number)-> string
+  def replace(searchFor: string, replaceWith: string)-> string
+  def replaceAll(searchFor: string, replaceWith: string)-> string
+  def search(regexp: string)-> string
+  def slice(beginIndex: number, endIndex: number)-> string
+  def split(sep: string, limit: number)-> string[]
+  def startsWith(searchString: string, position: number)-> boolean
+  def substring(indexStart: number, indexEnd: number)-> string
+  def toLocaleLowerCase(locale: string)-> string
+  def toLocaleUpperCase(locale: string)-> string
+  def toLowerCase()-> string
+  def toUpperCase()-> string
+  def toString()-> string
+  def trim()-> string
+  def trimStart()-> string
+  def trimEnd()-> string
+  def valueOf()-> string
 }
-@NotTrans def $array$ {
-  length: number
-  at(index)-> string
-  concat()-> string
-  copyWithin()-> string
-  every(callbackFn)-> string
-  fill(value, start, end)-> string
-  filter(callbackFn)-> string
-  find(callbackFn)-> string
-  findIndex(callbackFn)-> string
-  findLast(callbackFn)-> string
-  findLastIndex(callbackFn)-> string
-  flat(depth)-> string
-  flatMap(callbackFn)-> string
-  forEach(callbackFn)-> string
-  includes(searchElement, fromIndex)-> boolean
-  indexOf(searchElement, fromIndex)-> number
-  join(separate)-> string
-  keys()-> string
-  lastIndexOf(searchElement, fromIndex)-> string
-  map(callbackFn)-> string
-  pop()-> string
-  push(element)-> string
-  reduce(callbackFn)-> string
-  reduceRight(callbackFn)-> string
-  reverse()-> string
-  shift()-> string
-  slice()-> string
-  some(callbackFn)-> string
-  sort(callbackFn)-> string
-  splice()-> string
-  toString()-> string
-  unshift()-> string
-  values()-> string
+@NotTrans def $array$ => {
+  var length: number
+  def at(index)-> string
+  def concat()-> string
+  def copyWithin()-> string
+  def every(callbackFn)-> string
+  def fill(value, start, end)-> string
+  def filter(callbackFn)-> string[]
+  def find(callbackFn)-> string
+  def findIndex(callbackFn)-> number
+  def findLast(callbackFn)-> string
+  def findLastIndex(callbackFn)-> number
+  def flat(depth)-> string
+  def flatMap(callbackFn)-> string
+  def forEach(callbackFn)-> string
+  def includes(searchElement, fromIndex)-> boolean
+  def indexOf(searchElement, fromIndex)-> number
+  def join(separate)-> string
+  def keys()-> string
+  def lastIndexOf(searchElement, fromIndex)-> string
+  def map(callbackFn)-> string
+  def pop()-> string
+  def push(element)-> string
+  def reduce(callbackFn)-> string
+  def reduceRight(callbackFn)-> string
+  def reverse()-> string
+  def shift()-> string
+  def slice()-> string
+  def some(callbackFn)-> string
+  def sort(callbackFn)-> string
+  def splice()-> string
+  def toString()-> string
+  def unshift()-> string
+  def values()-> string
 }
-@NotTrans def $number$ {
-  isNaN()-> boolean
-  isFinite()-> boolean
-  isInteger()-> boolean
-  isSafeInteger()-> boolean
-  parseFloat(x: string)-> number
-  parseInt(x: string)-> number
-  toExponential(fractionDigits: number)-> number
-  toFixed(digits: number)-> string
-  toLocaleString(locales: string)-> string
-  toPrecision(precision: number)-> number
-  toString()-> string
-  valueOf()-> number
+@NotTrans def $number$ => {
+  def isNaN()-> boolean
+  def isFinite()-> boolean
+  def isInteger()-> boolean
+  def isSafeInteger()-> boolean
+  def parseFloat(x: string)-> number
+  def parseInt(x: string)-> number
+  def toExponential(fractionDigits: number)-> number
+  def toFixed(digits: number)-> string
+  def toLocaleString(locales: string)-> string
+  def toPrecision(precision: number)-> number
+  def toString()-> string
+  def valueOf()-> number
 }
 @NotTrans def Number => {
-  EPSILON: number
-  MAX_SAFE_INTEGER: number
-  MIN_SAFE_INTEGER: number
-  MAX_VALUE: number
-  MIN_VALUE: number
-  NaN: number
-  NEGATIVE_INFINITY: number
-  POSITIVE_INFINITY: number
+  val EPSILON: number
+  val MAX_SAFE_INTEGER: number
+  val MIN_SAFE_INTEGER: number
+  val MAX_VALUE: number
+  val MIN_VALUE: number
+  val NaN: number
+  val NEGATIVE_INFINITY: number
+  val POSITIVE_INFINITY: number
 }
-@NotTrans def Math {
-  E: number
-  PI: number
-  LN2: number
-  LN10: number
-  LOG2E: number
-  LOG10E: number
-  SQRT1_2: number
-  SQRT2: number
-  abs(x: number)-> number
-  acos(x: number)-> number
-  acosh(x: number)-> number
-  asin(x: number)-> number
-  asinh(x: number)-> number
-  atan(x: number)-> number
-  atanh(x: number)-> number
-  atan2(y: number, x: number)-> number
-  cbrt(x: number)-> number
-  ceil(x: number)-> number
-  clz32(x: number)-> number
-  cos(x: number)-> number
-  cosh(x: number)-> number
-  exp(x: number)-> number
-  expm1(x: number)-> number
-  floor(x: number)-> number
-  fround(x: number)-> number
-  imul(x: number, y)-> number
-  log(x: number)-> number
-  log1p(x: number)-> number
-  log10(x: number)-> number
-  log2(x: number)-> number
-  max(x: number, y: number)-> number
-  min(x: number, y: number)-> number
-  pow(x: number, y)-> number
-  random()-> number
-  round(x: number)-> number
-  sign(x: number)-> number
-  sin(x: number)-> number
-  sinh(x: number)-> number
-  sqrt(x: number)-> number
-  tan(x: number)-> number
-  tanh(x: number)-> number
-  trunc(x: number)-> number
+@NotTrans def Math => {
+  val E: number
+  val PI: number
+  val LN2: number
+  val LN10: number
+  val LOG2E: number
+  val LOG10E: number
+  val SQRT1_2: number
+  val SQRT2: number
+  def abs(x: number)-> number
+  def acos(x: number)-> number
+  def acosh(x: number)-> number
+  def asin(x: number)-> number
+  def asinh(x: number)-> number
+  def atan(x: number)-> number
+  def atanh(x: number)-> number
+  def atan2(y: number, x: number)-> number
+  def cbrt(x: number)-> number
+  def ceil(x: number)-> number
+  def clz32(x: number)-> number
+  def cos(x: number)-> number
+  def cosh(x: number)-> number
+  def exp(x: number)-> number
+  def expm1(x: number)-> number
+  def floor(x: number)-> number
+  def fround(x: number)-> number
+  def imul(x: number, y)-> number
+  def log(x: number)-> number
+  def log1p(x: number)-> number
+  def log10(x: number)-> number
+  def log2(x: number)-> number
+  def max(x: number, y: number)-> number
+  def min(x: number, y: number)-> number
+  def pow(x: number, y)-> number
+  def random()-> number
+  def round(x: number)-> number
+  def sign(x: number)-> number
+  def sin(x: number)-> number
+  def sinh(x: number)-> number
+  def sqrt(x: number)-> number
+  def tan(x: number)-> number
+  def tanh(x: number)-> number
+  def trunc(x: number)-> number
 }
 
-@NotTrans def console => { log() }
-@NotTrans def assert => { equal() notEqual() }
+@NotTrans def console => { def log() }
+@NotTrans def assert => { def equal() def notEqual() }
 `.trim();
 
 /**

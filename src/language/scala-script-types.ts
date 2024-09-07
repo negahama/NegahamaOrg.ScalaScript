@@ -1,21 +1,16 @@
-import { AstNode, AstUtils } from "langium";
+import { AstNode } from "langium";
 import * as ast from "./generated/ast.js";
-import { AllTypesComponent } from "../components/datatype-components.js";
-import { FunctionComponent, CallChainComponent } from "../components/methodcall-components.js";
+import { TypesComponent, SimpleTypeComponent } from "../components/datatype-components.js";
+import { FunctionComponent, CallChainComponent, FunctionValueComponent } from "../components/methodcall-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
-import {
-  ClassComponent,
-  FieldComponent,
-  MethodComponent,
-  ClassLiteralComponent,
-} from "../components/class-components.js";
+import { ObjectComponent, ObjectValueComponent } from "../components/class-components.js";
 import { ForOfComponent, ForToComponent, ForUntilComponent } from "../components/statement-components.js";
 import {
   UnaryExpressionComponent,
   BinaryExpressionComponent,
   NewExpressionComponent,
 } from "../components/expression-components.js";
-import { ArrayExpressionComponent, ArrayLiteralComponent } from "../components/array-components.js";
+import { ArrayExpressionComponent, ArrayValueComponent } from "../components/array-components.js";
 
 /**
  *
@@ -25,13 +20,15 @@ import { ArrayExpressionComponent, ArrayLiteralComponent } from "../components/a
  * @returns
  */
 var _enableLog_ = false;
+var _sig_number_ = 0;
 export function enableLog(enable: boolean) {
   _enableLog_ = enable;
 }
 export function enterLog(procKind: string, procId: string | undefined, indent: number): string {
+  _sig_number_ += 1;
   const space = "    ".repeat(indent);
-  if (_enableLog_) console.log(space + `Enter ${procKind}, ${procId}`);
-  return space + `Exit ${procKind}, ${procId}`;
+  if (_enableLog_) console.log(space + `Enter(${_sig_number_}) ${procKind}, ${procId}`);
+  return space + `Exit0(${_sig_number_}) ${procKind}, ${procId}`;
 }
 
 /**
@@ -142,7 +139,7 @@ export interface FunctionParameter {
  */
 export interface ClassTypeDescription {
   readonly $type: "class";
-  readonly literal: ast.Class | ast.ClassType | ast.ClassLiteral;
+  readonly literal: ast.TObject | ast.ObjectType | ast.ObjectValue;
 }
 
 /**
@@ -327,7 +324,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createClassType(literal: ast.Class | ast.ClassType | ast.ClassLiteral): ClassTypeDescription {
+  static createClassType(literal: ast.TObject | ast.ObjectType | ast.ObjectValue): ClassTypeDescription {
     return {
       $type: "class",
       literal,
@@ -398,33 +395,32 @@ export class TypeSystem {
 
     let type: TypeDescription | undefined;
     if (!node) {
-      exitLog(rootLog.replace("Exit", "Exit1"));
+      exitLog(rootLog.replace("Exit0", "Exit1"));
       return this.createErrorType("Could not infer type for undefined", node);
     }
 
     const existing = cache.get(node);
     if (existing) {
-      exitLog(rootLog.replace("Exit", "Exit2"));
+      exitLog(rootLog.replace("Exit0", "Exit2"));
       return existing;
     }
 
     // Prevent recursive inference errors
     cache.set(node, this.createErrorType("Recursive definition", node));
 
-    if (ast.isAllTypes(node)) {
-      type = AllTypesComponent.inferType(node, cache, indent);
-    } else if (ast.isVariable(node)) {
+    if (ast.isTypes(node)) {
+      type = TypesComponent.inferType(node, cache, indent);
+    } else if (ast.isPrimitiveType(node)) {
+      //todo - 따로 분리된 이유는
+      type = SimpleTypeComponent.inferType(node, cache, indent);
+    } else if (ast.isTVariable(node)) {
       type = VariableComponent.inferType(node, cache, indent);
     } else if (ast.isTFunction(node)) {
       type = FunctionComponent.inferType(node, cache, indent);
     } else if (ast.isCallChain(node)) {
       type = CallChainComponent.inferType(node, cache, indent);
-    } else if (ast.isClass(node)) {
-      type = ClassComponent.inferType(node, cache, indent);
-    } else if (ast.isField(node)) {
-      type = FieldComponent.inferType(node, cache, indent);
-    } else if (ast.isMethod(node)) {
-      type = MethodComponent.inferType(node, cache, indent);
+    } else if (ast.isTObject(node)) {
+      type = ObjectComponent.inferType(node, cache, indent);
     } else if (ast.isParameter(node)) {
       // Parameter를 type이나 value로 타입을 알 수 없을 경우는 any type으로 취급한다.
       const log = enterLog("isParameter", node.name, indent);
@@ -436,13 +432,23 @@ export class TypeSystem {
         type = TypeSystem.createAnyType();
       }
       exitLog(log);
-    } else if (ast.isBinding(node)) {
-      const log = enterLog("isBinding", node.name, indent);
+    } else if (ast.isTypeBinding(node)) {
+      const log = enterLog("isTypeBinding", node.name, indent);
       // Binding에 type 정보가 없으면 any type으로 취급한다.
       if (node.type) {
         type = TypeSystem.inferType(node.type, cache, indent + 1);
       } else {
         type = TypeSystem.createAnyType();
+      }
+      exitLog(log);
+    } else if (ast.isAssignBinding(node)) {
+      const log = enterLog("isAssignBinding", node.name, indent);
+      //todo 원래 타입은?
+      // Assign Binding에는 value가 없을수는 없지만 없으면 nil type으로 취급한다.
+      if (node.value) {
+        type = TypeSystem.inferType(node.value, cache, indent + 1);
+      } else {
+        type = TypeSystem.createNilType();
       }
       exitLog(log);
     } else if (ast.isForOf(node)) {
@@ -473,28 +479,21 @@ export class TypeSystem {
       exitLog(log);
     } else if (ast.isNewExpression(node)) {
       type = NewExpressionComponent.inferType(node, cache, indent);
-    } else if (ast.isClassLiteral(node)) {
-      type = ClassLiteralComponent.inferType(node, cache, indent);
-    } else if (ast.isArrayLiteral(node)) {
-      type = ArrayLiteralComponent.inferType(node, cache, indent);
+    } else if (ast.isArrayValue(node)) {
+      type = ArrayValueComponent.inferType(node, cache, indent);
+    } else if (ast.isObjectValue(node)) {
+      type = ObjectValueComponent.inferType(node, cache, indent);
+    } else if (ast.isFunctionValue(node)) {
+      type = FunctionValueComponent.inferType(node, cache, indent);
     } else if (ast.isLiteral(node)) {
-      if (ast.isStringExpression(node)) {
-        const log = enterLog("isStringExpression", node.value, indent);
-        type = this.createStringType(node);
-        exitLog(log);
-      } else if (ast.isNumberExpression(node)) {
-        const log = enterLog("isNumberExpression", node.value.toString(), indent);
-        type = this.createNumberType(node);
-        exitLog(log);
-      } else if (ast.isBooleanExpression(node)) {
-        const log = enterLog("isBooleanExpression", node.value.toString(), indent);
-        type = this.createBooleanType(node);
-        exitLog(log);
-      } else if (ast.isVoidExpression(node)) {
-        const log = enterLog("isVoidExpression", node.value, indent);
-        type = this.createVoidType();
-        exitLog(log);
-      }
+      const log = enterLog("isLiteralExpression", node.$cstNode?.text, indent);
+      if (ast.isAnyExpression(node)) type = this.createAnyType();
+      else if (ast.isNilExpression(node)) type = this.createNilType();
+      else if (ast.isVoidExpression(node)) type = this.createVoidType();
+      else if (ast.isStringExpression(node)) type = this.createStringType(node);
+      else if (ast.isNumberExpression(node)) type = this.createNumberType(node);
+      else if (ast.isBooleanExpression(node)) type = this.createBooleanType(node);
+      exitLog(log + ", type: " + type?.$type);
     }
 
     if (!type) {
@@ -502,47 +501,7 @@ export class TypeSystem {
     }
 
     cache.set(node, type);
-    exitLog(rootLog.replace("Exit", "Exit3") + `, type: ${this.typeToString(type)}`);
-    return type;
-  }
-
-  /**
-   *
-   * @param node
-   * @param name
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferTypeByName(
-    node: AstNode | undefined,
-    name: string,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number = 0
-  ): TypeDescription {
-    const rootLog = enterLog("inferTypeByName", `node is ${node?.$type}, name is ${name}`, indent);
-    if (node == undefined)
-      return this.createErrorType("Could not infer type because node is undefined in inferTypeByName", node);
-
-    let type: TypeDescription = this.createErrorType("Could not find name in inferTypeByName", node);
-    const precomputed = AstUtils.getDocument(node).precomputedScopes;
-    if (precomputed) {
-      let currentNode: AstNode | undefined = node;
-      do {
-        // console.log("  currNode:", currentNode?.$type);
-        const allDescriptions = precomputed.get(currentNode);
-        if (allDescriptions.length > 0) {
-          const found = allDescriptions.find((d) => d.name == name && d.type == "Variable");
-          if (found) {
-            // console.log("     found:", found.name, found.type);
-            type = TypeSystem.inferType(found.node, cache, indent + 1);
-          }
-        }
-        currentNode = currentNode?.$container;
-      } while (currentNode);
-    }
-
-    exitLog(rootLog);
+    exitLog(rootLog.replace("Exit0", "Exit3") + `, type: ${type.$type}`);
     return type;
   }
 
@@ -551,9 +510,9 @@ export class TypeSystem {
    * @param classItem
    * @returns
    */
-  static getClassChain(classItem: ast.Class): ast.Class[] {
-    const set = new Set<ast.Class>();
-    let value: ast.Class | undefined = classItem;
+  static getClassChain(classItem: ast.TObject): ast.TObject[] {
+    const set = new Set<ast.TObject>();
+    let value: ast.TObject | undefined = classItem;
     while (value && !set.has(value)) {
       set.add(value);
       value = value.superClass?.ref;
