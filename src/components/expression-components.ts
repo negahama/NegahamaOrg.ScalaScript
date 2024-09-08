@@ -1,6 +1,7 @@
 import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
-import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
+import { TypeDescription, TypeSystem } from "../language/scala-script-types.js";
+import { enterLog, exitLog } from "../language/scala-script-util.js";
 import { getTypeCache, isLegalOperation } from "../language/scala-script-validator.js";
 import {
   generateExpression,
@@ -43,7 +44,7 @@ export class UnaryExpressionComponent {
    * @returns
    */
   static inferType(node: ast.UnaryExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isUnaryExpression", node.operator, indent);
     if (node.operator === "!" || node.operator === "not") {
       type = TypeSystem.createBooleanType();
@@ -52,7 +53,7 @@ export class UnaryExpressionComponent {
     } else {
       type = TypeSystem.createNumberType();
     }
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 
@@ -116,7 +117,7 @@ export class BinaryExpressionComponent {
    * @returns
    */
   static inferType(node: ast.BinaryExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isBinaryExpression", node.operator, indent);
     type = TypeSystem.createErrorType("Could not infer type from binary expression", node);
     if (["and", "or", "&&", "||", "<", "<=", ">", ">=", "==", "!="].includes(node.operator)) {
@@ -130,7 +131,7 @@ export class BinaryExpressionComponent {
         type = TypeSystem.createStringType();
       }
     }
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 
@@ -222,9 +223,9 @@ export class IfExpressionComponent {
    * @returns
    */
   static inferType(node: ast.IfExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isIfExpression", node.$type, indent);
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
@@ -268,9 +269,9 @@ export class MatchExpressionComponent {
    * @returns
    */
   static inferType(node: ast.MatchExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isMatchExpression", node.$type, indent);
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
@@ -312,12 +313,12 @@ export class NewExpressionComponent {
    * @returns
    */
   static inferType(node: ast.NewExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isNewExpression", node.$type, indent);
     if (node.class.ref) {
       type = TypeSystem.createClassType(node.class.ref);
     }
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }

@@ -1,6 +1,7 @@
 import { AstNode } from "langium";
 import * as ast from "../language/generated/ast.js";
-import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
+import { TypeDescription, TypeSystem } from "../language/scala-script-types.js";
+import { enterLog, exitLog } from "../language/scala-script-util.js";
 import { generateExpression } from "../cli/generator.js";
 import { SimpleTypeComponent } from "./datatype-components.js";
 
@@ -27,9 +28,9 @@ export class ArrayTypeComponent {
    * @returns
    */
   static inferType(node: ast.ArrayType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const log = enterLog("isArrayType", node.elementType.$cstNode?.text, indent);
+    const log = enterLog("isArrayType", `'${node.elementType.$cstNode?.text}'`, indent);
     const type = TypeSystem.createArrayType(TypeSystem.inferType(node.elementType, cache, indent));
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
@@ -69,13 +70,13 @@ export class ArrayValueComponent {
    * @returns
    */
   static inferType(node: ast.ArrayValue, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isArrayValue", node.items.toString(), indent);
     // item이 없는 경우 즉 [] 으로 표현되는 빈 배열의 경우 any type으로 취급한다.
     if (node.items.length > 0) {
       type = TypeSystem.createArrayType(TypeSystem.inferType(node.items[0], cache, indent));
     } else type = TypeSystem.createAnyType();
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
@@ -104,13 +105,13 @@ export class ArrayExpressionComponent {
    * @returns
    */
   static inferType(node: ast.ArrayExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     // 다른 것들은 node의 타입을 통해서 타입을 추론하지만 이것은 ref을 이용해서 추론해야만 한다.
-    const log = enterLog("isArrayExpression", node.element.$refText, indent);
+    const log = enterLog("isArrayExpression", `'${node.element.$refText}'`, indent);
     const ref = node.element.ref;
     type = TypeSystem.inferType(ref, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }

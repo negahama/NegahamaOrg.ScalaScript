@@ -1,6 +1,7 @@
 import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
-import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
+import { TypeDescription, TypeSystem } from "../language/scala-script-types.js";
+import { enterLog, exitLog } from "../language/scala-script-util.js";
 import { getTypeCache, isAssignable } from "../language/scala-script-validator.js";
 import { generateExpression, generateTypes } from "../cli/generator.js";
 
@@ -41,7 +42,7 @@ export class VariableComponent {
    * @returns
    */
   static inferType(node: ast.TVariable, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isTVariable", node.name.toString(), indent);
     if (node.type) {
       type = TypeSystem.inferType(node.type, cache, indent + 1);
@@ -50,7 +51,7 @@ export class VariableComponent {
     } else {
       type = TypeSystem.createErrorType("No type hint for this element", node);
     }
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 
@@ -133,7 +134,7 @@ export class AssignmentComponent {
    * @returns
    */
   static inferType(node: ast.Assignment, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isAssignment", node.operator, indent);
     if (node.assign) {
       type = TypeSystem.inferType(node.assign, cache, indent + 1);
@@ -142,7 +143,7 @@ export class AssignmentComponent {
     } else {
       type = TypeSystem.createErrorType("No type hint for this element", node);
     }
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 

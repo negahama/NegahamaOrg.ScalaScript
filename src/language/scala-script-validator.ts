@@ -96,6 +96,26 @@ export class ScalaScriptValidator {
  * @returns
  */
 export function isLegalOperation(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
+  // Union type이면 모든 내부 타입들을 하나씩 적용해서 적법한 연산이 있는지 확인한다.
+  if (TypeSystem.isUnionType(left)) {
+    for (const l of left.elementTypes) {
+      if (right && TypeSystem.isUnionType(right)) {
+        for (const r of right.elementTypes) {
+          if (isLegalOperation_(operator, l, r)) return true;
+        }
+      } else return isLegalOperation_(operator, l, right);
+    }
+  } else {
+    if (right && TypeSystem.isUnionType(right)) {
+      for (const r of right.elementTypes) {
+        if (isLegalOperation_(operator, left, r)) return true;
+      }
+    } else return isLegalOperation_(operator, left, right);
+  }
+  return false;
+}
+
+function isLegalOperation_(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
   if (TypeSystem.isAnyType(left) || (right != undefined && TypeSystem.isAnyType(right))) {
     return true;
   }

@@ -1,9 +1,10 @@
 import { AstNode } from "langium";
 import * as ast from "../language/generated/ast.js";
-import { TypeDescription, TypeSystem, enterLog, exitLog, traceLog } from "../language/scala-script-types.js";
+import { TypeDescription, TypeSystem } from "../language/scala-script-types.js";
+import { enterLog, exitLog, traceLog } from "../language/scala-script-util.js";
 import { ObjectTypeComponent } from "./class-components.js";
 import { ArrayTypeComponent } from "./array-components.js";
-import { generateTypes } from "../cli/generator.js";
+import { FunctionTypeComponent } from "./function-components.js";
 
 /**
  *
@@ -33,16 +34,14 @@ export class TypesComponent {
    * @returns
    */
   static inferType(node: ast.Types, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    const log = enterLog("isAllTypes", node.$cstNode?.text, indent);
-    node.types.forEach((t, index) => {
-      //todo - union type의 type은 무엇이어야 하는가?
-      // 일단은 nil 인 경우는 스킵하고 가장 마지막의 타입을 사용
-      const n = SimpleTypeComponent.inferType(t, cache, indent);
-      if (TypeSystem.isNilType(n)) return;
-      else type = n;
-    });
-    exitLog(log);
+    let type: TypeDescription;
+    const log = enterLog("isAllTypes", `'${node.$cstNode?.text}'`, indent);
+    const ts = node.types.map((t) => SimpleTypeComponent.inferType(t, cache, indent));
+    // 실제 Union 타입이 아니면 처리를 단순화하기 위해 개별 타입으로 리턴한다.
+    if (ts.length == 0) type = TypeSystem.createErrorType("internal error", node);
+    else if (ts.length == 1) type = ts[0];
+    else type = TypeSystem.createUnionType(ts);
+    exitLog(log, type);
     return type;
   }
 }
@@ -64,20 +63,7 @@ export class SimpleTypeComponent {
     } else if (ast.isObjectType(expr)) {
       result += ObjectTypeComponent.transpile(expr, indent);
     } else if (ast.isElementType(expr)) {
-      if (ast.isFunctionType(expr)) {
-        const list = expr.bindings
-          .map((bind) => {
-            return bind.name + generateTypes(bind.type, indent);
-          })
-          .join(", ");
-        result += `(${list})` + (expr.returnType ? ` => ${TypesComponent.transpile(expr.returnType, indent)}` : "");
-      } else if (ast.isPrimitiveType(expr)) {
-        // nil 만 undefined로 바꿔준다.
-        if (expr.type == "nil") return "undefined";
-        return expr.type;
-      } else if (expr.reference) {
-        return expr.reference.$refText;
-      } else result += "internal error";
+      result += ElementTypeComponent.transpile(expr, indent);
     }
     return result;
   }
@@ -90,48 +76,114 @@ export class SimpleTypeComponent {
    * @returns
    */
   static inferType(node: ast.SimpleType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
-    const log = enterLog("isSimpleType", node.$cstNode?.text, indent);
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
+    const log = enterLog("isSimpleType", `'${node.$cstNode?.text}'`, indent);
     if (ast.isArrayType(node)) {
-      traceLog(indent + 1, "Type is array");
-      type = ArrayTypeComponent.inferType(node, cache, indent);
+      type = ArrayTypeComponent.inferType(node, cache, indent + 1);
     } else if (ast.isObjectType(node)) {
-      traceLog(indent + 1, "Type is compound");
-      type = ObjectTypeComponent.inferType(node, cache, indent);
+      type = ObjectTypeComponent.inferType(node, cache, indent + 1);
     } else if (ast.isElementType(node)) {
-      traceLog(indent + 1, "Type is element");
-      if (ast.isFunctionType(node)) {
-        traceLog(indent + 1, "Type is function");
-      } else if (ast.isPrimitiveType(node)) {
-        traceLog(indent + 1, "Type is primitive");
-        if (node.type === "any") {
-          type = TypeSystem.createAnyType();
-        } else if (node.type === "nil") {
-          type = TypeSystem.createNilType();
-        } else if (node.type === "string") {
-          type = TypeSystem.createStringType();
-        } else if (node.type === "number") {
-          type = TypeSystem.createNumberType();
-        } else if (node.type === "boolean") {
-          type = TypeSystem.createBooleanType();
-        } else if (node.type === "void") {
-          type = TypeSystem.createVoidType();
-        }
-      } else if (node.reference) {
-        traceLog(indent + 1, "Type is reference");
-        if (node.reference.ref) {
-          const ref = node.reference.ref;
-          if (ast.isTObject(ref)) {
-            type = TypeSystem.createClassType(ref);
-          } else {
-            traceLog(indent + 1, "node.reference.ref is not class");
-          }
+      type = ElementTypeComponent.inferType(node, cache, indent + 1);
+    }
+    exitLog(log, type);
+    return type;
+  }
+}
+
+/**
+ *
+ */
+export class ElementTypeComponent {
+  /**
+   *
+   * @param expr
+   * @param indent
+   * @returns
+   */
+  static transpile(expr: ast.ElementType, indent: number): string {
+    let result = "";
+    if (ast.isFunctionType(expr)) {
+      result += FunctionTypeComponent.transpile(expr, indent);
+    } else if (ast.isPrimitiveType(expr)) {
+      result += PrimitiveTypeComponent.transpile(expr, indent);
+    } else if (expr.reference) {
+      return expr.reference.$refText;
+    } else result += "internal error";
+    return result;
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
+  static inferType(node: ast.ElementType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
+    const log = enterLog("isElementType", `'${node.$cstNode?.text}'`, indent);
+    if (ast.isFunctionType(node)) {
+      type = FunctionTypeComponent.inferType(node, cache, indent);
+    } else if (ast.isPrimitiveType(node)) {
+      type = PrimitiveTypeComponent.inferType(node, cache, indent);
+    } else if (node.reference) {
+      traceLog(indent + 1, "Type is reference");
+      if (node.reference.ref) {
+        const ref = node.reference.ref;
+        if (ast.isTObject(ref)) {
+          type = TypeSystem.createClassType(ref);
         } else {
-          traceLog(indent + 1, "node.reference.ref is not valid");
+          traceLog(indent + 1, "node.reference.ref is not class");
         }
+      } else {
+        traceLog(indent + 1, "node.reference.ref is not valid");
       }
-    } else type = TypeSystem.createErrorType("Could not infer type for this reference", node);
-    exitLog(log);
+    }
+    exitLog(log, type);
+    return type;
+  }
+}
+
+/**
+ *
+ */
+export class PrimitiveTypeComponent {
+  /**
+   *
+   * @param expr
+   * @param indent
+   * @returns
+   */
+  static transpile(expr: ast.PrimitiveType, indent: number): string {
+    // nil 만 undefined로 바꿔준다.
+    if (expr.type == "nil") return "undefined";
+    return expr.type;
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
+  static inferType(node: ast.PrimitiveType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
+    const log = enterLog("isPrimitiveType", `'${node.$cstNode?.text}'`, indent);
+    if (node.type === "any") {
+      type = TypeSystem.createAnyType();
+    } else if (node.type === "nil") {
+      type = TypeSystem.createNilType();
+    } else if (node.type === "string") {
+      type = TypeSystem.createStringType();
+    } else if (node.type === "number") {
+      type = TypeSystem.createNumberType();
+    } else if (node.type === "boolean") {
+      type = TypeSystem.createBooleanType();
+    } else if (node.type === "void") {
+      type = TypeSystem.createVoidType();
+    }
+    exitLog(log, type);
     return type;
   }
 }

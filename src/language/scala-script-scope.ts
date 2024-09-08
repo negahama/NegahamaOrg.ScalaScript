@@ -10,7 +10,8 @@ import {
 } from "langium";
 import * as ast from "./generated/ast.js";
 import { LangiumServices } from "langium/lsp";
-import { enterLog, traceLog, exitLog, TypeSystem } from "./scala-script-types.js";
+import { TypeSystem } from "./scala-script-types.js";
+import { enterLog, exitLog, traceLog } from "../language/scala-script-util.js";
 import chalk from "chalk";
 
 /**
@@ -76,45 +77,76 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // previous 의 타입을 추론한 결과가...
     const prevTypeDesc = TypeSystem.inferType(previous, new Map(), 1);
 
+    // union type이면 포함된 타입중에 class, string, ... 등이 있는지 확인하고 있으면 이를 추론 타입으로 사용한다.
+    let classDesc = prevTypeDesc;
+    let stringDesc = prevTypeDesc;
+    let numberDesc = prevTypeDesc;
+    let arrayDesc = prevTypeDesc;
+    let anyDesc = prevTypeDesc;
+    if (TypeSystem.isUnionType(prevTypeDesc)) {
+      for (const t of prevTypeDesc.elementTypes) {
+        if (TypeSystem.isClassType(t)) {
+          classDesc = t;
+          break;
+        }
+        if (TypeSystem.isStringType(t)) {
+          stringDesc = t;
+          break;
+        }
+        if (TypeSystem.isNumberType(t)) {
+          numberDesc = t;
+          break;
+        }
+        if (TypeSystem.isArrayType(t)) {
+          arrayDesc = t;
+          break;
+        }
+        if (TypeSystem.isAnyType(t)) {
+          arrayDesc = t;
+          break;
+        }
+      }
+    }
+
     // 클래스이면
     // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
-    if (TypeSystem.isClassType(prevTypeDesc)) {
-      traceLog(1, `FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
+    if (TypeSystem.isClassType(classDesc)) {
+      traceLog(1, `FIND Class: ${previous.$type}, ${classDesc.literal?.$type}`);
       exitLog(scopeLog.replace("Exit0", "Exit2"));
-      if (ast.isTObject(prevTypeDesc.literal)) {
-        return this.scopeTObject(context, prevTypeDesc.literal);
-      } else if (ast.isObjectType(prevTypeDesc.literal)) {
-        return this.scopeObjectType(context, prevTypeDesc.literal);
+      if (ast.isTObject(classDesc.literal)) {
+        return this.scopeTObject(context, classDesc.literal);
+      } else if (ast.isObjectType(classDesc.literal)) {
+        return this.scopeObjectType(context, classDesc.literal);
       } else {
-        console.log(chalk.red("find class, but error:", prevTypeDesc.literal?.$type));
+        console.log(chalk.red("find class, but error:", classDesc.literal?.$type));
       }
     }
 
     // 문자열이면
     // 문자열이나 배열 관련 빌트인 함수들은 전역으로 class $string$ { ... } 형태로 저장되어져 있기 때문에
     // 전역 클래스 중 이름이 $string$인 것의 멤버들을 scope로 구성해서 리턴한다.
-    else if (TypeSystem.isStringType(prevTypeDesc)) {
-      traceLog(1, `FIND string type: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
+    else if (TypeSystem.isStringType(stringDesc)) {
+      traceLog(1, `FIND string type: ${previous.$type}, ${stringDesc.literal?.$type}`);
       exitLog(scopeLog.replace("Exit0", "Exit2"));
       return this.scopeSpecificClass(context, "$string$");
     }
 
     // number이면
-    else if (TypeSystem.isNumberType(prevTypeDesc)) {
-      traceLog(1, `FIND number type: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
+    else if (TypeSystem.isNumberType(numberDesc)) {
+      traceLog(1, `FIND number type: ${previous.$type}, ${numberDesc.literal?.$type}`);
       exitLog(scopeLog.replace("Exit0", "Exit2"));
       return this.scopeSpecificClass(context, "$number$");
     }
 
     // 배열이면
-    else if (TypeSystem.isArrayType(prevTypeDesc)) {
-      traceLog(1, `FIND array type: ${previous.$type}, element-type:${prevTypeDesc.elementType.$type}`);
+    else if (TypeSystem.isArrayType(arrayDesc)) {
+      traceLog(1, `FIND array type: ${previous.$type}, element-type:${arrayDesc.elementType.$type}`);
       exitLog(scopeLog.replace("Exit0", "Exit2"));
       return this.scopeSpecificClass(context, "$array$");
     }
 
     // any 타입이면
-    else if (TypeSystem.isAnyType(prevTypeDesc)) {
+    else if (TypeSystem.isAnyType(anyDesc)) {
       traceLog(1, `FIND any-type: ${previous.$type}`);
       exitLog(scopeLog.replace("Exit0", "Exit2"));
       return this.scopeAnytype(context, previous);

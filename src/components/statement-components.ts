@@ -1,6 +1,7 @@
 import { AstNode } from "langium";
 import * as ast from "../language/generated/ast.js";
-import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
+import { TypeDescription, TypeSystem } from "../language/scala-script-types.js";
+import { enterLog, exitLog } from "../language/scala-script-util.js";
 import { generateExpression, generateStatement, applyIndent, generateBlock } from "../cli/generator.js";
 
 /**
@@ -59,9 +60,9 @@ export class ForStatementComponent {
    * @returns
    */
   static inferType(node: ast.ForStatement, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isForStatement", node.$type, indent);
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
@@ -92,7 +93,7 @@ export class ForOfComponent {
     const log = enterLog("isForOf", node.name, indent);
     let type = TypeSystem.inferType(node.of, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
@@ -123,7 +124,7 @@ export class ForToComponent {
     const log = enterLog("isForTo", node.name, indent);
     let type = TypeSystem.inferType(node.e1, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
@@ -154,7 +155,7 @@ export class ForUntilComponent {
     const log = enterLog("isForUntil", node.name, indent);
     let type = TypeSystem.inferType(node.e1, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
@@ -200,9 +201,9 @@ export class TryCatchStatementComponent {
    * @returns
    */
   static inferType(node: ast.TryCatchStatement, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isCatchStatement", node.$type, indent);
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }

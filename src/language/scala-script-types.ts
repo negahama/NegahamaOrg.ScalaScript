@@ -1,53 +1,17 @@
 import { AstNode } from "langium";
 import * as ast from "./generated/ast.js";
+import { enterLog, exitLog } from "../language/scala-script-util.js";
 import { TypesComponent, SimpleTypeComponent } from "../components/datatype-components.js";
-import { FunctionComponent, CallChainComponent, FunctionValueComponent } from "../components/function-components.js";
 import { AssignmentComponent, VariableComponent } from "../components/variable-components.js";
 import { ObjectComponent, ObjectValueComponent } from "../components/class-components.js";
+import { ArrayExpressionComponent, ArrayValueComponent } from "../components/array-components.js";
 import { ForOfComponent, ForToComponent, ForUntilComponent } from "../components/statement-components.js";
+import { FunctionComponent, CallChainComponent, FunctionValueComponent } from "../components/function-components.js";
 import {
   UnaryExpressionComponent,
   BinaryExpressionComponent,
   NewExpressionComponent,
 } from "../components/expression-components.js";
-import { ArrayExpressionComponent, ArrayValueComponent } from "../components/array-components.js";
-
-/**
- *
- * @param procKind
- * @param procId
- * @param indent
- * @returns
- */
-var _enableLog_ = false;
-var _sig_number_ = 0;
-export function enableLog(enable: boolean) {
-  _enableLog_ = enable;
-}
-export function enterLog(procKind: string, procId: string | undefined, indent: number): string {
-  _sig_number_ += 1;
-  const space = "    ".repeat(indent);
-  if (_enableLog_) console.log(space + `Enter(${_sig_number_}) ${procKind}, ${procId}`);
-  return space + `Exit0(${_sig_number_}) ${procKind}, ${procId}`;
-}
-
-/**
- *
- * @param indent
- * @param msg
- * @param optionalParams
- */
-export function traceLog(indent: number, msg: string, ...optionalParams: any[]) {
-  if (_enableLog_) console.log("    ".repeat(indent) + msg, ...optionalParams);
-}
-
-/**
- *
- * @param log
- */
-export function exitLog(log: string) {
-  if (_enableLog_) console.log(log);
-}
 
 /**
  *
@@ -60,6 +24,7 @@ export type TypeDescription =
   | BooleanTypeDescription
   | VoidTypeDescription
   | ArrayTypeDescription
+  | UnionTypeDescription
   | FunctionTypeDescription
   | ClassTypeDescription
   | ErrorTypeDescription;
@@ -115,6 +80,14 @@ export interface VoidTypeDescription {
 export interface ArrayTypeDescription {
   readonly $type: "array";
   readonly elementType: TypeDescription;
+}
+
+/**
+ *
+ */
+export interface UnionTypeDescription {
+  readonly $type: "union";
+  readonly elementTypes: TypeDescription[];
 }
 
 /**
@@ -298,6 +271,27 @@ export class TypeSystem {
 
   /**
    *
+   * @param elementType
+   * @returns
+   */
+  static createUnionType(elementTypes: TypeDescription[]): UnionTypeDescription {
+    return {
+      $type: "union",
+      elementTypes,
+    };
+  }
+
+  /**
+   *
+   * @param item
+   * @returns
+   */
+  static isUnionType(item: TypeDescription): item is UnionTypeDescription {
+    return item.$type === "union";
+  }
+
+  /**
+   *
    * @param returnType
    * @param parameters
    * @returns
@@ -391,17 +385,17 @@ export class TypeSystem {
     cache: Map<AstNode, TypeDescription>,
     indent: number = 0
   ): TypeDescription {
-    const rootLog = enterLog("inferType", `node is ${node?.$type}`, indent);
+    const rootLog = enterLog("inferType", `'${node?.$cstNode?.text}', node is ${node?.$type}`, indent);
 
     let type: TypeDescription | undefined;
     if (!node) {
-      exitLog(rootLog.replace("Exit0", "Exit1"));
+      exitLog(rootLog.replace("Exit0", "Exit1"), type);
       return this.createErrorType("Could not infer type for undefined", node);
     }
 
     const existing = cache.get(node);
     if (existing) {
-      exitLog(rootLog.replace("Exit0", "Exit2"));
+      exitLog(rootLog.replace("Exit0", "Exit2"), type);
       return existing;
     }
 
@@ -431,7 +425,7 @@ export class TypeSystem {
       } else {
         type = TypeSystem.createAnyType();
       }
-      exitLog(log);
+      exitLog(log, type);
     } else if (ast.isTypeBinding(node)) {
       const log = enterLog("isTypeBinding", node.name, indent);
       // Binding에 type 정보가 없으면 any type으로 취급한다.
@@ -440,7 +434,7 @@ export class TypeSystem {
       } else {
         type = TypeSystem.createAnyType();
       }
-      exitLog(log);
+      exitLog(log, type);
     } else if (ast.isAssignBinding(node)) {
       const log = enterLog("isAssignBinding", node.name, indent);
       //todo 원래 타입은?
@@ -450,7 +444,7 @@ export class TypeSystem {
       } else {
         type = TypeSystem.createNilType();
       }
-      exitLog(log);
+      exitLog(log, type);
     } else if (ast.isForOf(node)) {
       type = ForOfComponent.inferType(node, cache, indent);
     } else if (ast.isForTo(node)) {
@@ -462,9 +456,9 @@ export class TypeSystem {
     } else if (ast.isArrayExpression(node)) {
       type = ArrayExpressionComponent.inferType(node, cache, indent);
     } else if (ast.isGroupExpression(node)) {
-      const log = enterLog("isGroup", node.$cstNode?.text, indent);
+      const log = enterLog("isGroup", `'${node.$cstNode?.text}'`, indent);
       type = TypeSystem.inferType(node.value, cache, indent + 1);
-      exitLog(log);
+      exitLog(log, type);
     } else if (ast.isUnaryExpression(node)) {
       type = UnaryExpressionComponent.inferType(node, cache, indent);
     } else if (ast.isBinaryExpression(node)) {
@@ -476,7 +470,7 @@ export class TypeSystem {
       } else {
         type = TypeSystem.inferType(node.value, cache, indent + 1);
       }
-      exitLog(log);
+      exitLog(log, type);
     } else if (ast.isNewExpression(node)) {
       type = NewExpressionComponent.inferType(node, cache, indent);
     } else if (ast.isArrayValue(node)) {
@@ -486,14 +480,14 @@ export class TypeSystem {
     } else if (ast.isFunctionValue(node)) {
       type = FunctionValueComponent.inferType(node, cache, indent);
     } else if (ast.isLiteral(node)) {
-      const log = enterLog("isLiteralExpression", node.$cstNode?.text, indent);
+      const log = enterLog("isLiteralExpression", `'${node.$cstNode?.text}'`, indent);
       if (ast.isAnyExpression(node)) type = this.createAnyType();
       else if (ast.isNilExpression(node)) type = this.createNilType();
       else if (ast.isVoidExpression(node)) type = this.createVoidType();
       else if (ast.isStringExpression(node)) type = this.createStringType(node);
       else if (ast.isNumberExpression(node)) type = this.createNumberType(node);
       else if (ast.isBooleanExpression(node)) type = this.createBooleanType(node);
-      exitLog(log + ", type: " + type?.$type);
+      exitLog(log, type);
     }
 
     if (!type) {
@@ -501,7 +495,7 @@ export class TypeSystem {
     }
 
     cache.set(node, type);
-    exitLog(rootLog.replace("Exit0", "Exit3") + `, type: ${type.$type}`);
+    exitLog(rootLog.replace("Exit0", "Exit3"), type);
     return type;
   }
 

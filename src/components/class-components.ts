@@ -1,6 +1,7 @@
 import { AstNode, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
-import { TypeDescription, TypeSystem, enterLog, exitLog } from "../language/scala-script-types.js";
+import { TypeDescription, TypeSystem } from "../language/scala-script-types.js";
+import { enterLog, exitLog } from "../language/scala-script-util.js";
 import { applyIndent, generateExpression, generateStatement } from "../cli/generator.js";
 import { FunctionComponent } from "./function-components.js";
 import { VariableComponent } from "./variable-components.js";
@@ -54,7 +55,7 @@ export class ObjectComponent {
   static inferType(node: ast.TObject, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     const log = enterLog("isTObject", node.name, indent);
     const type = TypeSystem.createClassType(node);
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 
@@ -108,9 +109,9 @@ export class ObjectTypeComponent {
    * @returns
    */
   static inferType(node: ast.ObjectType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const log = enterLog("isObjectType", node.$cstNode?.text, indent);
+    const log = enterLog("isObjectType", `'${node.$cstNode?.text}'`, indent);
     const type = TypeSystem.createClassType(node);
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
@@ -149,9 +150,9 @@ export class ObjectValueComponent {
    * @returns
    */
   static inferType(node: ast.ObjectValue, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const log = enterLog("isObjectValue", node.$cstNode?.text, indent);
+    const log = enterLog("isObjectValue", `'${node.$cstNode?.text}'`, indent);
     const type = TypeSystem.createClassType(node);
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }

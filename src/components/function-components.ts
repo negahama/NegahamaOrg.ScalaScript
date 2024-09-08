@@ -1,8 +1,10 @@
 import { AstNode, AstUtils, ValidationAcceptor } from "langium";
 import * as ast from "../language/generated/ast.js";
-import { TypeDescription, TypeSystem, enterLog, exitLog, traceLog } from "../language/scala-script-types.js";
+import { TypeDescription, TypeSystem } from "../language/scala-script-types.js";
+import { enterLog, exitLog, traceLog } from "../language/scala-script-util.js";
 import { generateBlock, generateExpression, generateStatement, generateTypes } from "../cli/generator.js";
 import { getTypeCache } from "../language/scala-script-validator.js";
+import { TypesComponent } from "./datatype-components.js";
 
 /**
  *
@@ -60,7 +62,7 @@ export class FunctionComponent {
       type: TypeSystem.inferType(e.type, cache, indent + 2),
     }));
     const type = TypeSystem.createFunctionType(returnType, parameters);
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 
@@ -166,7 +168,7 @@ export class CallChainComponent {
    * @returns
    */
   static inferType(node: ast.CallChain, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const id = node.element?.$refText;
     const log = enterLog("isCallChain", id, indent);
     traceLog(indent + 1, "ref 참조전:", id);
@@ -185,7 +187,47 @@ export class CallChainComponent {
     if (node.isFunction) {
       if (TypeSystem.isFunctionType(type)) type = type.returnType;
     }
-    exitLog(log);
+    exitLog(log, type);
+    return type;
+  }
+}
+
+/**
+ *
+ */
+export class FunctionTypeComponent {
+  /**
+   *
+   * @param expr
+   * @param indent
+   * @returns
+   */
+  static transpile(expr: ast.FunctionType, indent: number): string {
+    const list = expr.bindings
+      .map((bind) => {
+        return bind.name + generateTypes(bind.type, indent);
+      })
+      .join(", ");
+    return `(${list})` + (expr.returnType ? ` => ${TypesComponent.transpile(expr.returnType, indent)}` : "");
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
+  static inferType(node: ast.FunctionType, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
+    const log = enterLog("isFunctionType", `'${node.$cstNode?.text}'`, indent);
+    const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
+    const parameters = node.bindings.map((e) => ({
+      name: e.name,
+      type: TypeSystem.inferType(e.type, cache, indent + 2),
+    }));
+    type = TypeSystem.createFunctionType(returnType, parameters);
+    exitLog(log, type);
     return type;
   }
 }
@@ -220,10 +262,10 @@ export class FunctionValueComponent {
    * @returns
    */
   static inferType(node: ast.FunctionValue, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error");
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isFunctionValue", node.$type, indent);
     if (node.returnType) type = TypeSystem.inferType(node.returnType, cache, indent);
-    exitLog(log);
+    exitLog(log, type);
     return type;
   }
 }
