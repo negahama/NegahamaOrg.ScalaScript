@@ -194,7 +194,14 @@ export class IfExpressionComponent {
       (expr.elif == undefined || expr.elif.length == 0)
     ) {
       result += `${generateCondition(expr.condition, indent)} ? `;
-      result += generateExpression(expr.then.codes[0], indent) + " : ";
+
+      // then 절에 해당하는 부분은 세미콜론을 포함하지 않아야 한다.
+      let then = generateExpression(expr.then.codes[0], indent);
+      if (then.endsWith(";")) {
+        then = then.slice(0, then.lastIndexOf(";"));
+      }
+
+      result += then + " : ";
       result += generateExpression(expr.else.codes[0], indent);
       return result;
     }
@@ -225,6 +232,8 @@ export class IfExpressionComponent {
   static inferType(node: ast.IfExpression, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isIfExpression", node.$type, indent);
+    //todo 삼항연산자의 경우 inferType이 호출될 수 있다... 일단은 any type return
+    type = TypeSystem.createAnyType();
     exitLog(log, type);
     return type;
   }

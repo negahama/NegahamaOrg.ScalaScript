@@ -11,6 +11,8 @@ import {
   UnaryExpressionComponent,
   BinaryExpressionComponent,
   NewExpressionComponent,
+  IfExpressionComponent,
+  MatchExpressionComponent,
 } from "../components/expression-components.js";
 
 /**
@@ -453,6 +455,10 @@ export class TypeSystem {
       type = ForUntilComponent.inferType(node, cache, indent);
     } else if (ast.isAssignment(node)) {
       type = AssignmentComponent.inferType(node, cache, indent);
+    } else if (ast.isIfExpression(node)) {
+      type = IfExpressionComponent.inferType(node, cache, indent);
+    } else if (ast.isMatchExpression(node)) {
+      type = MatchExpressionComponent.inferType(node, cache, indent);
     } else if (ast.isArrayExpression(node)) {
       type = ArrayExpressionComponent.inferType(node, cache, indent);
     } else if (ast.isGroupExpression(node)) {
