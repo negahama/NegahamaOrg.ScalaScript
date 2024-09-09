@@ -1,21 +1,45 @@
 {
   "name": "scala-script",
-  "displayName": "ScalaScript",
-  "description": "Please enter a brief description here",
   "version": "0.1.0",
+  "displayName": "ScalaScript",
+  "description": "Programming language that is mixed Scala and TypeScript's features",
+  "author": "Samuel Kang",
+  "homepage": "https://github.com/negahama/NegahamaOrg.ScalaScript",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.67.0",
     "node": ">=18.0.0"
   },
-  "categories": [
-    "Programming Languages"
-  ],
+  "main": "./out/extension/main.cjs",
   "type": "module",
+  "bin": {
+    "ssc": "bin/cli.js"
+  },
+  "directories": {
+    "test": "test"
+  },
   "files": [
     "bin",
     "out",
     "src"
   ],
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "ScalaScript",
+    "TypeScript",
+    "compiler",
+    "language",
+    "Scala"
+  ],
+  "bugs": {
+    "url": "https://github.com/negahama/NegahamaOrg.ScalaScript/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/negahama/NegahamaOrg.ScalaScript.git"
+  },
   "scripts": {
     "all": "npm run langium:generate && npm run build && npm run cli",
     "cli": "node bin/cli.js generate samples/test.ss -d samples/generated",
@@ -33,34 +57,33 @@
     "serve": "npm run dev",
     "test": "vitest run"
   },
-  "devDependencies": {
-    "langium-cli": "~3.1.0",
-    "typescript": "~5.1.6",
-    "eslint": "~8.57.0",
-    "esbuild": "~0.20.2",
-    "concurrently": "~8.2.1",
-    "@types/node": "^18.0.0",
-    "@types/vscode": "~1.67.0",
-    "@typescript-eslint/parser": "~7.3.1",
-    "@typescript-eslint/eslint-plugin": "~7.3.1",
-    "@codingame/esbuild-import-meta-url-plugin": "~1.0.2",
-    "http-server": "~14.1.1",
-    "vite": "~5.2.7",
-    "vitest": "~1.4.0"
-  },
   "dependencies": {
     "langium": "~3.1.0",
-    "vscode-languageclient": "~9.0.1",
-    "vscode-languageserver": "~9.0.1",
     "chalk": "~5.3.0",
     "commander": "~11.0.0",
     "vscode": "npm:@codingame/monaco-vscode-api@~3.2.3",
-    "@vscode/vsce": "^2.32.0",
+    "vscode-languageclient": "~9.0.1",
+    "vscode-languageserver": "~9.0.1",
     "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@~3.2.3",
     "monaco-editor-wrapper": "~4.0.2",
     "monaco-languageclient": "~8.1.1",
     "@codingame/monaco-vscode-editor-service-override": "~3.2.3",
     "@codingame/monaco-vscode-keybindings-service-override": "~3.2.3"
+  },
+  "devDependencies": {
+    "langium-cli": "~3.1.0",
+    "typescript": "~5.1.6",
+    "eslint": "~8.57.0",
+    "@types/node": "^18.0.0",
+    "@typescript-eslint/parser": "~7.3.1",
+    "@typescript-eslint/eslint-plugin": "~7.3.1",
+    "@types/vscode": "~1.67.0",
+    "concurrently": "~8.2.1",
+    "esbuild": "~0.20.2",
+    "@codingame/esbuild-import-meta-url-plugin": "~1.0.2",
+    "http-server": "~14.1.1",
+    "vite": "~5.2.7",
+    "vitest": "~1.4.0"
   },
   "volta": {
     "node": "18.19.1",
@@ -90,14 +113,5 @@
   },
   "activationEvents": [
     "onLanguage:scala-script"
-  ],
-  "main": "./out/extension/main.cjs",
-  "bin": {
-    "scala-script-cli": "bin/cli.js"
-  },
-  "directories": {
-    "test": "test"
-  },
-  "author": "",
-  "license": "ISC"
+  ]
 }
