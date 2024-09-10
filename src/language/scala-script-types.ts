@@ -792,7 +792,7 @@ export class TypeSystem {
     const log = enterLog("isUnaryExpression", node.operator, indent);
     if (node.operator === "!" || node.operator === "not") {
       type = TypeSystem.createBooleanType();
-    } else if (node.operator === "typeof" || node.operator === "instanceof") {
+    } else if (node.operator === "typeof") {
       type = TypeSystem.createStringType();
     } else {
       type = TypeSystem.createNumberType();
@@ -826,6 +826,9 @@ export class TypeSystem {
       if (TypeSystem.isStringType(left) || TypeSystem.isStringType(right)) {
         type = TypeSystem.createStringType();
       }
+    } else if (node.operator === "instanceof") {
+      //todo instanceof 의 결과는 일단 any type으로 처리한다.
+      type = TypeSystem.createAnyType();
     }
     exitLog(log, type);
     return type;

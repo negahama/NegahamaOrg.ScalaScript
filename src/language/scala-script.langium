@@ -269,7 +269,11 @@ Expression:
 
 // Binary Operators
 Logical infers Expression:
-  Comparison     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '&&' | '||') right=Comparison)*;
+  InstanceOf     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '&&' | '||') right=InstanceOf)*;
+
+// instanceof 연산자의 우선 순위는 비교연산자와 동일하다.
+InstanceOf infers Expression:
+  Comparison     ({infer BinaryExpression.left=current} operator=('instanceof') right=Comparison)*;
 
 Comparison infers Expression:
   Addition       ({infer BinaryExpression.left=current} operator=('<' | '<=' | '>' | '>=' | '==' | '!=') right=Addition)*;
@@ -341,7 +345,7 @@ ThisOrSuper: {infer CallChain} this=('this' | 'super');
 
 // Unary operators
 UnaryExpression:
-  operator=('-' | '+' | 'typeof' | 'instanceof') value=Expression;
+  operator=('-' | '+' | 'typeof') value=Expression;
 
 // grouped expression with parentheses
 GroupExpression:

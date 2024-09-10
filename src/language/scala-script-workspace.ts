@@ -178,6 +178,6 @@ export class ScalaScriptWorkspaceManager extends DefaultWorkspaceManager {
     await super.loadAdditionalDocuments(folders, collector);
     // console.log("after loadAdditionalDocuments");
     // Load our library using the `builtin` URI schema
-    collector(this.documentFactory.fromString(ScalaScriptBuiltinLibrary, URI.parse("builtin:///library.hello")));
+    collector(this.documentFactory.fromString(ScalaScriptBuiltinLibrary, URI.parse("builtin:///library.ss")));
   }
 }
