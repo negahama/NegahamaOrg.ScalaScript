@@ -78,7 +78,7 @@ ArrayValue:
   '[' items+=ArrayItem? (',' items+=ArrayItem )* ']';
 
 ArrayItem:
-  item=Literal | Spread;
+  item=Expression | Spread;
 
 fragment Spread:
   '...' spread=[NamedElement:Id];
@@ -184,7 +184,7 @@ FunctionDefinition infers TFunction:
   '(' (params+=Parameter (',' params+=Parameter)*)? ')' ('->' returnType=Types)? ('=>' body=Block)?;
 
 Parameter:
-  name=Id (nullable?='?')? (':' type=Types)? ('=' value=Expression)?;
+  (spread?='...')? name=Id (nullable?='?')? (':' type=Types)? ('=' value=Expression)?;
 
 // Object Definition
 //-----------------------------------------------------------------------------
@@ -403,7 +403,7 @@ MatchExpression:
   expr=CallChain 'match' '{' cases+=CaseClause+ '}';
 
 CaseClause:
-  'case' pattern=(CaseDefalut | CasePattern) '=>' body=Block;
+  'case' pattern=(CaseDefalut | CasePattern) '=>' (body=Block)?;
 
 CaseDefalut returns string: '_';
 CasePattern: Literal;

@@ -240,7 +240,8 @@ export function transpileVariable(stmt: ast.TVariable, indent: number, isClassMe
 export function transpileFunction(stmt: ast.TFunction, indent: number, isClassMethod: boolean = false): string {
   const params = stmt.params
     .map((param) => {
-      let p = param.name + (param.nullable ? "?" : "") + generateTypes(param.type, indent);
+      let p = (param.spread ? "..." : "") + param.name;
+      p += (param.nullable ? "?" : "") + generateTypes(param.type, indent);
       p += param.value ? ` = ${generateExpression(param.value, indent)}` : "";
       return p;
     })
@@ -361,12 +362,14 @@ export function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: 
     } else {
       result += applyIndent(indent + 1, `default: `);
     }
-    result +=
-      generateBlock(mc.body, indent + 1, (lastCode, indent) => {
+    if (mc.body) {
+      result += generateBlock(mc.body, indent + 1, (lastCode, indent) => {
         if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
         else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
         else return "";
-      }) + "\n";
+      });
+    }
+    result += "\n";
   });
   result += applyIndent(indent, "}");
   result += applyIndent(indent, `finally ${generateExpression(stmt.finally, indent)}`);
@@ -499,12 +502,14 @@ export function transpileMatchExpression(expr: ast.MatchExpression, indent: numb
     } else {
       result += applyIndent(indent + 1, `default: `);
     }
-    result +=
-      generateBlock(mc.body, indent + 1, (lastCode, indent) => {
+    if (mc.body) {
+      result += generateBlock(mc.body, indent + 1, (lastCode, indent) => {
         if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
         else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
         else return "";
-      }) + "\n";
+      });
+    }
+    result += "\n";
   });
   result += applyIndent(indent, "}");
   return result;
@@ -604,7 +609,7 @@ export function transpileArrayValue(expr: ast.ArrayValue, indent: number): strin
     "[" +
     expr.items
       .map((item) => {
-        if (item.item) return item.item.value;
+        if (item.item) return generateExpression(item.item, indent);
         else if (item.spread) return "..." + item.spread.$refText;
         else return "error";
       })
