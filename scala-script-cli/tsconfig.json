@@ -14,14 +14,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts", "../src/**/*.ts"],
-  "exclude": [
-    "../src/setupClassic.ts",
-    "../src/setupCommon.ts",
-    "../src/setupExtended.ts",
-    "../src/language/main.ts",
-    "../src/language/main-browser.ts",
-    "out",
-    "node_modules"
-  ]
+  "include": ["../src/cli/*.ts", "../src/language/*.ts"],
+  "exclude": ["../src/language/main.ts", "../src/language/main-browser.ts", "out", "node_modules"]
 }
