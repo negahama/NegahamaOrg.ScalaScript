@@ -1,0 +1,64 @@
+{
+  "name": "scala-script",
+  "version": "0.2.0",
+  "displayName": "ScalaScript",
+  "description": "Programming language that is mixed Scala and TypeScript's features",
+  "author": "Samuel Kang",
+  "homepage": "https://github.com/negahama/NegahamaOrg.ScalaScript",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "module",
+  "bin": {
+    "ssc": "bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "out",
+    "src"
+  ],
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "ScalaScript",
+    "TypeScript",
+    "compiler",
+    "language",
+    "Scala"
+  ],
+  "bugs": {
+    "url": "https://github.com/negahama/NegahamaOrg.ScalaScript/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/negahama/NegahamaOrg.ScalaScript.git"
+  },
+  "scripts": {
+    "all": "npm run langium:generate && npm run build && npm run cli",
+    "cli": "node bin/cli.js generate samples/test.ss -d samples/generated",
+    "build": "tsc -b tsconfig.json",
+    "watch": "tsc -b tsconfig.json --watch",
+    "lint": "eslint src --ext ts",
+    "langium:generate": "langium generate",
+    "langium:watch": "langium generate --watch"
+  },
+  "dependencies": {
+    "langium": "~3.1.0",
+    "chalk": "~5.3.0",
+    "commander": "~11.0.0"
+  },
+  "devDependencies": {
+    "langium-cli": "~3.1.0",
+    "typescript": "~5.1.6",
+    "eslint": "~8.57.0",
+    "@types/node": "^18.0.0",
+    "@typescript-eslint/parser": "~7.3.1",
+    "@typescript-eslint/eslint-plugin": "~7.3.1"
+  },
+  "volta": {
+    "node": "18.19.1",
+    "npm": "10.2.4"
+  }
+}
