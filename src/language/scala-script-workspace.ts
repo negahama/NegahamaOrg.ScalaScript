@@ -49,7 +49,7 @@ const ScalaScriptBuiltinLibrary = `
 @NotTrans def $array$ => {
   var length: number
   def at(index)-> string
-  def concat()-> string
+  def concat()-> string[]
   def copyWithin()-> string
   def every(callbackFn)-> string
   def fill(value, start, end)-> string

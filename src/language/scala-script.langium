@@ -78,10 +78,7 @@ ArrayValue:
   '[' items+=ArrayItem? (',' items+=ArrayItem )* ']';
 
 ArrayItem:
-  item=Expression | Spread;
-
-fragment Spread:
-  '...' spread=[NamedElement:Id];
+  item=Expression;
 
 // Array의 실제 사용... function의 function call 동일
 // ex) ary[ 1 ]
@@ -173,7 +170,10 @@ Block:
 fragment Bindings:
   bindings+=TypeBinding (',' bindings+=TypeBinding)*;
 
-TypeBinding: name=Id (':' type=Types)?;
+TypeBinding: name=Id (':' type=Types)? | Spread;
+
+fragment Spread:
+  '...' spread=[NamedElement:Id];
 
 // 함수의 정의 자체는 값에 대한 이름 부여이고 ScalaScript의 Type system에 부합되지 않지만
 // 편이를 위해 제공하고 있다. 실제로도 타입스크립트의 function으로 transpile되어지기는 하지만
@@ -261,6 +261,7 @@ Expression:
   | MatchExpression
   | InfixExpression
   | ReturnExpression
+  | SpreadExpression
   | NewExpression
   | ArrayValue
   | ObjectValue
@@ -309,7 +310,7 @@ Exponentiation infers Expression:
 // 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 CallChain infers Expression:
   // SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
-  SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
+  SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id] (assertion=('!'|'?'))?
   (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')? )*;
 
 // fragment CallableElements:
@@ -339,11 +340,13 @@ SimpleExpression infers Expression:
 // @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
 FunctionCall: {infer CallChain}
   // (export?='export')? element=[NamedElement:Id] (FunctionCallSignature)?;
-  (export?='export')? element=[NamedElement:Id] (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
+  (export?='export')? element=[NamedElement:Id] (assertion=('!'|'?'))?
+  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
 
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
 
 // Unary operators
+//todo 이것은 거듭제곱보다 우선순위가 높은 연산이다. 연산에 포함되어야 한다
 UnaryExpression:
   operator=('-' | '+' | 'typeof') value=Expression;
 
@@ -418,6 +421,9 @@ InfixExpression:
 // return 할 것이 없으면 세미콜론으로 없음을 표시해야 한다.
 ReturnExpression:
   'return' (value=Expression | ";");
+
+SpreadExpression:
+  '...' spread=[NamedElement:Id];
 
 NewExpression:
   'new' class=[TObject:Id] (generic=Generic)?'(' (args+=Expression (',' args+=Expression)*)? ')';

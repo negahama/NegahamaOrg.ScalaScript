@@ -69,9 +69,9 @@ export class ScalaScriptValidator {
     if (expr.type && expr.value) {
       const map = getTypeCache();
       const left = TypeSystem.inferType(expr.type, map);
-      const right = TypeSystem.inferType(expr.value, map);
-      // console.log("    left:", left.$type);
-      // console.log("    right:", right.$type);
+      let right = TypeSystem.inferType(expr.value, map);
+      if (TypeSystem.isFunctionType(right)) right = right.returnType;
+
       if (!isAssignable(right, left)) {
         accept(
           "error",
@@ -101,7 +101,9 @@ export class ScalaScriptValidator {
     // console.log(`    right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`);
     const map = getTypeCache();
     const left = TypeSystem.inferType(expr.assign, map);
-    const right = TypeSystem.inferType(expr.value, map);
+    let right = TypeSystem.inferType(expr.value, map);
+    if (TypeSystem.isFunctionType(right)) right = right.returnType;
+
     if (!isAssignable(right, left)) {
       const msg = `Type '${TypeSystem.typeToString(right)}' is not assignable to type '${TypeSystem.typeToString(
         left

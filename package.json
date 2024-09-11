@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "displayName": "ScalaScript",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "author": "Samuel Kang",
@@ -41,8 +41,7 @@
     "url": "https://github.com/negahama/NegahamaOrg.ScalaScript.git"
   },
   "scripts": {
-    "all": "npm run langium:generate && npm run build && npm run cli",
-    "cli": "node bin/cli.js generate samples/test.ss -d samples/generated",
+    "all": "npm run langium:generate && npm run build",
     "build": "tsc -b tsconfig.src.json && node esbuild.mjs",
     "watch": "concurrently -n tsc,esbuild -c blue,yellow \"tsc -b tsconfig.src.json --watch\" \"node esbuild.mjs --watch\"",
     "lint": "eslint src --ext ts",

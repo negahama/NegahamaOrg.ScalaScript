@@ -45,6 +45,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     }
 
     // for now, `this` and `super` simply target the container class type
+    // this, super가 [NamedElement:'this'] 인 경우에 호출된다. 지금처럼 keyword 인 경우에는
+    // ref 처리가 되지 않아서 여기가 호출되지 않는다.
     if (context.reference.$refText === "this" || context.reference.$refText === "super") {
       const classItem = AstUtils.getContainerOfType(context.container, ast.isTObject);
       if (classItem) {
@@ -102,7 +104,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
           break;
         }
         if (TypeSystem.isAnyType(t)) {
-          arrayDesc = t;
+          anyDesc = t;
           break;
         }
       }

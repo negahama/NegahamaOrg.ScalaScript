@@ -116,6 +116,8 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
   } else if (ast.isReturnExpression(expr)) {
     if (expr.value) result += `return ${generateExpression(expr.value, indent)};`;
     else result += "return";
+  } else if (ast.isSpreadExpression(expr)) {
+    return "..." + expr.spread.$refText;
   } else if (ast.isNewExpression(expr)) {
     result += transpileNewExpression(expr, indent);
   } else if (ast.isArrayExpression(expr)) {
@@ -405,6 +407,7 @@ export function transpileCallChain(expr: ast.CallChain, indent: number): string 
     result += expr.this ? expr.this : "";
     result += expr.element ? expr.element.$refText : "";
   }
+  if (expr.assertion) result += expr.assertion;
   if (expr.isFunction) {
     // endsWith()의 endPosition은 1부터 카운트되므로 제외
     const methodsUsingArrayIndex = [
@@ -605,17 +608,7 @@ export function transpileArrayExpression(expr: ast.ArrayExpression, indent: numb
  * @returns
  */
 export function transpileArrayValue(expr: ast.ArrayValue, indent: number): string {
-  return (
-    "[" +
-    expr.items
-      .map((item) => {
-        if (item.item) return generateExpression(item.item, indent);
-        else if (item.spread) return "..." + item.spread.$refText;
-        else return "error";
-      })
-      .join(", ") +
-    "]"
-  );
+  return "[" + expr.items.map((item) => generateExpression(item.item, indent)).join(", ") + "]";
 }
 
 /**

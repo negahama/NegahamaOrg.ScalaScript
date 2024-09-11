@@ -1,4 +1,4 @@
-import { AstNode } from "langium";
+import { AstNode, AstUtils } from "langium";
 import * as ast from "./generated/ast.js";
 import { enterLog, exitLog, traceLog } from "../language/scala-script-util.js";
 
@@ -356,7 +356,7 @@ export class TypeSystem {
       return item.literal.$cstNode?.text ?? "unknown";
     } else if (this.isFunctionType(item)) {
       const params = item.parameters.map((e) => `${e.name}: ${this.typeToString(e.type)}`).join(", ");
-      return `(${params}) => ${this.typeToString(item.returnType)}`;
+      return `(${params})-> ${this.typeToString(item.returnType)}`;
     } else {
       return item.$type;
     }
@@ -582,7 +582,7 @@ export class TypeSystem {
    */
   static inferTypeFunction(node: ast.TFunction, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
     const log = enterLog("isFunction", node.name, indent);
-    const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
+    const returnType = TypeSystem.inferFunctionReturnType(node, cache, indent);
     const parameters = node.params.map((e) => ({
       name: e.name,
       type: TypeSystem.inferType(e.type, cache, indent + 2),
@@ -599,30 +599,84 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
+  static inferFunctionReturnType(
+    node: ast.TFunction,
+    cache: Map<AstNode, TypeDescription>,
+    indent: number
+  ): TypeDescription {
+    // 명시된 리턴 타입이 있으면 이를 근거로 한다.
+    if (node.returnType) return TypeSystem.inferType(node.returnType, cache, indent + 1);
+
+    // 함수의 바디가 없으면 void type으로 간주한다
+    if (!node.body) return TypeSystem.createVoidType();
+
+    // 함수의 바디에 명시된 return 문이 없어도 void type으로 간주한다.
+    const returnStatements = AstUtils.streamAllContents(node.body).filter(ast.isReturnExpression).toArray();
+    if (returnStatements.length == 0) return TypeSystem.createVoidType();
+
+    // 여러 타입을 return할 수 있지만 일단은 모두 단일 타입을 리턴하는 것으로 가정하고 이 타입을 return
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
+    for (const returnStatement of returnStatements) {
+      type = TypeSystem.inferType(returnStatement, cache, indent + 1);
+    }
+    return type;
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
   static inferTypeCallChain(
     node: ast.CallChain,
     cache: Map<AstNode, TypeDescription>,
     indent: number
   ): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
-    const id = node.element?.$refText;
+    const id = `element='${node.element?.$refText}', cst='${node?.$cstNode?.text}'`;
     const log = enterLog("isCallChain", id, indent);
     traceLog(indent + 1, "ref 참조전:", id);
     const element = node.element?.ref;
     traceLog(indent + 1, "ref 참조후:", id);
+
     if (element) {
       type = TypeSystem.inferType(element, cache, indent + 1);
-    } else if (node.isFunction && node.previous) {
-      const previousType = TypeSystem.inferType(node.previous, cache, indent + 1);
-      if (TypeSystem.isFunctionType(previousType)) type = previousType.returnType;
-      else type = TypeSystem.createErrorType("Cannot call operation on non-function type", node);
-    } else if (node.isArray) {
-      //todo 해당 배열의 자료형이 무엇인지 어떻게 알아낼 수 있을까
-      type = TypeSystem.createArrayType(TypeSystem.createAnyType());
-    } else type = TypeSystem.createErrorType("Could not infer type for element " + node.element?.$refText, node);
-    if (node.isFunction) {
+    }
+
+    // this인 경우
+    else if (node.$cstNode?.text == "this") {
+      const classItem = AstUtils.getContainerOfType(node, ast.isTObject);
+      if (classItem) {
+        traceLog(indent + 1, `'this' refers ${classItem.name}`);
+        type = TypeSystem.createClassType(classItem);
+      } else {
+        console.error("this or super: empty");
+      }
+    }
+
+    // 함수인 경우
+    else if (node.isFunction) {
+      if (node.previous) {
+        const previousType = TypeSystem.inferType(node.previous, cache, indent + 1);
+        if (TypeSystem.isFunctionType(previousType)) type = previousType.returnType;
+        else type = TypeSystem.createErrorType("Cannot call operation on non-function type", node);
+      }
       if (TypeSystem.isFunctionType(type)) type = type.returnType;
     }
+
+    // 배열인 경우
+    else if (node.isArray) {
+      //todo 해당 배열의 자료형이 무엇인지 어떻게 알아낼 수 있을까
+      type = TypeSystem.createArrayType(TypeSystem.createAnyType());
+    }
+
+    // 아무것도 아닌 경우
+    else {
+      type = TypeSystem.createErrorType("Could not infer type for element " + node.element?.$refText, node);
+    }
+
     exitLog(log, type);
     return type;
   }
@@ -1033,10 +1087,14 @@ export class TypeSystem {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isFunctionType", `'${node.$cstNode?.text}'`, indent);
     const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
-    const parameters = node.bindings.map((e) => ({
-      name: e.name,
-      type: TypeSystem.inferType(e.type, cache, indent + 2),
-    }));
+    const parameters = node.bindings.map((e) => {
+      if (e.spread) {
+        //todo ...optionalParams 같은 경우 일단은 any type을 리턴한다.
+        return { name: e.spread.$refText, type: TypeSystem.createAnyType() };
+      } else {
+        return { name: e.name!, type: TypeSystem.inferType(e.type, cache, indent + 2) };
+      }
+    });
     type = TypeSystem.createFunctionType(returnType, parameters);
     exitLog(log, type);
     return type;
