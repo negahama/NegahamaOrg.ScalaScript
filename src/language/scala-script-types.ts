@@ -1,6 +1,7 @@
 import { AstNode, AstUtils } from "langium";
 import * as ast from "./generated/ast.js";
 import { enterLog, exitLog, traceLog } from "../language/scala-script-util.js";
+import chalk from "chalk";
 
 /**
  *
@@ -393,6 +394,9 @@ export class TypeSystem {
 
     if (ast.isTypes(node)) {
       type = TypeSystem.inferTypeTypes(node, cache, indent);
+    } else if (ast.isElementType(node)) {
+      // 따로 분리된 이유는 Array의 element type이 object type과 element type으로 되어져 있기 때문이다
+      type = TypeSystem.inferTypeSimpleType(node, cache, indent);
     } else if (ast.isPrimitiveType(node)) {
       //todo - 따로 분리된 이유는
       type = TypeSystem.inferTypeSimpleType(node, cache, indent);
@@ -643,6 +647,18 @@ export class TypeSystem {
 
     if (element) {
       type = TypeSystem.inferType(element, cache, indent + 1);
+
+      // 배열 호출이면 배열 요소가 리턴되어야 한다.
+      if (TypeSystem.isArrayType(type) && node.isArray) {
+        traceLog(indent + 1, "배열 호출이면 배열 요소가 리턴되어야 한다", type.elementType.$type);
+        type = type.elementType;
+      }
+
+      // 함수 호출이면 함수 리턴 타입이 리턴되어야 한다
+      if (TypeSystem.isFunctionType(type) && node.isFunction) {
+        traceLog(indent + 1, "함수 호출이면 함수 리턴 타입이 리턴되어야 한다", type.returnType.$type);
+        type = type.returnType;
+      }
     }
 
     // this인 경우
@@ -656,14 +672,12 @@ export class TypeSystem {
       }
     }
 
-    // 함수인 경우
-    else if (node.isFunction) {
-      if (node.previous) {
-        const previousType = TypeSystem.inferType(node.previous, cache, indent + 1);
-        if (TypeSystem.isFunctionType(previousType)) type = previousType.returnType;
-        else type = TypeSystem.createErrorType("Cannot call operation on non-function type", node);
-      }
-      if (TypeSystem.isFunctionType(type)) type = type.returnType;
+    //todo 함수인 경우, 여기는 정확히 어떨 때 호출되는가?
+    else if (node.isFunction && node.previous) {
+      console.log(chalk.red("여기는 정확히 어떨 때 호출되는가?"));
+      const previousType = TypeSystem.inferType(node.previous, cache, indent + 1);
+      if (TypeSystem.isFunctionType(previousType)) type = previousType.returnType;
+      else type = TypeSystem.createErrorType("Cannot call operation on non-function type", node);
     }
 
     // 배열인 경우
@@ -676,6 +690,8 @@ export class TypeSystem {
     else {
       type = TypeSystem.createErrorType("Could not infer type for element " + node.element?.$refText, node);
     }
+
+    if (TypeSystem.isFunctionType(type)) type = type.returnType;
 
     exitLog(log, type);
     return type;

@@ -54,7 +54,7 @@ const ScalaScriptBuiltinLibrary = `
   def every(callbackFn)-> string
   def fill(value, start, end)-> string
   def filter(callbackFn)-> string[]
-  def find(callbackFn)-> string
+  def find(callbackFn)-> any
   def findIndex(callbackFn)-> number
   def findLast(callbackFn)-> string
   def findLastIndex(callbackFn)-> number
@@ -75,7 +75,7 @@ const ScalaScriptBuiltinLibrary = `
   def shift()-> string
   def slice()-> string
   def some(callbackFn)-> string
-  def sort(callbackFn)-> string
+  def sort(callbackFn)-> any[]
   def splice()-> string
   def toString()-> string
   def unshift()-> string
@@ -104,6 +104,7 @@ const ScalaScriptBuiltinLibrary = `
   val NaN: number
   val NEGATIVE_INFINITY: number
   val POSITIVE_INFINITY: number
+  def isNaN()-> boolean
 }
 @NotTrans def Math => {
   val E: number
@@ -152,6 +153,7 @@ const ScalaScriptBuiltinLibrary = `
 
 @NotTrans def console => { def log() }
 @NotTrans def assert => { def equal() def notEqual() }
+@NotTrans def parseInt()->number
 `.trim();
 
 /**

@@ -69,8 +69,7 @@ export class ScalaScriptValidator {
     if (expr.type && expr.value) {
       const map = getTypeCache();
       const left = TypeSystem.inferType(expr.type, map);
-      let right = TypeSystem.inferType(expr.value, map);
-      if (TypeSystem.isFunctionType(right)) right = right.returnType;
+      const right = TypeSystem.inferType(expr.value, map);
 
       if (!isAssignable(right, left)) {
         accept(
@@ -101,8 +100,7 @@ export class ScalaScriptValidator {
     // console.log(`    right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`);
     const map = getTypeCache();
     const left = TypeSystem.inferType(expr.assign, map);
-    let right = TypeSystem.inferType(expr.value, map);
-    if (TypeSystem.isFunctionType(right)) right = right.returnType;
+    const right = TypeSystem.inferType(expr.value, map);
 
     if (!isAssignable(right, left)) {
       const msg = `Type '${TypeSystem.typeToString(right)}' is not assignable to type '${TypeSystem.typeToString(
@@ -123,6 +121,7 @@ export class ScalaScriptValidator {
   checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
     // console.log("checkUnaryOperationAllowed");
     const item = TypeSystem.inferType(unary.value, getTypeCache());
+
     if (!isLegalOperation(unary.operator, item)) {
       accept(
         "error",
@@ -147,8 +146,7 @@ export class ScalaScriptValidator {
     const map = getTypeCache();
     const left = TypeSystem.inferType(binary.left, map);
     const right = TypeSystem.inferType(binary.right, map);
-    // console.log(`    type1: ${left.$type}, ${right.$type}`);
-    // console.log(`    type2: ${TypeSystem.typeToString(left)}, ${TypeSystem.typeToString(right)}`);
+
     if (!isLegalOperation(binary.operator, left, right)) {
       const msg =
         `Cannot perform operation '${binary.operator}' on values of type ` +

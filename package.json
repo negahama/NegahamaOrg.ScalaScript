@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "displayName": "ScalaScript",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "author": "Samuel Kang",

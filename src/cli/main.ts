@@ -80,6 +80,9 @@ export async function extractAllDocuments(fileName: string, services: LangiumCor
   for (const d of services.shared.workspace.LangiumDocuments.all) {
     console.log("Processing:", d.uri.path);
 
+    //todo builtin:/library.ss는 파싱되지 않는다.
+    if (d.uri.path == "/library.ss") continue;
+
     // fileName이 * 이 아니면 동일한 파일명을, * 인 경우는 모든 ss 파일을 변환한다
     if (!(d.uri.path.endsWith(fileName) || (path.basename(fileName) == "*.ss" && d.uri.path.endsWith(".ss")))) continue;
 
