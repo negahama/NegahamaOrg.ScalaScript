@@ -62,7 +62,7 @@ SimpleType:
 ElementType:
   FunctionType
   | PrimitiveType
-  | reference=[TObject:Id];
+  | reference=[TObject:Id] (generic=Generic)?;
 
 PrimitiveType:
   type=('any' | 'nil' | 'void' | 'string' | 'number' | 'boolean');
@@ -141,7 +141,7 @@ Statement:
 // var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
 VariableDefinition infers TVariable:
   (Annotation)? (export?='export')? (private?='private')? (static?='static')?
-  kind=('val' | 'var') name=Id (':' type=Types)? ('=' value=Expression)?;
+  kind=('val' | 'var') name=Id (nullable?='?')? (':' type=Types)? ('=' value=Expression)?;
 
 // Function Defintion
 //-----------------------------------------------------------------------------

@@ -40,7 +40,7 @@ export function generateTypeScript(program: ast.Program, filePath: string, desti
 export function generateCode(code: ast.Code): string {
   let result = "";
   if (ast.isStatement(code)) result += generateStatement(code, 0);
-  else if (ast.isExpression(code)) result += generateExpression(code, 0);
+  else if (ast.isExpression(code)) result += generateExpression(code, 0) + ";";
   else console.log(chalk.red("ERROR in Code:", code));
   return result;
 }
@@ -114,7 +114,7 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
   } else if (ast.isInfixExpression(expr)) {
     result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`;
   } else if (ast.isReturnExpression(expr)) {
-    if (expr.value) result += `return ${generateExpression(expr.value, indent)};`;
+    if (expr.value) result += `return ${generateExpression(expr.value, indent)}`;
     else result += "return";
   } else if (ast.isSpreadExpression(expr)) {
     return "..." + expr.spread.$refText;
@@ -151,7 +151,7 @@ export function generateBlock(
 ): string {
   const defaultDoIt = (lastCode: ast.Code, indent: number) => {
     if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
+    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
     else return "";
   };
 
@@ -165,7 +165,7 @@ export function generateBlock(
       else element += doItForLastCode(code, indent + 1);
     } else {
       if (ast.isStatement(code)) element += generateStatement(code, indent + 1);
-      else if (ast.isExpression(code)) element += generateExpression(code, indent + 1);
+      else if (ast.isExpression(code)) element += generateExpression(code, indent + 1) + ";";
       else console.log(chalk.red("ERROR in Block:", code));
     }
     result += applyIndent(indent + 1, element + "\n");
@@ -223,7 +223,7 @@ export function transpileVariable(stmt: ast.TVariable, indent: number, isClassMe
     if (stmt.kind == "var") result += "let ";
     if (stmt.kind == "val") result += "const ";
   }
-  result += stmt.name + generateTypes(stmt.type, indent);
+  result += stmt.name + (stmt.nullable ? "?" : "") + generateTypes(stmt.type, indent);
   if (stmt.value) {
     let i = indent;
     if (ast.isObjectValue(stmt.value)) i++;
@@ -264,7 +264,7 @@ export function transpileFunction(stmt: ast.TFunction, indent: number, isClassMe
   result += stmt.body
     ? generateBlock(stmt.body, indent, (lastCode: ast.Code, indent: number) => {
         if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
+        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
         else return "";
       })
     : "";
@@ -451,16 +451,21 @@ export function transpileCallChain(expr: ast.CallChain, indent: number): string 
  */
 export function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
   let result = "";
-  // 삼항 연산자 처리
+  // 삼항 연산자 처리 조건
+  // else if 문 없이 then, else 문만 있어야 한다.
+  // then, else 모두 중괄호 없어야 하며 식이 하나만 있어야 한다.
+  // 하나의 식은 return 이 아니어야 한다.
   if (
     expr.then &&
     !expr.then.isBracket &&
     expr.then.codes.length == 1 &&
     ast.isExpression(expr.then.codes[0]) &&
+    !ast.isReturnExpression(expr.then.codes[0]) &&
     expr.else &&
     !expr.else.isBracket &&
     expr.else.codes.length == 1 &&
     ast.isExpression(expr.else.codes[0]) &&
+    !ast.isReturnExpression(expr.else.codes[0]) &&
     (expr.elif == undefined || expr.elif.length == 0)
   ) {
     result += `${generateCondition(expr.condition, indent)} ? `;
@@ -648,7 +653,7 @@ export function transpileFunctionValue(expr: ast.FunctionValue, indent: number):
   result += ")" + generateTypes(expr.returnType, indent) + " => ";
   result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
     if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent);
+    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
     else return "";
   });
   return result;
@@ -734,7 +739,15 @@ export function transpileElementType(expr: ast.ElementType, indent: number): str
   } else if (ast.isPrimitiveType(expr)) {
     result += transpilePrimitiveType(expr, indent);
   } else if (expr.reference) {
-    return expr.reference.$refText;
+    result += expr.reference.$refText;
+    if (expr.generic) {
+      result += "<";
+      expr.generic.types.forEach((t, index) => {
+        if (index != 0) result += ", ";
+        result += transpileSimpleType(t, indent);
+      });
+      result += ">";
+    }
   } else result += "internal error";
   return result;
 }

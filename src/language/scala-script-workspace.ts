@@ -244,6 +244,8 @@ const ScalaScriptBuiltinLibrary = `
 @NotTrans def console => { def log() }
 @NotTrans def assert => { def equal() def notEqual() }
 
+@NotTrans def Array => {}
+
 @NotTrans def Map => {
   // 요소의 개수를 반환합니다.
   var size: number
