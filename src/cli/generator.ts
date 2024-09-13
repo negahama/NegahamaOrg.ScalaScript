@@ -216,6 +216,7 @@ export function applyIndent(lv: number, s: string) {
 export function transpileVariable(stmt: ast.TVariable, indent: number, isClassMember: boolean = false): string {
   let result = "";
   if (stmt.annotate == "NotTrans") return result;
+  if (stmt.export) result += "export ";
   if (stmt.private) result += "private ";
   if (stmt.static) result += "static ";
   if (!isClassMember) {
@@ -388,7 +389,9 @@ export function transpileAssignment(expr: ast.Assignment, indent: number): strin
   let result = "";
   const name = generateExpression(expr.assign, indent);
   result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`;
-  result += ast.isAssignment(expr.value) ? "" : ";";
+
+  // n++ 을 대신해서 n += 1 이 argument로 사용되거나 할 때는 semi colon을 표시하면 안되므로 지원하지 않는다
+  // result += ast.isAssignment(expr.value) ? "" : ";";
   return result;
 }
 

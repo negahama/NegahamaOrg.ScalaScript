@@ -661,8 +661,8 @@ export class TypeSystem {
       }
     }
 
-    // this인 경우
-    else if (node.$cstNode?.text == "this") {
+    // this, super인 경우
+    else if (node.$cstNode?.text == "this" || node.$cstNode?.text == "super") {
       const classItem = AstUtils.getContainerOfType(node, ast.isTObject);
       if (classItem) {
         traceLog(indent + 1, `'this' refers ${classItem.name}`);

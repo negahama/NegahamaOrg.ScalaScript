@@ -58,14 +58,15 @@ export class ScalaScriptValidator {
     //   }
     // }
 
-    // console.log("    expr.names:", expr.names);
+    // console.log("    expr.name:", expr.name);
     // console.log("    expr.type:", `'${expr.type?.$cstNode?.text}'`);
     // console.log("    expr.value:", `${expr.value?.$type}, '${expr.value?.$cstNode?.text}'`);
-    if (expr.type == undefined) {
-      if (ast.isLiteral(expr.value)) {
-        // console.log("    expr.value:", expr.value.$type, expr.value.value, typeof expr.value.value);
-      }
-    }
+    // if (expr.type == undefined) {
+    //   if (ast.isLiteral(expr.value)) {
+    //     console.log("    expr.value:", expr.value.$type, expr.value.value, typeof expr.value.value);
+    //   }
+    // }
+
     if (expr.type && expr.value) {
       const map = getTypeCache();
       const left = TypeSystem.inferType(expr.type, map);
@@ -98,18 +99,20 @@ export class ScalaScriptValidator {
     // console.log("checkAssignment");
     // console.log(`    left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`);
     // console.log(`    right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`);
+
     const map = getTypeCache();
     const left = TypeSystem.inferType(expr.assign, map);
     const right = TypeSystem.inferType(expr.value, map);
 
     if (!isAssignable(right, left)) {
-      const msg = `Type '${TypeSystem.typeToString(right)}' is not assignable to type '${TypeSystem.typeToString(
-        left
-      )}'.`;
-      accept("error", msg, {
-        node: expr,
-        property: "value",
-      });
+      accept(
+        "error",
+        `Type '${TypeSystem.typeToString(right)}' is not assignable to type '${TypeSystem.typeToString(left)}'.`,
+        {
+          node: expr,
+          property: "value",
+        }
+      );
     }
   }
 
@@ -172,7 +175,30 @@ export class ScalaScriptValidator {
    * @returns
    */
   checkFunctionReturnType(method: ast.TFunction, accept: ValidationAcceptor): void {
-    checkMethodReturnType(method, accept);
+    // console.log("checkFunctionReturnType");
+    if (method.body && method.returnType) {
+      const map = getTypeCache();
+      const returnStatements = AstUtils.streamAllContents(method.body).filter(ast.isReturnExpression).toArray();
+      const expectedType = TypeSystem.inferType(method.returnType, map);
+      if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
+        accept("error", "A function whose declared type is not 'void' must return a value.", {
+          node: method.returnType,
+        });
+        return;
+      }
+      //todo
+      // for (const returnStatement of returnStatements) {
+      //   const returnValueType = TypeSystem.inferType(returnStatement, map);
+      //   if (!isAssignable(returnValueType, expectedType)) {
+      //     const msg = `Type '${TypeSystem.typeToString(
+      //       returnValueType
+      //     )}' is not assignable to type '${TypeSystem.typeToString(expectedType)}'.`;
+      //     accept("error", msg, {
+      //       node: returnStatement,
+      //     });
+      //   }
+      // }
+    }
   }
 }
 
@@ -302,8 +328,39 @@ function isLegalOperation_(operator: string, left: TypeDescription, right?: Type
  * @param to
  * @returns
  */
-export function isAssignable(from: TypeDescription, to: TypeDescription): boolean {
-  // console.log(`isAssignable: ${to.$type} = ${from.$type}`);
+export function isAssignable(from: TypeDescription, to: TypeDescription, indent: number = 0): boolean {
+  // const space = "  ".repeat(indent);
+  // console.log(space + `isAssignable: ${to.$type} = ${from.$type}`);
+
+  // union type이면 각 세부 타입들의 조합을 검사한다.
+  if (TypeSystem.isUnionType(to)) {
+    return to.elementTypes.some((t) => isAssignable(from, t, indent));
+    // console.log(
+    //   space + "to's union type:",
+    //   to.elementTypes.map((t) => t.$type)
+    // );
+    // let result: boolean = false;
+    // to.elementTypes.forEach((t) => {
+    //   console.log(space + "type compare:", t.$type, "=", from.$type);
+    //   if (isAssignable(from, t, indent + 1)) result = true;
+    // });
+    // return result;
+  }
+
+  if (TypeSystem.isUnionType(from)) {
+    return from.elementTypes.some((t) => isAssignable(t, to, indent));
+    // console.log(
+    //   space + "from's union type:",
+    //   from.elementTypes.map((t) => t.$type)
+    // );
+    // let result: boolean = false;
+    // from.elementTypes.forEach((t) => {
+    //   console.log(space + "type compare:", to.$type, "=", t.$type);
+    //   if (isAssignable(t, to, indent + 1)) result = true;
+    // });
+    // return result;
+  }
+
   if (TypeSystem.isAnyType(from) || TypeSystem.isAnyType(to)) {
     return true;
   }
@@ -315,16 +372,22 @@ export function isAssignable(from: TypeDescription, to: TypeDescription): boolea
     if (!TypeSystem.isClassType(to)) {
       return false;
     }
-    // const fromLit = from.literal;
-    // if (ast.isClass(fromLit)) {
-    //   const fromChain = TypeSystem.getClassChain(fromLit);
-    //   const toClass = to.literal;
-    //   for (const fromClass of fromChain) {
-    //     if (fromClass === toClass) {
-    //       return true;
-    //     }
-    //   }
-    // }
+    const fromLit = from.literal;
+    if (ast.isTObject(fromLit)) {
+      // console.log(space + `from is object: '${fromLit.name}'`);
+      const fromChain = TypeSystem.getClassChain(fromLit);
+      const toClass = to.literal;
+      for (const fromClass of fromChain) {
+        if (fromClass === toClass) {
+          return true;
+        }
+      }
+    } else if (ast.isObjectType(fromLit)) {
+      // console.log(space + "from is object type", fromLit.$cstNode?.text);
+    } else if (ast.isObjectValue(fromLit)) {
+      // console.log(space + "from is object value", fromLit.$cstNode?.text);
+    }
+    // 둘 다 클래스 타입이면 일단 통과시킨다.
     // return false;
   }
   if (TypeSystem.isVoidType(from)) {
@@ -351,37 +414,4 @@ export function isAssignable(from: TypeDescription, to: TypeDescription): boolea
   }
 
   return from.$type === to.$type;
-}
-
-/**
- *
- * @param method
- * @param accept
- * @returns
- */
-export function checkMethodReturnType(method: ast.TFunction, accept: ValidationAcceptor): void {
-  // console.log("checkMethodReturnType");
-  if (method.body && method.returnType) {
-    const map = getTypeCache();
-    const returnStatements = AstUtils.streamAllContents(method.body).filter(ast.isReturnExpression).toArray();
-    const expectedType = TypeSystem.inferType(method.returnType, map);
-    if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
-      accept("error", "A function whose declared type is not 'void' must return a value.", {
-        node: method.returnType,
-      });
-      return;
-    }
-    //todo
-    // for (const returnStatement of returnStatements) {
-    //   const returnValueType = TypeSystem.inferType(returnStatement, map);
-    //   if (!isAssignable(returnValueType, expectedType)) {
-    //     const msg = `Type '${TypeSystem.typeToString(
-    //       returnValueType
-    //     )}' is not assignable to type '${TypeSystem.typeToString(expectedType)}'.`;
-    //     accept("error", msg, {
-    //       node: returnStatement,
-    //     });
-    //   }
-    // }
-  }
 }
