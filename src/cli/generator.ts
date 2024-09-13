@@ -281,8 +281,15 @@ export function transpileObject(stmt: ast.TObject, indent: number): string {
   let result = "";
   if (stmt.annotate == "NotTrans") return result;
   if (stmt.export) result += "export ";
+
+  // interface가 되는 조건
+  // body 에 함수나 할당문이 있을 경우 또는 변수 선언문에서 값으로 초기화하는 경우가 아닌 경우
   let isInterface = true;
-  if (stmt.body.elements.find((m) => ast.isTFunction(m))) isInterface = false;
+  stmt.body.elements.forEach((m) => {
+    if (ast.isTFunction(m) || ast.isAssignment(m)) isInterface = false;
+    if (ast.isTVariable(m) && m.value) isInterface = false;
+  });
+
   if (isInterface) {
     result += `interface ${stmt.name} {\n`;
   } else {
@@ -410,7 +417,6 @@ export function transpileCallChain(expr: ast.CallChain, indent: number): string 
     result += expr.this ? expr.this : "";
     result += expr.element ? expr.element.$refText : "";
   }
-  if (expr.assertion) result += expr.assertion;
   if (expr.isFunction) {
     // endsWith()의 endPosition은 1부터 카운트되므로 제외
     const methodsUsingArrayIndex = [
@@ -440,6 +446,7 @@ export function transpileCallChain(expr: ast.CallChain, indent: number): string 
   if (expr.isArray) {
     result += "[" + generateExpression(expr.index, indent) + "]";
   }
+  if (expr.assertion) result += expr.assertion;
   return result;
 }
 

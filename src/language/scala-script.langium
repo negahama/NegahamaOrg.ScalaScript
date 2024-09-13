@@ -310,8 +310,9 @@ Exponentiation infers Expression:
 // 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 CallChain infers Expression:
   // SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
-  SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id] (assertion=('!'|'?'))?
-  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')? )*;
+  SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
+  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')?
+  (assertion=('!'|'?'))? )*;
 
 // fragment CallableElements:
 //   element=[NamedElement:Id] (
@@ -340,8 +341,9 @@ SimpleExpression infers Expression:
 // @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
 FunctionCall: {infer CallChain}
   // (export?='export')? element=[NamedElement:Id] (FunctionCallSignature)?;
-  (export?='export')? element=[NamedElement:Id] (assertion=('!'|'?'))?
-  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?;
+  (export?='export')? element=[NamedElement:Id]
+  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?
+  (assertion=('!'|'?'))?;
 
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
 
