@@ -48,10 +48,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // this, super가 [NamedElement:'this'] 인 경우에 호출된다. 지금처럼 keyword 인 경우에는
     // ref 처리가 되지 않아서 여기가 호출되지 않는다.
     if (context.reference.$refText === "this" || context.reference.$refText === "super") {
-      const classItem = AstUtils.getContainerOfType(context.container, ast.isTObject);
+      const classItem = AstUtils.getContainerOfType(context.container, ast.isObjectDef);
       if (classItem) {
         traceLog(1, "this or super");
-        return this.scopeTObject(context, classItem);
+        return this.scopeObjectDef(context, classItem);
       } else {
         console.error("this or super: empty");
         return EMPTY_SCOPE;
@@ -115,8 +115,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     if (TypeSystem.isClassType(classDesc)) {
       traceLog(1, `FIND Class: ${previous.$type}, ${classDesc.literal?.$type}`);
       exitLog(scopeLog.replace("Exit0", "Exit2"));
-      if (ast.isTObject(classDesc.literal)) {
-        return this.scopeTObject(context, classDesc.literal);
+      if (ast.isObjectDef(classDesc.literal)) {
+        return this.scopeObjectDef(context, classDesc.literal);
       } else if (ast.isObjectType(classDesc.literal)) {
         return this.scopeObjectType(context, classDesc.literal);
       } else {
@@ -167,13 +167,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @param classItem
    * @returns
    */
-  private scopeTObject(context: ReferenceInfo, classItem: ast.TObject): Scope {
+  private scopeObjectDef(context: ReferenceInfo, classItem: ast.ObjectDef): Scope {
     // console.log("find class, class name:", classItem.name);
     const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.body.elements);
     const removedBypass = allMembers.filter((e) => !ast.isBypass(e));
     removedBypass.forEach((e) => {
-      if (ast.isTVariable(e) || ast.isTFunction(e)) {
-        traceLog(0, "scopeTObject", e.name);
+      if (ast.isVariableDef(e) || ast.isFunctionDef(e)) {
+        traceLog(0, "scopeObjectDef", e.name);
       }
     });
     return this.createScopeForNodes(removedBypass);
@@ -189,7 +189,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // console.log("find object, object name:", classType.$cstNode?.text);
     const removedBypass = classType.elements.filter((e) => !ast.isBypass(e));
     removedBypass.forEach((e) => {
-      if (ast.isTVariable(e) || ast.isTFunction(e)) {
+      if (ast.isVariableDef(e) || ast.isFunctionDef(e)) {
         traceLog(0, "scopeObjectType", e.name);
       }
     });
@@ -204,9 +204,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   private scopeSpecificClass(context: ReferenceInfo, className: string): Scope {
     // console.log("find specific class, class name:", className);
-    const scope: Scope = this.getGlobalScope("TObject", context);
+    const scope: Scope = this.getGlobalScope("ObjectDef", context);
     const sc = scope.getAllElements().find((d) => d.name == className);
-    if (ast.isTObject(sc?.node)) {
+    if (ast.isObjectDef(sc?.node)) {
       const allMembers = sc?.node.body.elements;
       if (allMembers) {
         // const names = allMembers.map((m) => m.$cstNode?.text ?? "unknown");

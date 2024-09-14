@@ -54,12 +54,12 @@ export function generateCode(code: ast.Code): string {
 export function generateStatement(stmt: ast.Statement | undefined, indent: number): string {
   let result = "";
   if (stmt == undefined) return result;
-  if (ast.isTVariable(stmt)) {
-    result += transpileVariable(stmt, indent);
-  } else if (ast.isTFunction(stmt)) {
-    result += transpileFunction(stmt, indent);
-  } else if (ast.isTObject(stmt)) {
-    result += transpileObject(stmt, indent);
+  if (ast.isVariableDef(stmt)) {
+    result += transpileVariableDef(stmt, indent);
+  } else if (ast.isFunctionDef(stmt)) {
+    result += transpileFunctionDef(stmt, indent);
+  } else if (ast.isObjectDef(stmt)) {
+    result += transpileObjectDef(stmt, indent);
   } else if (ast.isDoStatement(stmt)) {
     result += `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition, indent)}`;
   } else if (ast.isForStatement(stmt)) {
@@ -213,7 +213,7 @@ export function applyIndent(lv: number, s: string) {
  * @param indent
  * @returns
  */
-export function transpileVariable(stmt: ast.TVariable, indent: number, isClassMember: boolean = false): string {
+export function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMember: boolean = false): string {
   let result = "";
   if (stmt.annotate == "NotTrans") return result;
   if (stmt.export) result += "export ";
@@ -240,7 +240,7 @@ export function transpileVariable(stmt: ast.TVariable, indent: number, isClassMe
  * @param isClassMethod
  * @returns
  */
-export function transpileFunction(stmt: ast.TFunction, indent: number, isClassMethod: boolean = false): string {
+export function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMethod: boolean = false): string {
   const params = stmt.params
     .map((param) => {
       let p = (param.spread ? "..." : "") + param.name;
@@ -252,11 +252,10 @@ export function transpileFunction(stmt: ast.TFunction, indent: number, isClassMe
 
   let result = "";
   if (stmt.annotate == "NotTrans") return result;
-  if (ast.isTFunction(stmt)) {
-    if (stmt.export) result += "export ";
-    if (stmt.private) result += "private ";
-    if (stmt.static) result += "static ";
-  }
+  if (stmt.export) result += "export ";
+  if (stmt.private) result += "private ";
+  if (stmt.static) result += "static ";
+
   if (!isClassMethod) result += "function ";
   result += `${stmt.name}(${params})${generateTypes(stmt.returnType, indent)} `;
   // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
@@ -272,12 +271,52 @@ export function transpileFunction(stmt: ast.TFunction, indent: number, isClassMe
 }
 
 /**
+ * function type은 TypeScript로 변환될 때 (arg: number) => number 형태로 변환된다.
+ *
+ * @param expr
+ * @param indent
+ * @returns
+ */
+export function transpileFunctionType(expr: ast.FunctionType, indent: number): string {
+  const result = transpileFunctionArguments(expr.bindings, indent);
+  return result + (expr.returnType ? ` => ${transpileTypes(expr.returnType, indent)}` : "");
+}
+
+/**
+ * function value는 TypeScript로 변환될 때 (arg: number): number => { ... } 형태로 변환된다.
+ *
+ * @param expr
+ * @param indent
+ * @returns
+ */
+export function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string {
+  let result = transpileFunctionArguments(expr.bindings, indent);
+  result += generateTypes(expr.returnType, indent) + " => ";
+  result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
+    if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
+    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
+    else return "";
+  });
+  return result;
+}
+
+/**
+ *
+ * @param bindings
+ * @param indent
+ * @returns
+ */
+function transpileFunctionArguments(bindings: ast.TypeBinding[], indent: number) {
+  return "(" + bindings.map((bind) => bind.name + generateTypes(bind.type, indent)).join(", ") + ")";
+}
+
+/**
  *
  * @param stmt
  * @param indent
  * @returns
  */
-export function transpileObject(stmt: ast.TObject, indent: number): string {
+export function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
   let result = "";
   if (stmt.annotate == "NotTrans") return result;
   if (stmt.export) result += "export ";
@@ -286,8 +325,8 @@ export function transpileObject(stmt: ast.TObject, indent: number): string {
   // body 에 함수나 할당문이 있을 경우 또는 변수 선언문에서 값으로 초기화하는 경우가 아닌 경우
   let isInterface = true;
   stmt.body.elements.forEach((m) => {
-    if (ast.isTFunction(m) || ast.isAssignment(m)) isInterface = false;
-    if (ast.isTVariable(m) && m.value) isInterface = false;
+    if (ast.isFunctionDef(m) || ast.isAssignment(m)) isInterface = false;
+    if (ast.isVariableDef(m) && m.value) isInterface = false;
   });
 
   if (isInterface) {
@@ -297,10 +336,10 @@ export function transpileObject(stmt: ast.TObject, indent: number): string {
     result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
   }
   stmt.body.elements.forEach((m) => {
-    if (ast.isTFunction(m)) {
-      result += applyIndent(indent + 1, transpileFunction(m, indent + 1, true));
-    } else if (ast.isTVariable(m)) {
-      result += applyIndent(indent + 1, transpileVariable(m, indent, true));
+    if (ast.isFunctionDef(m)) {
+      result += applyIndent(indent + 1, transpileFunctionDef(m, indent + 1, true));
+    } else if (ast.isVariableDef(m)) {
+      result += applyIndent(indent + 1, transpileVariableDef(m, indent, true));
     } else if (ast.isBypass(m)) {
       result += applyIndent(indent + 1, generateStatement(m, indent + 1));
     } else {
@@ -654,24 +693,6 @@ export function transpileObjectValue(expr: ast.ObjectValue, indent: number): str
  * @param indent
  * @returns
  */
-export function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string {
-  let result = "";
-  result += "(" + expr.bindings.map((bind) => bind.name + generateTypes(bind.type, indent)).join(", ");
-  result += ")" + generateTypes(expr.returnType, indent) + " => ";
-  result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
-    if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
-    else return "";
-  });
-  return result;
-}
-
-/**
- *
- * @param expr
- * @param indent
- * @returns
- */
 export function transpileTypes(expr: ast.Types | undefined, indent: number): string {
   let result = "";
   if (expr == undefined) return result;
@@ -719,10 +740,10 @@ export function transpileArrayType(expr: ast.ArrayType, indent: number): string 
 export function transpileObjectType(expr: ast.ObjectType, indent: number): string {
   let result = "{ ";
   expr.elements.forEach((e) => {
-    if (ast.isTFunction(e)) {
-      result += transpileFunction(e, indent, true);
-    } else if (ast.isTVariable(e)) {
-      result += transpileVariable(e, indent, true);
+    if (ast.isFunctionDef(e)) {
+      result += transpileFunctionDef(e, indent, true);
+    } else if (ast.isVariableDef(e)) {
+      result += transpileVariableDef(e, indent, true);
     } else if (ast.isBypass(e)) {
       result += generateStatement(e, indent);
     } else {
@@ -757,21 +778,6 @@ export function transpileElementType(expr: ast.ElementType, indent: number): str
     }
   } else result += "internal error";
   return result;
-}
-
-/**
- *
- * @param expr
- * @param indent
- * @returns
- */
-export function transpileFunctionType(expr: ast.FunctionType, indent: number): string {
-  const list = expr.bindings
-    .map((bind) => {
-      return bind.name + generateTypes(bind.type, indent);
-    })
-    .join(", ");
-  return `(${list})` + (expr.returnType ? ` => ${transpileTypes(expr.returnType, indent)}` : "");
 }
 
 /**

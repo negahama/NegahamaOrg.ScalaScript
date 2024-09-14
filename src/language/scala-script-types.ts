@@ -19,6 +19,8 @@ export type TypeDescription =
   | ClassTypeDescription
   | ErrorTypeDescription;
 
+type CacheType = Map<AstNode, TypeDescription>;
+
 /**
  *
  */
@@ -38,7 +40,7 @@ export interface NilTypeDescription {
  */
 export interface StringTypeDescription {
   readonly $type: "string";
-  readonly literal?: ast.StringExpression;
+  readonly literal?: ast.Literal;
 }
 
 /**
@@ -46,7 +48,7 @@ export interface StringTypeDescription {
  */
 export interface NumberTypeDescription {
   readonly $type: "number";
-  readonly literal?: ast.NumberExpression;
+  readonly literal?: ast.Literal;
 }
 
 /**
@@ -54,7 +56,7 @@ export interface NumberTypeDescription {
  */
 export interface BooleanTypeDescription {
   readonly $type: "boolean";
-  readonly literal?: ast.BooleanExpression;
+  readonly literal?: ast.Literal;
 }
 
 /**
@@ -102,7 +104,7 @@ export interface FunctionParameter {
  */
 export interface ClassTypeDescription {
   readonly $type: "class";
-  readonly literal: ast.TObject | ast.ObjectType | ast.ObjectValue;
+  readonly literal: ast.ObjectDef | ast.ObjectType | ast.ObjectValue;
 }
 
 /**
@@ -161,7 +163,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createStringType(literal?: ast.StringExpression): StringTypeDescription {
+  static createStringType(literal?: ast.Literal): StringTypeDescription {
     return {
       $type: "string",
       literal,
@@ -182,7 +184,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createNumberType(literal?: ast.NumberExpression): NumberTypeDescription {
+  static createNumberType(literal?: ast.Literal): NumberTypeDescription {
     return {
       $type: "number",
       literal,
@@ -203,7 +205,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createBooleanType(literal?: ast.BooleanExpression): BooleanTypeDescription {
+  static createBooleanType(literal?: ast.Literal): BooleanTypeDescription {
     return {
       $type: "boolean",
       literal,
@@ -289,8 +291,8 @@ export class TypeSystem {
   static createFunctionType(returnType: TypeDescription, parameters: FunctionParameter[]): FunctionTypeDescription {
     return {
       $type: "function",
-      parameters,
       returnType,
+      parameters,
     };
   }
 
@@ -308,7 +310,7 @@ export class TypeSystem {
    * @param literal
    * @returns
    */
-  static createClassType(literal: ast.TObject | ast.ObjectType | ast.ObjectValue): ClassTypeDescription {
+  static createClassType(literal: ast.ObjectDef | ast.ObjectType | ast.ObjectValue): ClassTypeDescription {
     return {
       $type: "class",
       literal,
@@ -370,11 +372,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferType(
-    node: AstNode | undefined,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number = 0
-  ): TypeDescription {
+  static inferType(node: AstNode | undefined, cache: CacheType, indent: number = 0): TypeDescription {
     const rootLog = enterLog("inferType", `'${node?.$cstNode?.text}', node is ${node?.$type}`, indent);
 
     let type: TypeDescription | undefined;
@@ -400,14 +398,14 @@ export class TypeSystem {
     } else if (ast.isPrimitiveType(node)) {
       //todo - 따로 분리된 이유는
       type = TypeSystem.inferTypeSimpleType(node, cache, indent);
-    } else if (ast.isTVariable(node)) {
-      type = TypeSystem.inferTypeVariable(node, cache, indent);
-    } else if (ast.isTFunction(node)) {
-      type = TypeSystem.inferTypeFunction(node, cache, indent);
+    } else if (ast.isVariableDef(node)) {
+      type = TypeSystem.inferTypeVariableDef(node, cache, indent);
+    } else if (ast.isFunctionDef(node)) {
+      type = TypeSystem.inferTypeFunctionDef(node, cache, indent);
+    } else if (ast.isObjectDef(node)) {
+      type = TypeSystem.inferTypeObjectDef(node, cache, indent);
     } else if (ast.isCallChain(node)) {
       type = TypeSystem.inferTypeCallChain(node, cache, indent);
-    } else if (ast.isTObject(node)) {
-      type = TypeSystem.inferTypeObject(node, cache, indent);
     } else if (ast.isParameter(node)) {
       // Parameter를 type이나 value로 타입을 알 수 없을 경우는 any type으로 취급한다.
       const log = enterLog("isParameter", node.name, indent);
@@ -475,15 +473,32 @@ export class TypeSystem {
     } else if (ast.isObjectValue(node)) {
       type = TypeSystem.inferTypeObjectValue(node, cache, indent);
     } else if (ast.isFunctionValue(node)) {
-      type = TypeSystem.inferTypeFunctionValue(node, cache, indent);
+      const log = enterLog("isFunctionValue", node.$type, indent);
+      type = TypeSystem.inferFunctionSimpleType(node, cache, indent);
+      exitLog(log, type);
     } else if (ast.isLiteral(node)) {
-      const log = enterLog("isLiteralExpression", `'${node.$cstNode?.text}'`, indent);
-      if (ast.isAnyExpression(node)) type = this.createAnyType();
-      else if (ast.isNilExpression(node)) type = this.createNilType();
-      else if (ast.isVoidExpression(node)) type = this.createVoidType();
-      else if (ast.isStringExpression(node)) type = this.createStringType(node);
-      else if (ast.isNumberExpression(node)) type = this.createNumberType(node);
-      else if (ast.isBooleanExpression(node)) type = this.createBooleanType(node);
+      const log = enterLog("isLiteral", `'${node.$cstNode?.text}'`, indent);
+      if (typeof node.value == "string") {
+        switch (node.value) {
+          case "any":
+            type = TypeSystem.createAnyType();
+            break;
+          case "nil":
+            type = TypeSystem.createNilType();
+            break;
+          case "void":
+            type = TypeSystem.createVoidType();
+            break;
+          case "true":
+          case "false":
+            type = TypeSystem.createBooleanType();
+            break;
+          default:
+            type = TypeSystem.createStringType(node);
+        }
+      } else {
+        type = TypeSystem.createNumberType(node);
+      }
       exitLog(log, type);
     }
 
@@ -501,9 +516,9 @@ export class TypeSystem {
    * @param classItem
    * @returns
    */
-  static getClassChain(classItem: ast.TObject): ast.TObject[] {
-    const set = new Set<ast.TObject>();
-    let value: ast.TObject | undefined = classItem;
+  static getClassChain(classItem: ast.ObjectDef): ast.ObjectDef[] {
+    const set = new Set<ast.ObjectDef>();
+    let value: ast.ObjectDef | undefined = classItem;
     while (value && !set.has(value)) {
       set.add(value);
       value = value.superClass?.ref;
@@ -519,7 +534,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeTypes(node: ast.Types, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferTypeTypes(node: ast.Types, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription;
     const log = enterLog("isAllTypes", `'${node.$cstNode?.text}'`, indent);
     const ts = node.types.map((t) => this.inferTypeSimpleType(t, cache, indent));
@@ -538,11 +553,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeSimpleType(
-    node: ast.SimpleType,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeSimpleType(node: ast.SimpleType, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isSimpleType", `'${node.$cstNode?.text}'`, indent);
     if (ast.isArrayType(node)) {
@@ -563,9 +574,9 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeVariable(node: ast.TVariable, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferTypeVariableDef(node: ast.VariableDef, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
-    const log = enterLog("isTVariable", node.name.toString(), indent);
+    const log = enterLog("isVariableDef", node.name.toString(), indent);
     if (node.type) {
       type = TypeSystem.inferType(node.type, cache, indent + 1);
     } else if (node.value) {
@@ -584,7 +595,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeFunction(node: ast.TFunction, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferTypeFunctionDef(node: ast.FunctionDef, cache: CacheType, indent: number): TypeDescription {
     const log = enterLog("isFunction", node.name, indent);
     const returnType = TypeSystem.inferFunctionReturnType(node, cache, indent);
     const parameters = node.params.map((e) => ({
@@ -603,11 +614,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferFunctionReturnType(
-    node: ast.TFunction,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferFunctionReturnType(node: ast.FunctionDef, cache: CacheType, indent: number): TypeDescription {
     // 명시된 리턴 타입이 있으면 이를 근거로 한다.
     if (node.returnType) return TypeSystem.inferType(node.returnType, cache, indent + 1);
 
@@ -633,11 +640,33 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeCallChain(
-    node: ast.CallChain,
-    cache: Map<AstNode, TypeDescription>,
+  static inferFunctionSimpleType(
+    node: ast.FunctionValue | ast.FunctionType,
+    cache: CacheType,
     indent: number
   ): TypeDescription {
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
+    const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
+    const parameters = node.bindings.map((e) => {
+      if (e.spread) {
+        //todo ...optionalParams 같은 경우 일단은 any type을 리턴한다.
+        return { name: e.spread.$refText, type: TypeSystem.createAnyType() };
+      } else {
+        return { name: e.name!, type: TypeSystem.inferType(e.type, cache, indent + 2) };
+      }
+    });
+    type = TypeSystem.createFunctionType(returnType, parameters);
+    return type;
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
+  static inferTypeCallChain(node: ast.CallChain, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const id = `element='${node.element?.$refText}', cst='${node?.$cstNode?.text}'`;
     const log = enterLog("isCallChain", id, indent);
@@ -663,7 +692,7 @@ export class TypeSystem {
 
     // this, super인 경우
     else if (node.$cstNode?.text == "this" || node.$cstNode?.text == "super") {
-      const classItem = AstUtils.getContainerOfType(node, ast.isTObject);
+      const classItem = AstUtils.getContainerOfType(node, ast.isObjectDef);
       if (classItem) {
         traceLog(indent + 1, `'this' refers ${classItem.name}`);
         type = TypeSystem.createClassType(classItem);
@@ -674,7 +703,7 @@ export class TypeSystem {
 
     //todo 함수인 경우, 여기는 정확히 어떨 때 호출되는가?
     else if (node.isFunction && node.previous) {
-      console.log(chalk.red("여기는 정확히 어떨 때 호출되는가?"));
+      console.log(chalk.red("여기는 정확히 어떨 때 호출되는가?", node.$cstNode?.text));
       const previousType = TypeSystem.inferType(node.previous, cache, indent + 1);
       if (TypeSystem.isFunctionType(previousType)) type = previousType.returnType;
       else type = TypeSystem.createErrorType("Cannot call operation on non-function type", node);
@@ -704,8 +733,8 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeObject(node: ast.TObject, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
-    const log = enterLog("isTObject", node.name, indent);
+  static inferTypeObjectDef(node: ast.ObjectDef, cache: CacheType, indent: number): TypeDescription {
+    const log = enterLog("isObjectDef", node.name, indent);
     const type = TypeSystem.createClassType(node);
     exitLog(log, type);
     return type;
@@ -719,7 +748,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeForOf(node: ast.ForOf, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferTypeForOf(node: ast.ForOf, cache: CacheType, indent: number): TypeDescription {
     const log = enterLog("isForOf", node.name, indent);
     let type = TypeSystem.inferType(node.of, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
@@ -735,7 +764,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeForTo(node: ast.ForTo, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferTypeForTo(node: ast.ForTo, cache: CacheType, indent: number): TypeDescription {
     const log = enterLog("isForTo", node.name, indent);
     let type = TypeSystem.inferType(node.e1, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
@@ -751,7 +780,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeForUntil(node: ast.ForUntil, cache: Map<AstNode, TypeDescription>, indent: number): TypeDescription {
+  static inferTypeForUntil(node: ast.ForUntil, cache: CacheType, indent: number): TypeDescription {
     const log = enterLog("isForUntil", node.name, indent);
     let type = TypeSystem.inferType(node.e1, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
@@ -767,11 +796,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeAssignment(
-    node: ast.Assignment,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeAssignment(node: ast.Assignment, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isAssignment", node.operator, indent);
     if (node.assign) {
@@ -792,11 +817,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeIfExpression(
-    node: ast.IfExpression,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeIfExpression(node: ast.IfExpression, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isIfExpression", node.$type, indent);
     //todo 삼항연산자의 경우 inferType이 호출될 수 있다... 일단은 any type return
@@ -812,11 +833,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeMatchExpression(
-    node: ast.MatchExpression,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeMatchExpression(node: ast.MatchExpression, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isMatchExpression", node.$type, indent);
     exitLog(log, type);
@@ -831,11 +848,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeArrayExpression(
-    node: ast.ArrayExpression,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeArrayExpression(node: ast.ArrayExpression, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     // 다른 것들은 node의 타입을 통해서 타입을 추론하지만 이것은 ref을 이용해서 추론해야만 한다.
     const log = enterLog("isArrayExpression", `'${node.element.$refText}'`, indent);
@@ -853,11 +866,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeUnaryExpression(
-    node: ast.UnaryExpression,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeUnaryExpression(node: ast.UnaryExpression, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isUnaryExpression", node.operator, indent);
     if (node.operator === "!" || node.operator === "not") {
@@ -878,11 +887,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeBinaryExpression(
-    node: ast.BinaryExpression,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeBinaryExpression(node: ast.BinaryExpression, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isBinaryExpression", node.operator, indent);
     type = TypeSystem.createErrorType("Could not infer type from binary expression", node);
@@ -911,11 +916,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeNewExpression(
-    node: ast.NewExpression,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeNewExpression(node: ast.NewExpression, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isNewExpression", node.$type, indent);
     if (node.class.ref) {
@@ -934,11 +935,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeArrayValue(
-    node: ast.ArrayValue,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeArrayValue(node: ast.ArrayValue, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isArrayValue", node.items.toString(), indent);
     // item이 없는 경우 즉 [] 으로 표현되는 빈 배열의 경우 any type으로 취급한다.
@@ -956,11 +953,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeObjectValue(
-    node: ast.ObjectValue,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeObjectValue(node: ast.ObjectValue, cache: CacheType, indent: number): TypeDescription {
     const log = enterLog("isObjectValue", `'${node.$cstNode?.text}'`, indent);
     const type = TypeSystem.createClassType(node);
     exitLog(log, type);
@@ -974,30 +967,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeFunctionValue(
-    node: ast.FunctionValue,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
-    const log = enterLog("isFunctionValue", node.$type, indent);
-    if (node.returnType) type = TypeSystem.inferType(node.returnType, cache, indent);
-    exitLog(log, type);
-    return type;
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferTypeArrayType(
-    node: ast.ArrayType,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeArrayType(node: ast.ArrayType, cache: CacheType, indent: number): TypeDescription {
     const log = enterLog("isArrayType", `'${node.elementType.$cstNode?.text}'`, indent);
     const type = TypeSystem.createArrayType(TypeSystem.inferType(node.elementType, cache, indent));
     exitLog(log, type);
@@ -1011,11 +981,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeObjectType(
-    node: ast.ObjectType,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeObjectType(node: ast.ObjectType, cache: CacheType, indent: number): TypeDescription {
     const log = enterLog("isObjectType", `'${node.$cstNode?.text}'`, indent);
     const type = TypeSystem.createClassType(node);
     exitLog(log, type);
@@ -1029,22 +995,20 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeElementType(
-    node: ast.ElementType,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypeElementType(node: ast.ElementType, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isElementType", `'${node.$cstNode?.text}'`, indent);
     if (ast.isFunctionType(node)) {
-      type = TypeSystem.inferTypeFunctionType(node, cache, indent);
+      traceLog(indent + 1, "Type is function");
+      type = TypeSystem.inferFunctionSimpleType(node, cache, indent);
     } else if (ast.isPrimitiveType(node)) {
+      traceLog(indent + 1, "Type is primitive");
       type = TypeSystem.inferTypePrimitiveType(node, cache, indent);
     } else if (node.reference) {
       traceLog(indent + 1, "Type is reference");
       if (node.reference.ref) {
         const ref = node.reference.ref;
-        if (ast.isTObject(ref)) {
+        if (ast.isObjectDef(ref)) {
           type = TypeSystem.createClassType(ref);
         } else {
           traceLog(indent + 1, "node.reference.ref is not class");
@@ -1064,11 +1028,7 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypePrimitiveType(
-    node: ast.PrimitiveType,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
+  static inferTypePrimitiveType(node: ast.PrimitiveType, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isPrimitiveType", `'${node.$cstNode?.text}'`, indent);
     if (node.type === "any") {
@@ -1084,34 +1044,6 @@ export class TypeSystem {
     } else if (node.type === "void") {
       type = TypeSystem.createVoidType();
     }
-    exitLog(log, type);
-    return type;
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferTypeFunctionType(
-    node: ast.FunctionType,
-    cache: Map<AstNode, TypeDescription>,
-    indent: number
-  ): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
-    const log = enterLog("isFunctionType", `'${node.$cstNode?.text}'`, indent);
-    const returnType = TypeSystem.inferType(node.returnType, cache, indent + 1);
-    const parameters = node.bindings.map((e) => {
-      if (e.spread) {
-        //todo ...optionalParams 같은 경우 일단은 any type을 리턴한다.
-        return { name: e.spread.$refText, type: TypeSystem.createAnyType() };
-      } else {
-        return { name: e.name!, type: TypeSystem.inferType(e.type, cache, indent + 2) };
-      }
-    });
-    type = TypeSystem.createFunctionType(returnType, parameters);
     exitLog(log, type);
     return type;
   }

@@ -11,9 +11,9 @@ export function registerValidationChecks(services: ScalaScriptServices) {
   const registry = services.validation.ValidationRegistry;
   const validator = services.validation.ScalaScriptValidator;
   const checks: ValidationChecks<ast.ScalaScriptAstType> = {
-    TObject: validator.checkClassDeclaration,
-    TFunction: validator.checkFunctionReturnType,
-    TVariable: validator.checkVariableDeclaration,
+    VariableDef: validator.checkVariableDeclaration,
+    FunctionDef: validator.checkFunctionReturnType,
+    ObjectDef: validator.checkClassDeclaration,
     Assignment: validator.checkAssignment,
     UnaryExpression: validator.checkUnaryOperationAllowed,
     BinaryExpression: validator.checkBinaryOperationAllowed,
@@ -27,24 +27,10 @@ export function registerValidationChecks(services: ScalaScriptServices) {
 export class ScalaScriptValidator {
   /**
    *
-   * @param declaration
-   * @param accept
-   */
-  checkClassDeclaration(declaration: ast.TObject, accept: ValidationAcceptor): void {
-    // TODO: implement classes
-    // console.log("checkClassDeclaration");
-    // accept("error", "Classes are currently unsupported.", {
-    //   node: declaration,
-    //   property: "name",
-    // });
-  }
-
-  /**
-   *
    * @param expr
    * @param accept
    */
-  checkVariableDeclaration(expr: ast.TVariable, accept: ValidationAcceptor): void {
+  checkVariableDeclaration(expr: ast.VariableDef, accept: ValidationAcceptor): void {
     // console.log("checkVariableDeclaration");
     // const text = AstUtils.getDocument(expr).parseResult.value.$cstNode?.text;
     // const text = (AstUtils.getDocument(expr).parseResult.value.$cstNode as RootCstNode).fullText;
@@ -88,6 +74,53 @@ export class ScalaScriptValidator {
         property: "name",
       });
     }
+  }
+
+  /**
+   *
+   * @param method
+   * @param accept
+   * @returns
+   */
+  checkFunctionReturnType(method: ast.FunctionDef, accept: ValidationAcceptor): void {
+    // console.log("checkFunctionReturnType");
+    if (method.body && method.returnType) {
+      const map = getTypeCache();
+      const returnStatements = AstUtils.streamAllContents(method.body).filter(ast.isReturnExpression).toArray();
+      const expectedType = TypeSystem.inferType(method.returnType, map);
+      if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
+        accept("error", "A function whose declared type is not 'void' must return a value.", {
+          node: method.returnType,
+        });
+        return;
+      }
+      //todo
+      // for (const returnStatement of returnStatements) {
+      //   const returnValueType = TypeSystem.inferType(returnStatement, map);
+      //   if (!isAssignable(returnValueType, expectedType)) {
+      //     const msg = `Type '${TypeSystem.typeToString(
+      //       returnValueType
+      //     )}' is not assignable to type '${TypeSystem.typeToString(expectedType)}'.`;
+      //     accept("error", msg, {
+      //       node: returnStatement,
+      //     });
+      //   }
+      // }
+    }
+  }
+
+  /**
+   *
+   * @param declaration
+   * @param accept
+   */
+  checkClassDeclaration(declaration: ast.ObjectDef, accept: ValidationAcceptor): void {
+    // TODO: implement classes
+    // console.log("checkClassDeclaration");
+    // accept("error", "Classes are currently unsupported.", {
+    //   node: declaration,
+    //   property: "name",
+    // });
   }
 
   /**
@@ -165,39 +198,6 @@ export class ScalaScriptValidator {
           property: "operator",
         });
       }
-    }
-  }
-
-  /**
-   *
-   * @param method
-   * @param accept
-   * @returns
-   */
-  checkFunctionReturnType(method: ast.TFunction, accept: ValidationAcceptor): void {
-    // console.log("checkFunctionReturnType");
-    if (method.body && method.returnType) {
-      const map = getTypeCache();
-      const returnStatements = AstUtils.streamAllContents(method.body).filter(ast.isReturnExpression).toArray();
-      const expectedType = TypeSystem.inferType(method.returnType, map);
-      if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
-        accept("error", "A function whose declared type is not 'void' must return a value.", {
-          node: method.returnType,
-        });
-        return;
-      }
-      //todo
-      // for (const returnStatement of returnStatements) {
-      //   const returnValueType = TypeSystem.inferType(returnStatement, map);
-      //   if (!isAssignable(returnValueType, expectedType)) {
-      //     const msg = `Type '${TypeSystem.typeToString(
-      //       returnValueType
-      //     )}' is not assignable to type '${TypeSystem.typeToString(expectedType)}'.`;
-      //     accept("error", msg, {
-      //       node: returnStatement,
-      //     });
-      //   }
-      // }
     }
   }
 }
@@ -373,7 +373,7 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
       return false;
     }
     const fromLit = from.literal;
-    if (ast.isTObject(fromLit)) {
+    if (ast.isObjectDef(fromLit)) {
       // console.log(space + `from is object: '${fromLit.name}'`);
       const fromChain = TypeSystem.getClassChain(fromLit);
       const toClass = to.literal;

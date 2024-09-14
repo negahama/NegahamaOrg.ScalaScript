@@ -62,7 +62,7 @@ SimpleType:
 ElementType:
   FunctionType
   | PrimitiveType
-  | reference=[TObject:Id] (generic=Generic)?;
+  | reference=[ObjectDef:Id] (generic=Generic)?;
 
 PrimitiveType:
   type=('any' | 'nil' | 'void' | 'string' | 'number' | 'boolean');
@@ -94,9 +94,9 @@ Generic:
 
 
 type NamedElement =
-  TVariable
-  | TFunction
-  | TObject
+  VariableDef
+  | FunctionDef
+  | ObjectDef
   | Iterator
   | Parameter
   | TypeBinding
@@ -111,9 +111,9 @@ fragment Annotation:
 
 Statement:
   Bypass
-  | VariableDefinition
-  | FunctionDefinition
-  | ObjectDefinition
+  | VariableDef
+  | FunctionDef
+  | ObjectDef
   | DoStatement
   | ForStatement
   | WhileStatement
@@ -139,7 +139,7 @@ Statement:
 //
 // var, val 은 변수를 선언하는 것이지만 엄밀하게 말하면 변수의 성격을 결정하는 것으로써
 // var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
-VariableDefinition infers TVariable:
+VariableDef:
   (Annotation)? (export?='export')? (private?='private')? (static?='static')?
   kind=('val' | 'var') name=Id (nullable?='?')? (':' type=Types)? ('=' value=Expression)?;
 
@@ -178,9 +178,9 @@ fragment Spread:
 // 함수의 정의 자체는 값에 대한 이름 부여이고 ScalaScript의 Type system에 부합되지 않지만
 // 편이를 위해 제공하고 있다. 실제로도 타입스크립트의 function으로 transpile되어지기는 하지만
 // 이것 대신 val function_name = FuncionValue를 사용해야 한다.
-FunctionDefinition infers TFunction:
+FunctionDef:
   (Annotation)? (export?='export')? (private?='private')? (static?='static')? 
-  'def' (extension=[TObject:Id] '.')? name=Id
+  'def' (extension=[ObjectDef:Id] '.')? name=Id
   '(' (params+=Parameter (',' params+=Parameter)*)? ')' ('->' returnType=Types)? ('=>' body=Block)?;
 
 Parameter:
@@ -192,14 +192,14 @@ Parameter:
 // Object의 정의란 Object의 타입에 이름을 부여하는 것이다.
 // Object는 복합타입 컨테이너로 자신을 제외한 모든 타입을 가질 수 있다.
 // 예를들면 단일타입, 다른 복합타입, 배열타입등을 모두 element로 가질 수 있다. 
-ObjectDefinition infers TObject:
+ObjectDef:
   (Annotation)? (export?='export')?
-  'def' name=Id ('extends' superClass=[TObject:Id])?
+  'def' name=Id ('extends' superClass=[ObjectDef:Id])?
   '=>' body=ObjectType;
 
 // ex) var obj: { name: string age: number }
 ObjectType:
-  '{' elements+=(Bypass | VariableDefinition | FunctionDefinition)* '}';
+  '{' elements+=(Bypass | VariableDef | FunctionDef)* '}';
 
 // ex) var obj = { name = "samuel" age = 20 ...ary }
 ObjectValue:
@@ -222,8 +222,12 @@ ForStatement:
 Iterator: ForOf | ForTo | ForUntil;
 
 ForOf   : name=Id '<-' of=Expression;
-ForTo   : name=Id '<-' e1=Expression 'to'    e2=Expression ('step' step=NumberLiteral)?;
-ForUntil: name=Id '<-' e1=Expression 'until' e2=Expression ('step' step=NumberLiteral)?;
+ForTo   : name=Id '<-' e1=Expression 'to'    e2=Expression ('step' step=IntegerLiteral2)?;
+ForUntil: name=Id '<-' e1=Expression 'until' e2=Expression ('step' step=IntegerLiteral2)?;
+
+// step은 마이너스를 포함한 정수값만을 가질 수 있다.
+IntegerLiteral2 returns number:
+  ('-' | '+')? IntegerLiteral;
 
 // While Loop
 WhileStatement:
@@ -357,22 +361,12 @@ GroupExpression:
   '(' value=Expression ')';
 
 // Literals
-// There are literals for integer numbers, floating point numbers, characters, booleans, symbols, strings.
-// The syntax of these literals is in each case as in Java.
+// There are literals for booleans, integer numbers, floating point numbers, strings, and so on.
+// The syntax of these literals is in each case as in TypeScript.
+// FloatingPointLiteral, IntegerLiteral은 minus을 포함하지 않는다.
+// minus는 unary operation으로 따로 정의되어져 있음 
 Literal:
-  AnyExpression
-  | NilExpression
-  | StringExpression
-  | NumberExpression
-  | BooleanExpression
-  | VoidExpression;
-
-AnyExpression: value='any';
-NilExpression: value='nil';
-StringExpression: value=(StringLiteral | RegExStringLiteral);
-NumberExpression: value=NumberLiteral;
-BooleanExpression: value?='true' | 'false';
-VoidExpression: value='void';
+  value=( 'any' | 'nil' | 'void' | 'true' | 'false' | FloatingPointLiteral | IntegerLiteral | StringLiteral | RegExStringLiteral );
 
 // 이 규칙이 UnaryExpression과 독립적인 것은 연산 우선 순위가 다르기 때문이다.
 LogicalNot infers UnaryExpression:
@@ -428,7 +422,7 @@ SpreadExpression:
   '...' spread=[NamedElement:Id];
 
 NewExpression:
-  'new' class=[TObject:Id] (generic=Generic)?'(' (args+=Expression (',' args+=Expression)*)? ')';
+  'new' class=[ObjectDef:Id] (generic=Generic)?'(' (args+=Expression (',' args+=Expression)*)? ')';
 
 //-----------------------------------------------------------------------------
 // terminal & literal
@@ -451,9 +445,8 @@ NewExpression:
 // Otherwise `true` and `false` is identified for Indentifier
 // terminal BooleanLiteral returns boolean: 'true' | 'false';
 
-NumberLiteral returns number:
-  ('-')? FloatingPointLiteral
-  | ('-')? IntegerLiteral;
+// NumberLiteral returns number:
+//   FloatingPointLiteral | IntegerLiteral;
 
 // Floating Point Literals
 // example : 0.0    3.14159    1e30    1.0e-100
