@@ -444,6 +444,8 @@ export class TypeSystem {
       type = TypeSystem.inferTypeForUntil(node, cache, indent);
     } else if (ast.isAssignment(node)) {
       type = TypeSystem.inferTypeAssignment(node, cache, indent);
+    } else if (ast.isLogicalNot(node)) {
+      type = TypeSystem.inferTypeLogicalNot(node, cache, indent);
     } else if (ast.isIfExpression(node)) {
       type = TypeSystem.inferTypeIfExpression(node, cache, indent);
     } else if (ast.isMatchExpression(node)) {
@@ -817,6 +819,23 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
+  static inferTypeLogicalNot(node: ast.LogicalNot, cache: CacheType, indent: number): TypeDescription {
+    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
+    const log = enterLog("isLogicalNot", node.operator, indent);
+    if (node.operator === "!" || node.operator === "not") {
+      type = TypeSystem.createBooleanType();
+    }
+    exitLog(log, type);
+    return type;
+  }
+
+  /**
+   *
+   * @param node
+   * @param cache
+   * @param indent
+   * @returns
+   */
   static inferTypeIfExpression(node: ast.IfExpression, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isIfExpression", node.$type, indent);
@@ -869,12 +888,10 @@ export class TypeSystem {
   static inferTypeUnaryExpression(node: ast.UnaryExpression, cache: CacheType, indent: number): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isUnaryExpression", node.operator, indent);
-    if (node.operator === "!" || node.operator === "not") {
-      type = TypeSystem.createBooleanType();
-    } else if (node.operator === "typeof") {
+    if (node.operator && node.operator === "typeof") {
       type = TypeSystem.createStringType();
     } else {
-      type = TypeSystem.createNumberType();
+      type = TypeSystem.inferType(node.value, cache, indent);
     }
     exitLog(log, type);
     return type;

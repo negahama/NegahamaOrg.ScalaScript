@@ -290,7 +290,12 @@ Multiplication infers Expression:
   Exponentiation ({infer BinaryExpression.left=current} operator=('*' | '/' | '%') right=Exponentiation)*;
 
 Exponentiation infers Expression:
-  CallChain      ({infer BinaryExpression.left=current} operator=('**') right=CallChain)*;
+  UnaryOperator  ({infer BinaryExpression.left=current} operator=('**') right=UnaryOperator)*;
+
+// Unary operators
+// 이것은 거듭제곱보다 우선순위가 높은 연산이다.
+UnaryOperator infers Expression:
+  {infer UnaryExpression} (operator=('-' | '+' | 'typeof'))? value=CallChain;
 
 // Member call and Chaining of Member calls
 // 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수 있다.
@@ -327,7 +332,6 @@ CallChain infers Expression:
 SimpleExpression infers Expression:
   FunctionCall
   | ThisOrSuper
-  | UnaryExpression
   | ArrayExpression
   | GroupExpression
   | Literal;
@@ -351,11 +355,6 @@ FunctionCall: {infer CallChain}
 
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
 
-// Unary operators
-//todo 이것은 거듭제곱보다 우선순위가 높은 연산이다. 연산에 포함되어야 한다
-UnaryExpression:
-  operator=('-' | '+' | 'typeof') value=Expression;
-
 // grouped expression with parentheses
 GroupExpression:
   '(' value=Expression ')';
@@ -369,7 +368,7 @@ Literal:
   value=( 'any' | 'nil' | 'void' | 'true' | 'false' | FloatingPointLiteral | IntegerLiteral | StringLiteral | RegExStringLiteral );
 
 // 이 규칙이 UnaryExpression과 독립적인 것은 연산 우선 순위가 다르기 때문이다.
-LogicalNot infers UnaryExpression:
+LogicalNot:
   operator=('not' | '!') value=Expression;
 
 // Assignment를 아래와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.

@@ -40,7 +40,7 @@ export function generateTypeScript(program: ast.Program, filePath: string, desti
 export function generateCode(code: ast.Code): string {
   let result = "";
   if (ast.isStatement(code)) result += generateStatement(code, 0);
-  else if (ast.isExpression(code)) result += generateExpression(code, 0) + ";";
+  else if (ast.isExpression(code)) result += generateExpression(code, 0, true);
   else console.log(chalk.red("ERROR in Code:", code));
   return result;
 }
@@ -94,11 +94,17 @@ export function generateStatement(stmt: ast.Statement | undefined, indent: numbe
  * @param indent
  * @returns
  */
-export function generateExpression(expr: ast.Expression | undefined, indent: number): string {
+export function generateExpression(
+  expr: ast.Expression | undefined,
+  indent: number,
+  semicolon: boolean = false
+): string {
   let result = "";
   if (expr == undefined) return result;
   if (ast.isAssignment(expr)) {
     result += transpileAssignment(expr, indent);
+  } else if (ast.isLogicalNot(expr)) {
+    result += transpileLogicalNot(expr, indent);
   } else if (ast.isCallChain(expr)) {
     result += transpileCallChain(expr, indent);
   } else if (ast.isIfExpression(expr)) {
@@ -134,7 +140,10 @@ export function generateExpression(expr: ast.Expression | undefined, indent: num
   } else {
     console.log(chalk.red("ERROR in Expression:", expr));
   }
-  return result;
+
+  // semi colon 처리
+  if (ast.isIfExpression(expr)) semicolon = false;
+  return result + (semicolon ? ";" : "");
 }
 
 /**
@@ -151,7 +160,7 @@ export function generateBlock(
 ): string {
   const defaultDoIt = (lastCode: ast.Code, indent: number) => {
     if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
+    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true);
     else return "";
   };
 
@@ -165,7 +174,7 @@ export function generateBlock(
       else element += doItForLastCode(code, indent + 1);
     } else {
       if (ast.isStatement(code)) element += generateStatement(code, indent + 1);
-      else if (ast.isExpression(code)) element += generateExpression(code, indent + 1) + ";";
+      else if (ast.isExpression(code)) element += generateExpression(code, indent + 1, true);
       else console.log(chalk.red("ERROR in Block:", code));
     }
     result += applyIndent(indent + 1, element + "\n");
@@ -194,7 +203,7 @@ export function generateTypes(type: ast.Types | undefined, indent: number): stri
  */
 export function generateCondition(condition: ast.Expression, indent: number): string {
   const e = generateExpression(condition, indent);
-  return ast.isGroupExpression(condition) ? e : "(" + e + ")";
+  return ast.isGroupExpression(condition) || ast.isUnaryExpression(condition) ? e : "(" + e + ")";
 }
 
 /**
@@ -263,7 +272,7 @@ export function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isCl
   result += stmt.body
     ? generateBlock(stmt.body, indent, (lastCode: ast.Code, indent: number) => {
         if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
+        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true);
         else return "";
       })
     : "";
@@ -294,7 +303,7 @@ export function transpileFunctionValue(expr: ast.FunctionValue, indent: number):
   result += generateTypes(expr.returnType, indent) + " => ";
   result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
     if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
+    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true);
     else return "";
   });
   return result;
@@ -414,7 +423,7 @@ export function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: 
     if (mc.body) {
       result += generateBlock(mc.body, indent + 1, (lastCode, indent) => {
         if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
+        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true);
         else return "";
       });
     }
@@ -439,6 +448,26 @@ export function transpileAssignment(expr: ast.Assignment, indent: number): strin
   // n++ 을 대신해서 n += 1 이 argument로 사용되거나 할 때는 semi colon을 표시하면 안되므로 지원하지 않는다
   // result += ast.isAssignment(expr.value) ? "" : ";";
   return result;
+}
+
+/**
+ *
+ * @param expr
+ * @param indent
+ * @returns
+ */
+export function transpileLogicalNot(expr: ast.LogicalNot, indent: number): string {
+  let op = "";
+  switch (expr.operator) {
+    case "not": {
+      op = "!";
+      break;
+    }
+    default: {
+      op = expr.operator;
+    }
+  }
+  return `${op} ${generateExpression(expr.value, indent)}`;
 }
 
 /**
@@ -562,7 +591,7 @@ export function transpileMatchExpression(expr: ast.MatchExpression, indent: numb
     if (mc.body) {
       result += generateBlock(mc.body, indent + 1, (lastCode, indent) => {
         if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent) + ";";
+        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true);
         else return "";
       });
     }
@@ -579,17 +608,8 @@ export function transpileMatchExpression(expr: ast.MatchExpression, indent: numb
  * @returns
  */
 export function transpileUnaryExpression(expr: ast.UnaryExpression, indent: number): string {
-  let op = "";
-  switch (expr.operator) {
-    case "not": {
-      op = "!";
-      break;
-    }
-    default: {
-      op = expr.operator;
-    }
-  }
-  return `${op} ${generateExpression(expr.value, indent)}`;
+  if (expr.operator) return `${expr.operator} ${generateExpression(expr.value, indent)}`;
+  else return generateExpression(expr.value, indent);
 }
 
 /**

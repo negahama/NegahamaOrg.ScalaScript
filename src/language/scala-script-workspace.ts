@@ -254,7 +254,7 @@ const ScalaScriptBuiltinLibrary = `
   // key에 해당하는 값을 반환합니다. key가 존재하지 않으면 undefined를 반환합니다.
   def get(key)
   // key가 존재하면 true, 존재하지 않으면 false를 반환합니다.
-  def has(key)
+  def has(key)-> boolean
   // key에 해당하는 값을 삭제합니다.
   def delete(key)
   // 맵 안의 모든 요소를 제거합니다.
@@ -275,7 +275,7 @@ const ScalaScriptBuiltinLibrary = `
   // 값을 추가하고 셋 자신을 반환합니다.
   def add(value)
   // 셋 내에 값이 존재하면 true, 아니면 false를 반환합니다.
-  def has(value)
+  def has(value)-> boolean
   // 값을 제거합니다. 호출 시점에 셋 내에 값이 있어서 제거에 성공하면 true, 아니면 false를 반환합니다.
   def delete(value)
   // 셋을 비웁니다.

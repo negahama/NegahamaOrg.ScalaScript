@@ -156,17 +156,17 @@ export class ScalaScriptValidator {
    */
   checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
     // console.log("checkUnaryOperationAllowed");
-    const item = TypeSystem.inferType(unary.value, getTypeCache());
-
-    if (!isLegalOperation(unary.operator, item)) {
-      accept(
-        "error",
-        `Cannot perform operation '${unary.operator}' on value of type '${TypeSystem.typeToString(item)}'.`,
-        {
-          node: unary,
-        }
-      );
-    }
+    //todo
+    // const item = TypeSystem.inferType(unary.value, getTypeCache());
+    // if (!isLegalOperation(unary.operator, item)) {
+    //   accept(
+    //     "error",
+    //     `Cannot perform operation '${unary.operator}' on value of type '${TypeSystem.typeToString(item)}'.`,
+    //     {
+    //       node: unary,
+    //     }
+    //   );
+    // }
   }
 
   /**
