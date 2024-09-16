@@ -207,6 +207,21 @@ export function generateCondition(condition: ast.Expression, indent: number): st
 }
 
 /**
+ * 배열은 1 부터 카운트되기 때문에 TypeScript로 변환될 때는 -1을 해 주어야 한다.
+ * 이때 숫자로 되어져 있으면 -1을 한 값을 바로 사용하고 그렇지 않으면 -1을 추가해 준다.
+ * IntegerLiteral 인지의 여부를 판별하기 위해서는 여러 단계를 거쳐야만 한다.
+ *
+ * @param expr
+ * @param indent
+ */
+export function generateArrayIndex(expr: ast.Expression | undefined, indent: number): string {
+  if (ast.isUnaryExpression(expr) && ast.isLiteral(expr.value) && typeof expr.value.value == "number") {
+    return (expr.value.value - 1).toString();
+  }
+  return generateExpression(expr, indent) + " - 1";
+}
+
+/**
  *
  * @param lv
  * @param s
@@ -301,6 +316,26 @@ export function transpileFunctionType(expr: ast.FunctionType, indent: number): s
 export function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string {
   let result = transpileFunctionArguments(expr.bindings, indent);
   result += generateTypes(expr.returnType, indent) + " => ";
+
+  // 단일 expression을 괄호로 표시하면 numbers.find(n => n == 0) 과 같은 구문에 항상 return을 사용해야 하는 불편이 있다.
+  // 따라서 expression이 하나이면 괄호를 사용하지 않지만 이것도 return 문과 같이 사용되면 괄호를 사용해야 한다
+  // return처럼 단일 expression으로 처리할 수 없는 것들은 assignment, if, match등이 있다.
+  if (expr.body.codes.length == 0) console.error("block is empty");
+  if (expr.body.codes.length == 1) {
+    const lastCode = expr.body.codes[0];
+    if (ast.isExpression(lastCode)) {
+      if (
+        !(
+          ast.isAssignment(lastCode) ||
+          ast.isIfExpression(lastCode) ||
+          ast.isMatchExpression(lastCode) ||
+          ast.isReturnExpression(lastCode)
+        )
+      )
+        return result + generateExpression(lastCode, indent);
+    }
+  }
+
   result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
     if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
     else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true);
@@ -315,7 +350,7 @@ export function transpileFunctionValue(expr: ast.FunctionValue, indent: number):
  * @param indent
  * @returns
  */
-function transpileFunctionArguments(bindings: ast.TypeBinding[], indent: number) {
+export function transpileFunctionArguments(bindings: ast.TypeBinding[], indent: number) {
   return "(" + bindings.map((bind) => bind.name + generateTypes(bind.type, indent)).join(", ") + ")";
 }
 
@@ -512,7 +547,7 @@ export function transpileCallChain(expr: ast.CallChain, indent: number): string 
     }
   }
   if (expr.isArray) {
-    result += "[" + generateExpression(expr.index, indent) + "]";
+    result += "[" + generateArrayIndex(expr.index, indent) + "]";
   }
   if (expr.assertion) result += expr.assertion;
   return result;
@@ -672,7 +707,7 @@ export function transpileNewExpression(expr: ast.NewExpression, indent: number):
  * @returns
  */
 export function transpileArrayExpression(expr: ast.ArrayExpression, indent: number): string {
-  return `${expr.element.$refText}[(${generateExpression(expr.index, indent)}) - 1]`;
+  return `${expr.element.$refText}[(${generateArrayIndex(expr.index, indent)})]`;
 }
 
 /**
