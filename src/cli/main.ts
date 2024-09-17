@@ -1,10 +1,7 @@
 import type { Program } from "../language/generated/ast.js";
-import chalk from "chalk";
-import { Command } from "commander";
 import { ScalaScriptLanguageMetaData } from "../language/generated/module.js";
 import { createScalaScriptServices } from "../language/scala-script-module.js";
 import { generateTypeScript } from "./generator.js";
-import { NodeFileSystem } from "langium/node";
 import * as url from "node:url";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -12,6 +9,9 @@ import * as path from "node:path";
 import { URI } from "vscode-uri";
 import { WorkspaceFolder } from "vscode-languageserver";
 import { LangiumCoreServices } from "langium";
+import { NodeFileSystem } from "langium/node";
+import { Command } from "commander";
+import chalk from "chalk";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 

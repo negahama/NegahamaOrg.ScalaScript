@@ -1,6 +1,6 @@
 import { MonacoEditorLanguageClientWrapper, UserConfig } from "monaco-editor-wrapper";
 import { configureWorker, defineUserServices } from "./setupCommon.js";
-import monarchSyntax from "./syntaxes/scala-script.monarch.js";
+import monarchSyntax from "../../src/syntaxes/scala-script.monarch.js";
 
 export const setupConfigClassic = (): UserConfig => {
   return {

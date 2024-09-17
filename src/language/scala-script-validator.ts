@@ -2,6 +2,7 @@ import { AstNode, AstUtils, type ValidationAcceptor, type ValidationChecks } fro
 import * as ast from "./generated/ast.js";
 import type { ScalaScriptServices } from "./scala-script-module.js";
 import { TypeDescription, TypeSystem } from "./scala-script-types.js";
+import { enterLog, exitLog, traceLog } from "./scala-script-util.js";
 import chalk from "chalk";
 
 /**
@@ -11,8 +12,8 @@ export function registerValidationChecks(services: ScalaScriptServices) {
   const registry = services.validation.ValidationRegistry;
   const validator = services.validation.ScalaScriptValidator;
   const checks: ValidationChecks<ast.ScalaScriptAstType> = {
-    VariableDef: validator.checkVariableDeclaration,
-    FunctionDef: validator.checkFunctionReturnType,
+    VariableDef: validator.checkVariableDef,
+    FunctionDef: validator.checkFunctionDef,
     ObjectDef: validator.checkClassDeclaration,
     Assignment: validator.checkAssignment,
     UnaryExpression: validator.checkUnaryOperationAllowed,
@@ -30,8 +31,7 @@ export class ScalaScriptValidator {
    * @param expr
    * @param accept
    */
-  checkVariableDeclaration(expr: ast.VariableDef, accept: ValidationAcceptor): void {
-    // console.log("checkVariableDeclaration");
+  checkVariableDef(expr: ast.VariableDef, accept: ValidationAcceptor): void {
     // const text = AstUtils.getDocument(expr).parseResult.value.$cstNode?.text;
     // const text = (AstUtils.getDocument(expr).parseResult.value.$cstNode as RootCstNode).fullText;
     // console.log(text);
@@ -44,19 +44,16 @@ export class ScalaScriptValidator {
     //   }
     // }
 
-    // console.log("    expr.name:", expr.name);
-    // console.log("    expr.type:", `'${expr.type?.$cstNode?.text}'`);
-    // console.log("    expr.value:", `${expr.value?.$type}, '${expr.value?.$cstNode?.text}'`);
-    // if (expr.type == undefined) {
-    //   if (ast.isLiteral(expr.value)) {
-    //     console.log("    expr.value:", expr.value.$type, expr.value.value, typeof expr.value.value);
-    //   }
-    // }
+    const log = enterLog("checkVariableDef", expr.name, 0);
+    traceLog(1, "expr.type:", `'${expr.type?.$cstNode?.text}'`);
+    traceLog(1, "expr.value:", `${expr.value?.$type}, '${expr.value?.$cstNode?.text}'`);
 
     if (expr.type && expr.value) {
       const map = getTypeCache();
       const left = TypeSystem.inferType(expr.type, map);
       const right = TypeSystem.inferType(expr.value, map);
+
+      traceLog(1, `${right.$type} = ${left.$type}`);
 
       if (!isAssignable(right, left)) {
         accept(
@@ -74,6 +71,7 @@ export class ScalaScriptValidator {
         property: "name",
       });
     }
+    exitLog(log);
   }
 
   /**
@@ -82,8 +80,9 @@ export class ScalaScriptValidator {
    * @param accept
    * @returns
    */
-  checkFunctionReturnType(method: ast.FunctionDef, accept: ValidationAcceptor): void {
-    // console.log("checkFunctionReturnType");
+  checkFunctionDef(method: ast.FunctionDef, accept: ValidationAcceptor): void {
+    const log = enterLog("checkFunctionDef", method.name, 0);
+
     if (method.body && method.returnType) {
       const map = getTypeCache();
       const returnStatements = AstUtils.streamAllContents(method.body).filter(ast.isReturnExpression).toArray();
@@ -107,6 +106,7 @@ export class ScalaScriptValidator {
       //   }
       // }
     }
+    exitLog(log);
   }
 
   /**
@@ -114,13 +114,14 @@ export class ScalaScriptValidator {
    * @param declaration
    * @param accept
    */
-  checkClassDeclaration(declaration: ast.ObjectDef, accept: ValidationAcceptor): void {
+  checkClassDeclaration(decl: ast.ObjectDef, accept: ValidationAcceptor): void {
+    const log = enterLog("checkClassDeclaration", decl.name, 0);
     // TODO: implement classes
-    // console.log("checkClassDeclaration");
     // accept("error", "Classes are currently unsupported.", {
-    //   node: declaration,
+    //   node: decl,
     //   property: "name",
     // });
+    exitLog(log);
   }
 
   /**
@@ -129,13 +130,15 @@ export class ScalaScriptValidator {
    * @param accept
    */
   checkAssignment(expr: ast.Assignment, accept: ValidationAcceptor): void {
-    // console.log("checkAssignment");
-    // console.log(`    left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`);
-    // console.log(`    right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`);
+    const log = enterLog("checkAssignment", expr.assign.$type, 0);
+    traceLog(1, `left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`);
+    traceLog(1, `right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`);
 
     const map = getTypeCache();
     const left = TypeSystem.inferType(expr.assign, map);
     const right = TypeSystem.inferType(expr.value, map);
+
+    traceLog(1, `${right.$type} = ${left.$type}`);
 
     if (!isAssignable(right, left)) {
       accept(
@@ -147,6 +150,7 @@ export class ScalaScriptValidator {
         }
       );
     }
+    exitLog(log);
   }
 
   /**
@@ -155,8 +159,7 @@ export class ScalaScriptValidator {
    * @param accept
    */
   checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
-    // console.log("checkUnaryOperationAllowed");
-    //todo
+    const log = enterLog("checkUnaryOperationAllowed", unary.value.$type, 0);
     // const item = TypeSystem.inferType(unary.value, getTypeCache());
     // if (!isLegalOperation(unary.operator, item)) {
     //   accept(
@@ -167,6 +170,7 @@ export class ScalaScriptValidator {
     //     }
     //   );
     // }
+    exitLog(log);
   }
 
   /**
@@ -175,13 +179,14 @@ export class ScalaScriptValidator {
    * @param accept
    */
   checkBinaryOperationAllowed(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
-    // console.log("checkBinaryOperationAllowed");
-    // const expr = `'${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`;
-    // console.log(`    expression: ${expr}`);
+    const log = enterLog("checkBinaryOperationAllowed", binary.operator, 0);
+    traceLog(1, `expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`);
 
     const map = getTypeCache();
     const left = TypeSystem.inferType(binary.left, map);
     const right = TypeSystem.inferType(binary.right, map);
+
+    traceLog(1, `${right.$type} = ${left.$type}`);
 
     if (!isLegalOperation(binary.operator, left, right)) {
       const msg =
@@ -199,6 +204,7 @@ export class ScalaScriptValidator {
         });
       }
     }
+    exitLog(log);
   }
 }
 

@@ -1,8 +1,9 @@
 {
   "name": "scala-script",
-  "version": "0.3.5",
-  "displayName": "ScalaScript",
+  "version": "0.3.7",
+  "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
+  "publisher": "NegahamaOrg",
   "author": "Samuel Kang",
   "homepage": "https://github.com/negahama/NegahamaOrg.ScalaScript",
   "license": "MIT",
@@ -10,19 +11,7 @@
     "vscode": "^1.67.0",
     "node": ">=18.0.0"
   },
-  "main": "./out/extension/main.cjs",
   "type": "module",
-  "bin": {
-    "ssc": "bin/cli.js"
-  },
-  "directories": {
-    "test": "test"
-  },
-  "files": [
-    "bin",
-    "out",
-    "src"
-  ],
   "categories": [
     "Programming Languages"
   ],
@@ -47,45 +36,36 @@
     "lint": "eslint src --ext ts",
     "langium:generate": "langium generate",
     "langium:watch": "langium generate --watch",
-    "vscode:prepublish": "npm run build && npm run lint",
-    "build:web": "npm run build",
-    "bundle": "vite build",
-    "bundle:serve": "http-server ./dist --port 5175",
-    "dev": "vite",
-    "dev:debug": "vite --debug --force",
-    "serve": "npm run dev",
-    "test": "vitest run"
+    "vscode:prepublish": "npm run build && npm run lint"
   },
+  "files": [
+    "out",
+    "src"
+  ],
   "dependencies": {
     "langium": "~3.1.0",
-    "vscode": "npm:@codingame/monaco-vscode-api@~3.2.3",
     "vscode-languageclient": "~9.0.1",
-    "vscode-languageserver": "~9.0.1",
-    "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@~3.2.3",
-    "monaco-editor-wrapper": "~4.0.2",
-    "monaco-languageclient": "~8.1.1",
-    "@codingame/monaco-vscode-editor-service-override": "~3.2.3",
-    "@codingame/monaco-vscode-keybindings-service-override": "~3.2.3"
+    "vscode-languageserver": "~9.0.1"
   },
   "devDependencies": {
     "langium-cli": "~3.1.0",
     "typescript": "~5.1.6",
     "eslint": "~8.57.0",
+    "esbuild": "~0.20.2",
+    "concurrently": "~8.2.1",
+    "@types/vscode": "~1.67.0",
     "@types/node": "^18.0.0",
     "@typescript-eslint/parser": "~7.3.1",
-    "@typescript-eslint/eslint-plugin": "~7.3.1",
-    "@types/vscode": "~1.67.0",
-    "concurrently": "~8.2.1",
-    "esbuild": "~0.20.2",
-    "@codingame/esbuild-import-meta-url-plugin": "~1.0.2",
-    "http-server": "~14.1.1",
-    "vite": "~5.2.7",
-    "vitest": "~1.4.0"
+    "@typescript-eslint/eslint-plugin": "~7.3.1"
   },
   "volta": {
     "node": "18.19.1",
     "npm": "10.2.4"
   },
+  "main": "./out/extension/main.cjs",
+  "activationEvents": [
+    "onLanguage:scala-script"
+  ],
   "contributes": {
     "languages": [
       {
@@ -107,8 +87,5 @@
         "path": "syntaxes/scala-script.tmLanguage.json"
       }
     ]
-  },
-  "activationEvents": [
-    "onLanguage:scala-script"
-  ]
+  }
 }

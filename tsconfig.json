@@ -16,6 +16,6 @@
     "rootDir": ".",
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["../src/language/main-browser.ts", "out", "node_modules"]
 }

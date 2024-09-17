@@ -440,8 +440,6 @@ export class TypeSystem {
       type = TypeSystem.inferTypeForOf(node, cache, indent);
     } else if (ast.isForTo(node)) {
       type = TypeSystem.inferTypeForTo(node, cache, indent);
-    } else if (ast.isForUntil(node)) {
-      type = TypeSystem.inferTypeForUntil(node, cache, indent);
     } else if (ast.isAssignment(node)) {
       type = TypeSystem.inferTypeAssignment(node, cache, indent);
     } else if (ast.isLogicalNot(node)) {
@@ -473,7 +471,9 @@ export class TypeSystem {
     } else if (ast.isArrayValue(node)) {
       type = TypeSystem.inferTypeArrayValue(node, cache, indent);
     } else if (ast.isObjectValue(node)) {
-      type = TypeSystem.inferTypeObjectValue(node, cache, indent);
+      const log = enterLog("isObjectValue", `'${node.$cstNode?.text}'`, indent);
+      type = TypeSystem.createClassType(node);
+      exitLog(log, type);
     } else if (ast.isFunctionValue(node)) {
       const log = enterLog("isFunctionValue", node.$type, indent);
       type = TypeSystem.inferFunctionSimpleType(node, cache, indent);
@@ -559,11 +559,27 @@ export class TypeSystem {
     let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
     const log = enterLog("isSimpleType", `'${node.$cstNode?.text}'`, indent);
     if (ast.isArrayType(node)) {
-      type = TypeSystem.inferTypeArrayType(node, cache, indent + 1);
+      type = TypeSystem.createArrayType(TypeSystem.inferType(node.elementType, cache, indent));
     } else if (ast.isObjectType(node)) {
-      type = TypeSystem.inferTypeObjectType(node, cache, indent + 1);
+      type = TypeSystem.createClassType(node);
     } else if (ast.isElementType(node)) {
-      type = TypeSystem.inferTypeElementType(node, cache, indent + 1);
+      if (ast.isFunctionType(node)) {
+        type = TypeSystem.inferFunctionSimpleType(node, cache, indent);
+      } else if (ast.isPrimitiveType(node)) {
+        type = TypeSystem.inferTypePrimitiveType(node, cache, indent);
+      } else if (node.reference) {
+        traceLog(indent + 1, "Type is reference");
+        if (node.reference.ref) {
+          const ref = node.reference.ref;
+          if (ast.isObjectDef(ref)) {
+            type = TypeSystem.createClassType(ref);
+          } else {
+            traceLog(indent + 1, "node.reference.ref is not class");
+          }
+        } else {
+          traceLog(indent + 1, "node.reference.ref is not valid");
+        }
+      }
     }
     exitLog(log, type);
     return type;
@@ -759,7 +775,7 @@ export class TypeSystem {
   }
 
   /**
-   * 이 함수는 for(a <- 1 to 10)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
+   * 이 함수는 for(a <- 1 (to | until) 10)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
    *
    * @param node
    * @param cache
@@ -768,22 +784,6 @@ export class TypeSystem {
    */
   static inferTypeForTo(node: ast.ForTo, cache: CacheType, indent: number): TypeDescription {
     const log = enterLog("isForTo", node.name, indent);
-    let type = TypeSystem.inferType(node.e1, cache, indent + 1);
-    if (TypeSystem.isArrayType(type)) type = type.elementType;
-    exitLog(log, type);
-    return type;
-  }
-
-  /**
-   * 이 함수는 for(a <- 1 until 10)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferTypeForUntil(node: ast.ForUntil, cache: CacheType, indent: number): TypeDescription {
-    const log = enterLog("isForUntil", node.name, indent);
     let type = TypeSystem.inferType(node.e1, cache, indent + 1);
     if (TypeSystem.isArrayType(type)) type = type.elementType;
     exitLog(log, type);
@@ -959,81 +959,6 @@ export class TypeSystem {
     if (node.items.length > 0) {
       type = TypeSystem.createArrayType(TypeSystem.inferType(node.items[0], cache, indent));
     } else type = TypeSystem.createAnyType();
-    exitLog(log, type);
-    return type;
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferTypeObjectValue(node: ast.ObjectValue, cache: CacheType, indent: number): TypeDescription {
-    const log = enterLog("isObjectValue", `'${node.$cstNode?.text}'`, indent);
-    const type = TypeSystem.createClassType(node);
-    exitLog(log, type);
-    return type;
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferTypeArrayType(node: ast.ArrayType, cache: CacheType, indent: number): TypeDescription {
-    const log = enterLog("isArrayType", `'${node.elementType.$cstNode?.text}'`, indent);
-    const type = TypeSystem.createArrayType(TypeSystem.inferType(node.elementType, cache, indent));
-    exitLog(log, type);
-    return type;
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferTypeObjectType(node: ast.ObjectType, cache: CacheType, indent: number): TypeDescription {
-    const log = enterLog("isObjectType", `'${node.$cstNode?.text}'`, indent);
-    const type = TypeSystem.createClassType(node);
-    exitLog(log, type);
-    return type;
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferTypeElementType(node: ast.ElementType, cache: CacheType, indent: number): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType("internal error", node);
-    const log = enterLog("isElementType", `'${node.$cstNode?.text}'`, indent);
-    if (ast.isFunctionType(node)) {
-      traceLog(indent + 1, "Type is function");
-      type = TypeSystem.inferFunctionSimpleType(node, cache, indent);
-    } else if (ast.isPrimitiveType(node)) {
-      traceLog(indent + 1, "Type is primitive");
-      type = TypeSystem.inferTypePrimitiveType(node, cache, indent);
-    } else if (node.reference) {
-      traceLog(indent + 1, "Type is reference");
-      if (node.reference.ref) {
-        const ref = node.reference.ref;
-        if (ast.isObjectDef(ref)) {
-          type = TypeSystem.createClassType(ref);
-        } else {
-          traceLog(indent + 1, "node.reference.ref is not class");
-        }
-      } else {
-        traceLog(indent + 1, "node.reference.ref is not valid");
-      }
-    }
     exitLog(log, type);
     return type;
   }

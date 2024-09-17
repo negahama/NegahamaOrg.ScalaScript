@@ -219,11 +219,11 @@ DoStatement:
 ForStatement:
   'for' '(' iterators+=Iterator (';' iterators+=Iterator)* ')' loop=Block;
 
-Iterator: ForOf | ForTo | ForUntil;
+Iterator: ForOf | ForTo;
 
-ForOf   : name=Id '<-' of=Expression;
-ForTo   : name=Id '<-' e1=Expression 'to'    e2=Expression ('step' step=IntegerLiteral2)?;
-ForUntil: name=Id '<-' e1=Expression 'until' e2=Expression ('step' step=IntegerLiteral2)?;
+// to=Id 대신 to=('to' | 'until')을 사용해야 하지만 to, until이 keyword로 사용되는 것을 막기 위해서 이렇게 한다.
+ForOf: name=Id '<-' of=Expression;
+ForTo: name=Id '<-' e1=Expression to=Id e2=Expression ('step' step=IntegerLiteral2)?;
 
 // step은 마이너스를 포함한 정수값만을 가질 수 있다.
 IntegerLiteral2 returns number:

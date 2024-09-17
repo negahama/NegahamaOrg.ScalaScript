@@ -37,7 +37,7 @@ export function generateTypeScript(program: ast.Program, filePath: string, desti
  * @param code
  * @returns
  */
-export function generateCode(code: ast.Code): string {
+function generateCode(code: ast.Code): string {
   let result = "";
   if (ast.isStatement(code)) result += generateStatement(code, 0);
   else if (ast.isExpression(code)) result += generateExpression(code, 0, true);
@@ -51,7 +51,7 @@ export function generateCode(code: ast.Code): string {
  * @param indent
  * @returns
  */
-export function generateStatement(stmt: ast.Statement | undefined, indent: number): string {
+function generateStatement(stmt: ast.Statement | undefined, indent: number): string {
   let result = "";
   if (stmt == undefined) return result;
   if (ast.isVariableDef(stmt)) {
@@ -94,11 +94,7 @@ export function generateStatement(stmt: ast.Statement | undefined, indent: numbe
  * @param indent
  * @returns
  */
-export function generateExpression(
-  expr: ast.Expression | undefined,
-  indent: number,
-  semicolon: boolean = false
-): string {
+function generateExpression(expr: ast.Expression | undefined, indent: number, semicolon: boolean = false): string {
   let result = "";
   if (expr == undefined) return result;
   if (ast.isAssignment(expr)) {
@@ -153,7 +149,7 @@ export function generateExpression(
  * @param doItForLastCode
  * @returns
  */
-export function generateBlock(
+function generateBlock(
   body: ast.Block,
   indent: number,
   doItForLastCode?: (lastCode: ast.Code, indent: number) => string
@@ -189,7 +185,7 @@ export function generateBlock(
  * @param indent
  * @returns
  */
-export function generateTypes(type: ast.Types | undefined, indent: number): string {
+function generateTypes(type: ast.Types | undefined, indent: number): string {
   if (!type) return "";
   const result = transpileTypes(type, indent);
   return result ? ": " + result : "";
@@ -201,7 +197,7 @@ export function generateTypes(type: ast.Types | undefined, indent: number): stri
  * @param indent
  * @returns
  */
-export function generateCondition(condition: ast.Expression, indent: number): string {
+function generateCondition(condition: ast.Expression, indent: number): string {
   const e = generateExpression(condition, indent);
   return ast.isGroupExpression(condition) || ast.isUnaryExpression(condition) ? e : "(" + e + ")";
 }
@@ -214,7 +210,7 @@ export function generateCondition(condition: ast.Expression, indent: number): st
  * @param expr
  * @param indent
  */
-export function generateArrayIndex(expr: ast.Expression | undefined, indent: number): string {
+function generateArrayIndex(expr: ast.Expression | undefined, indent: number): string {
   if (ast.isUnaryExpression(expr) && ast.isLiteral(expr.value) && typeof expr.value.value == "number") {
     return (expr.value.value - 1).toString();
   }
@@ -227,7 +223,7 @@ export function generateArrayIndex(expr: ast.Expression | undefined, indent: num
  * @param s
  * @returns
  */
-export function applyIndent(lv: number, s: string) {
+function applyIndent(lv: number, s: string) {
   return "  ".repeat(lv) + s;
 }
 
@@ -237,7 +233,7 @@ export function applyIndent(lv: number, s: string) {
  * @param indent
  * @returns
  */
-export function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMember: boolean = false): string {
+function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMember: boolean = false): string {
   let result = "";
   if (stmt.annotate == "NotTrans") return result;
   if (stmt.export) result += "export ";
@@ -264,7 +260,7 @@ export function transpileVariableDef(stmt: ast.VariableDef, indent: number, isCl
  * @param isClassMethod
  * @returns
  */
-export function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMethod: boolean = false): string {
+function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMethod: boolean = false): string {
   const params = stmt.params
     .map((param) => {
       let p = (param.spread ? "..." : "") + param.name;
@@ -301,7 +297,7 @@ export function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isCl
  * @param indent
  * @returns
  */
-export function transpileFunctionType(expr: ast.FunctionType, indent: number): string {
+function transpileFunctionType(expr: ast.FunctionType, indent: number): string {
   const result = transpileFunctionArguments(expr.bindings, indent);
   return result + (expr.returnType ? ` => ${transpileTypes(expr.returnType, indent)}` : "");
 }
@@ -313,7 +309,7 @@ export function transpileFunctionType(expr: ast.FunctionType, indent: number): s
  * @param indent
  * @returns
  */
-export function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string {
+function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string {
   let result = transpileFunctionArguments(expr.bindings, indent);
   result += generateTypes(expr.returnType, indent) + " => ";
 
@@ -350,7 +346,7 @@ export function transpileFunctionValue(expr: ast.FunctionValue, indent: number):
  * @param indent
  * @returns
  */
-export function transpileFunctionArguments(bindings: ast.TypeBinding[], indent: number) {
+function transpileFunctionArguments(bindings: ast.TypeBinding[], indent: number) {
   return "(" + bindings.map((bind) => bind.name + generateTypes(bind.type, indent)).join(", ") + ")";
 }
 
@@ -360,7 +356,7 @@ export function transpileFunctionArguments(bindings: ast.TypeBinding[], indent: 
  * @param indent
  * @returns
  */
-export function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
+function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
   let result = "";
   if (stmt.annotate == "NotTrans") return result;
   if (stmt.export) result += "export ";
@@ -401,7 +397,7 @@ export function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string 
  * @param indent
  * @returns
  */
-export function transpileForStatement(stmt: ast.ForStatement, indent: number): string {
+function transpileForStatement(stmt: ast.ForStatement, indent: number): string {
   let result = "";
   let forIndent = indent;
   stmt.iterators.forEach((iter, idx) => {
@@ -413,12 +409,12 @@ export function transpileForStatement(stmt: ast.ForStatement, indent: number): s
     } else {
       const e1 = generateExpression(iter.e1, indent);
       const e2 = generateExpression(iter.e2, indent);
-      let mark = ast.isForTo(iter) ? "<=" : "<";
+      let mark = iter.to == "to" ? "<=" : "<";
       let step = `${name}++`;
       if (iter.step) {
         if (iter.step >= 0) step = `${name} += ${iter.step}`;
         if (iter.step < 0) {
-          mark = ast.isForTo(iter) ? ">=" : ">";
+          mark = iter.to == "to" ? ">=" : ">";
           step = `${name} -= ${-iter.step}`;
         }
       }
@@ -444,7 +440,7 @@ export function transpileForStatement(stmt: ast.ForStatement, indent: number): s
  * @param indent
  * @returns
  */
-export function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number): string {
+function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number): string {
   let result = "";
   result += `try ${generateBlock(stmt.body, indent)}`;
   result += applyIndent(indent, "catch {\n");
@@ -475,7 +471,7 @@ export function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: 
  * @param indent
  * @returns
  */
-export function transpileAssignment(expr: ast.Assignment, indent: number): string {
+function transpileAssignment(expr: ast.Assignment, indent: number): string {
   let result = "";
   const name = generateExpression(expr.assign, indent);
   result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`;
@@ -491,7 +487,7 @@ export function transpileAssignment(expr: ast.Assignment, indent: number): strin
  * @param indent
  * @returns
  */
-export function transpileLogicalNot(expr: ast.LogicalNot, indent: number): string {
+function transpileLogicalNot(expr: ast.LogicalNot, indent: number): string {
   let op = "";
   switch (expr.operator) {
     case "not": {
@@ -511,7 +507,7 @@ export function transpileLogicalNot(expr: ast.LogicalNot, indent: number): strin
  * @param indent
  * @returns
  */
-export function transpileCallChain(expr: ast.CallChain, indent: number): string {
+function transpileCallChain(expr: ast.CallChain, indent: number): string {
   let result = "";
   if (expr.previous) {
     result += generateExpression(expr.previous, indent);
@@ -559,7 +555,7 @@ export function transpileCallChain(expr: ast.CallChain, indent: number): string 
  * @param indent
  * @returns
  */
-export function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
+function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
   let result = "";
   // 삼항 연산자 처리 조건
   // else if 문 없이 then, else 문만 있어야 한다.
@@ -613,7 +609,7 @@ export function transpileIfExpression(expr: ast.IfExpression, indent: number): s
  * @param indent
  * @returns
  */
-export function transpileMatchExpression(expr: ast.MatchExpression, indent: number): string {
+function transpileMatchExpression(expr: ast.MatchExpression, indent: number): string {
   let result = "";
   result += `switch (${generateExpression(expr.expr, indent)}) {\n`;
   expr.cases.forEach((mc) => {
@@ -642,7 +638,7 @@ export function transpileMatchExpression(expr: ast.MatchExpression, indent: numb
  * @param indent
  * @returns
  */
-export function transpileUnaryExpression(expr: ast.UnaryExpression, indent: number): string {
+function transpileUnaryExpression(expr: ast.UnaryExpression, indent: number): string {
   if (expr.operator) return `${expr.operator} ${generateExpression(expr.value, indent)}`;
   else return generateExpression(expr.value, indent);
 }
@@ -653,7 +649,7 @@ export function transpileUnaryExpression(expr: ast.UnaryExpression, indent: numb
  * @param indent
  * @returns
  */
-export function transpileBinaryExpression(expr: ast.BinaryExpression, indent: number): string {
+function transpileBinaryExpression(expr: ast.BinaryExpression, indent: number): string {
   let op = "";
   switch (expr.operator) {
     case "and": {
@@ -681,7 +677,7 @@ export function transpileBinaryExpression(expr: ast.BinaryExpression, indent: nu
  * @param indent
  * @returns
  */
-export function transpileNewExpression(expr: ast.NewExpression, indent: number): string {
+function transpileNewExpression(expr: ast.NewExpression, indent: number): string {
   let result = `new ${expr.class.$refText}`;
   if (expr.generic) {
     result += "<";
@@ -706,7 +702,7 @@ export function transpileNewExpression(expr: ast.NewExpression, indent: number):
  * @param indent
  * @returns
  */
-export function transpileArrayExpression(expr: ast.ArrayExpression, indent: number): string {
+function transpileArrayExpression(expr: ast.ArrayExpression, indent: number): string {
   return `${expr.element.$refText}[(${generateArrayIndex(expr.index, indent)})]`;
 }
 
@@ -716,7 +712,7 @@ export function transpileArrayExpression(expr: ast.ArrayExpression, indent: numb
  * @param indent
  * @returns
  */
-export function transpileArrayValue(expr: ast.ArrayValue, indent: number): string {
+function transpileArrayValue(expr: ast.ArrayValue, indent: number): string {
   return "[" + expr.items.map((item) => generateExpression(item.item, indent)).join(", ") + "]";
 }
 
@@ -726,7 +722,7 @@ export function transpileArrayValue(expr: ast.ArrayValue, indent: number): strin
  * @param indent
  * @returns
  */
-export function transpileObjectValue(expr: ast.ObjectValue, indent: number): string {
+function transpileObjectValue(expr: ast.ObjectValue, indent: number): string {
   let result = "{\n";
   expr.elements.forEach((item) => {
     if (item.spread) {
@@ -748,7 +744,7 @@ export function transpileObjectValue(expr: ast.ObjectValue, indent: number): str
  * @param indent
  * @returns
  */
-export function transpileTypes(expr: ast.Types | undefined, indent: number): string {
+function transpileTypes(expr: ast.Types | undefined, indent: number): string {
   let result = "";
   if (expr == undefined) return result;
   expr.types.forEach((t, index) => {
@@ -764,7 +760,7 @@ export function transpileTypes(expr: ast.Types | undefined, indent: number): str
  * @param indent
  * @returns
  */
-export function transpileSimpleType(expr: ast.SimpleType, indent: number): string {
+function transpileSimpleType(expr: ast.SimpleType, indent: number): string {
   let result = "";
   if (ast.isArrayType(expr)) {
     result += transpileArrayType(expr, indent);
@@ -782,7 +778,7 @@ export function transpileSimpleType(expr: ast.SimpleType, indent: number): strin
  * @param indent
  * @returns
  */
-export function transpileArrayType(expr: ast.ArrayType, indent: number): string {
+function transpileArrayType(expr: ast.ArrayType, indent: number): string {
   return transpileSimpleType(expr.elementType, indent) + "[]";
 }
 
@@ -792,7 +788,7 @@ export function transpileArrayType(expr: ast.ArrayType, indent: number): string 
  * @param indent
  * @returns
  */
-export function transpileObjectType(expr: ast.ObjectType, indent: number): string {
+function transpileObjectType(expr: ast.ObjectType, indent: number): string {
   let result = "{ ";
   expr.elements.forEach((e) => {
     if (ast.isFunctionDef(e)) {
@@ -815,7 +811,7 @@ export function transpileObjectType(expr: ast.ObjectType, indent: number): strin
  * @param indent
  * @returns
  */
-export function transpileElementType(expr: ast.ElementType, indent: number): string {
+function transpileElementType(expr: ast.ElementType, indent: number): string {
   let result = "";
   if (ast.isFunctionType(expr)) {
     result += transpileFunctionType(expr, indent);
@@ -841,7 +837,7 @@ export function transpileElementType(expr: ast.ElementType, indent: number): str
  * @param indent
  * @returns
  */
-export function transpilePrimitiveType(expr: ast.PrimitiveType, indent: number): string {
+function transpilePrimitiveType(expr: ast.PrimitiveType, indent: number): string {
   // nil 만 undefined로 바꿔준다.
   if (expr.type == "nil") return "undefined";
   return expr.type;

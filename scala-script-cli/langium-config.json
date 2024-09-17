@@ -4,10 +4,7 @@
     {
       "id": "scala-script",
       "grammar": "../src/language/scala-script.langium",
-      "fileExtensions": [".ss"],
-      "textMate": {
-        "out": "syntaxes/scala-script.tmLanguage.json"
-      }
+      "fileExtensions": [".ss"]
     }
   ],
   "out": "../src/language/generated"
