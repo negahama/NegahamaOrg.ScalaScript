@@ -1,8 +1,8 @@
 import { AstNode, AstUtils, type ValidationAcceptor, type ValidationChecks } from "langium";
-import * as ast from "./generated/ast.js";
+import * as ast from "../../../language/generated/ast.js";
 import type { ScalaScriptServices } from "./scala-script-module.js";
-import { TypeDescription, TypeSystem } from "./scala-script-types.js";
-import { enterLog, exitLog, traceLog } from "./scala-script-util.js";
+import { TypeDescription, TypeSystem } from "../../../language/scala-script-types.js";
+import { enterLog, exitLog, traceLog } from "../../../language/scala-script-util.js";
 import chalk from "chalk";
 
 /**

@@ -3,7 +3,7 @@
   "languages": [
     {
       "id": "scala-script",
-      "grammar": "src/language/scala-script.langium",
+      "grammar": "../language/scala-script.langium",
       "fileExtensions": [".ss"],
       "textMate": {
         "out": "syntaxes/scala-script.tmLanguage.json"
@@ -13,5 +13,5 @@
       }
     }
   ],
-  "out": "src/language/generated"
+  "out": "./src/language/generated"
 }

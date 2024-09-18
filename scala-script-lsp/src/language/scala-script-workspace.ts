@@ -11,7 +11,7 @@ import { URI } from "vscode-uri";
 /**
  *
  */
-const ScalaScriptBuiltinLibrary = `
+export const ScalaScriptBuiltinLibrary = `
 @NotTrans def $string$ {
   var length: number
   def charAt(index: number)-> string

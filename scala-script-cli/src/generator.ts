@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { expandToNode, joinToNode, toString } from "langium/generate";
-import * as ast from "../language/generated/ast.js";
+import * as ast from "../../language/generated/ast.js";
 import { extractDestinationAndName } from "./cli-util.js";
 import chalk from "chalk";
 
@@ -541,6 +541,17 @@ function transpileCallChain(expr: ast.CallChain, indent: number): string {
     } else {
       result += "(" + expr.args.map((arg) => generateExpression(arg, indent)).join(", ") + ")";
     }
+
+    const methodsReturningArrayIndex = [
+      { methodName: "findIndex" },
+      { methodName: "findLastIndex" },
+      { methodName: "indexOf" },
+      { methodName: "lastIndexOf" },
+    ];
+    const found2 = methodsReturningArrayIndex.find((e) => e.methodName == expr.element?.$refText);
+    if (found2) {
+      result = "(" + result + " + 1)";
+    }
   }
   if (expr.isArray) {
     result += "[" + generateArrayIndex(expr.index, indent) + "]";
@@ -703,7 +714,7 @@ function transpileNewExpression(expr: ast.NewExpression, indent: number): string
  * @returns
  */
 function transpileArrayExpression(expr: ast.ArrayExpression, indent: number): string {
-  return `${expr.element.$refText}[(${generateArrayIndex(expr.index, indent)})]`;
+  return `${expr.element.$refText}[${generateArrayIndex(expr.index, indent)}]`;
 }
 
 /**

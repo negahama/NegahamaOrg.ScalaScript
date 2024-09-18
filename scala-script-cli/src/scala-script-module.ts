@@ -7,19 +7,13 @@ import {
   type LangiumSharedServices,
   type PartialLangiumServices,
 } from "langium/lsp";
-import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "./generated/module.js";
-import { ScalaScriptScopeProvider } from "./scala-script-scope.js";
-import { ScalaScriptValidator, registerValidationChecks } from "./scala-script-validator.js";
-import { ScalaScriptWorkspaceManager } from "./scala-script-workspace.js";
+import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "../../language/generated/module.js";
+import { ScalaScriptScopeProvider } from "../../language/scala-script-scope.js";
 
 /**
  * Declaration of custom services - add your own service classes here.
  */
-export type ScalaScriptAddedServices = {
-  validation: {
-    ScalaScriptValidator: ScalaScriptValidator;
-  };
-};
+export type ScalaScriptAddedServices = {};
 
 /**
  * Union of Langium default services and your custom services - use this as constructor parameter
@@ -31,11 +25,7 @@ export type ScalaScriptServices = LangiumServices & ScalaScriptAddedServices;
  *
  */
 export type ScalaScriptSharedServices = LangiumSharedServices;
-export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPartial<ScalaScriptSharedServices>> = {
-  workspace: {
-    WorkspaceManager: (services) => new ScalaScriptWorkspaceManager(services),
-  },
-};
+export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPartial<ScalaScriptSharedServices>> = {};
 
 /**
  * Dependency injection module that overrides Langium default services and contributes the
@@ -43,9 +33,6 @@ export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPart
  * selected services, while the custom services must be fully specified.
  */
 export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServices & ScalaScriptAddedServices> = {
-  validation: {
-    ScalaScriptValidator: () => new ScalaScriptValidator(),
-  },
   references: {
     ScopeProvider: (services) => new ScalaScriptScopeProvider(services),
   },
@@ -73,7 +60,6 @@ export function createScalaScriptServices(context: DefaultSharedModuleContext): 
   const shared = inject(createDefaultSharedModule(context), ScalaScriptGeneratedSharedModule, ScalaScriptSharedModule);
   const ScalaScript = inject(createDefaultModule({ shared }), ScalaScriptGeneratedModule, ScalaScriptModule);
   shared.ServiceRegistry.register(ScalaScript);
-  registerValidationChecks(ScalaScript);
   if (!context.connection) {
     // We don't run inside a language server
     // Therefore, initialize the configuration provider instantly

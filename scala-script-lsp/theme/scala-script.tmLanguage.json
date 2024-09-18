@@ -1,0 +1,88 @@
+{
+  "name": "scala-script",
+  "scopeName": "source.scala-script",
+  "fileTypes": [".ss"],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "name": "keyword.control.scala-script",
+      "match": "\\b(break|case|catch|continue|do|elif|else|else if|extends|finally|for|if|match|return|step|then|throw|try|while)\\b"
+    },
+    {
+      "name": "keyword.operator.scala-script",
+      "match": "\\b(instanceof|typeof|and|new|not|or)\\b"
+    },
+    {
+      "name": "entity.name.type.scala-script",
+      "match": "\\b(any|boolean|nil|number|string|void|false|true)\\b"
+    },
+    {
+      "name": "storage.modifier.scala-script",
+      "match": "\\b(export|private|static|super|this)\\b"
+    },
+    {
+      "name": "storage.type.scala-script",
+      "match": "\\b(def|val|var)\\b"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.scala-script",
+          "begin": "/\\*",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.scala-script"
+            }
+          },
+          "end": "\\*/",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.scala-script"
+            }
+          }
+        },
+        {
+          "name": "comment.line.scala-script",
+          "begin": "//",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.scala-script"
+            }
+          },
+          "end": "(?=$)"
+        }
+      ]
+    },
+    "string": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.scala-script",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "name": "string.quoted.double.scala-script",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.interpolated.scala-script",
+          "begin": "`",
+          "end": "`"
+        },
+        {
+          "name": "string.regexp.scala-script",
+          "begin": "/",
+          "end": "/g"
+        }
+      ]
+    }
+  }
+}

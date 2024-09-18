@@ -29,6 +29,15 @@
     "type": "git",
     "url": "https://github.com/negahama/NegahamaOrg.ScalaScript.git"
   },
+  "scripts": {
+    "all": "npm run langium:generate && npm run build",
+    "build": "tsc -b tsconfig.json && node esbuild.mjs",
+    "watch": "concurrently -n tsc,esbuild -c blue,yellow \"tsc -b tsconfig.json --watch\" \"node esbuild.mjs --watch\"",
+    "lint": "eslint src --ext ts",
+    "langium:generate": "langium generate",
+    "langium:watch": "langium generate --watch",
+    "vscode:prepublish": "npm run build && npm run lint"
+  },
   "devDependencies": {
     "langium-cli": "~3.1.0",
     "typescript": "~5.1.6",
@@ -43,5 +52,37 @@
   "volta": {
     "node": "18.19.1",
     "npm": "10.2.4"
+  },
+  "main": "./out/extension/main.cjs",
+  "activationEvents": [
+    "onLanguage:scala-script",
+    "onFileSystem:builtin"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "scala-script",
+        "aliases": [
+          "ScalaScript",
+          "scala-script"
+        ],
+        "extensions": [
+          ".ss"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "scala-script",
+        "scopeName": "source.scala-script",
+        "path": "./theme/scala-script.tmLanguage.json"
+      }
+    ]
+  },
+  "configurationDefaults": {
+    "scala-script": {
+      "editor.semanticHighlighting.enabled": true
+    }
   }
 }

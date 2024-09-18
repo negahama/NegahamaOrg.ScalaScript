@@ -12,10 +12,8 @@
     "moduleResolution": "Node16",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "rootDir": ".",
-    "noEmit": true
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["../src/language/main-browser.ts", "out", "node_modules"]
+  "include": ["src/**/*.ts", "../language/**/*.ts"],
+  "exclude": ["out", "node_modules"]
 }

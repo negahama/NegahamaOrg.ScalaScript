@@ -1,6 +1,6 @@
-import type { Program } from "../language/generated/ast.js";
-import { ScalaScriptLanguageMetaData } from "../language/generated/module.js";
-import { createScalaScriptServices } from "../language/scala-script-module.js";
+import type { Program } from "../../language/generated/ast.js";
+import { ScalaScriptLanguageMetaData } from "../../language/generated/module.js";
+import { createScalaScriptServices } from "./scala-script-module.js";
 import { generateTypeScript } from "./generator.js";
 import * as url from "node:url";
 import * as fs from "node:fs/promises";

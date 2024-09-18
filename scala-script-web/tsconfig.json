@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2017",
     "module": "Node16",
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM", "WebWorker"],
     "sourceMap": true,
     "outDir": "out",
     "strict": true,

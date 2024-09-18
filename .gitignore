@@ -1,9 +1,4 @@
-.vscode/*
-!.vscode/extensions.json
-!.vscode/launch.json
-!.vscode/tasks.json
-node_modules/
-out/
-src/language/generated/
+node_modules
+language/generated/
 syntaxes/
-*.vsix
+out/
