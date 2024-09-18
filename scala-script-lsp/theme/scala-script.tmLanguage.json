@@ -79,8 +79,7 @@
         },
         {
           "name": "string.regexp.scala-script",
-          "begin": "/",
-          "end": "/g"
+          "match": "/[^/]*/g"
         }
       ]
     }
