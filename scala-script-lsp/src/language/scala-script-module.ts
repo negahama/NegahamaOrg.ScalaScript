@@ -1,4 +1,4 @@
-import { DeepPartial, type Module, inject } from "langium";
+import { DeepPartial, type Module, inject, ValidationChecks } from "langium";
 import {
   createDefaultModule,
   createDefaultSharedModule,
@@ -7,9 +7,10 @@ import {
   type LangiumSharedServices,
   type PartialLangiumServices,
 } from "langium/lsp";
+import { ScalaScriptAstType } from "../../../language/generated/ast.js";
 import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "../../../language/generated/module.js";
 import { ScalaScriptScopeProvider } from "../../../language/scala-script-scope.js";
-import { ScalaScriptValidator, registerValidationChecks } from "./scala-script-validator.js";
+import { ScalaScriptValidator } from "../../../language/scala-script-validator.js";
 import { ScalaScriptWorkspaceManager } from "./scala-script-workspace.js";
 import { ScalaScriptSemanticTokenProvider } from "./scala-script-semantic.js";
 
@@ -84,4 +85,21 @@ export function createScalaScriptServices(context: DefaultSharedModuleContext): 
     shared.workspace.ConfigurationProvider.initialized({});
   }
   return { shared, ScalaScript };
+}
+
+/**
+ * Register custom validation checks.
+ */
+export function registerValidationChecks(services: ScalaScriptServices) {
+  const registry = services.validation.ValidationRegistry;
+  const validator = services.validation.ScalaScriptValidator;
+  const checks: ValidationChecks<ScalaScriptAstType> = {
+    VariableDef: validator.checkVariableDef,
+    FunctionDef: validator.checkFunctionDef,
+    ObjectDef: validator.checkClassDeclaration,
+    Assignment: validator.checkAssignment,
+    UnaryExpression: validator.checkUnaryOperationAllowed,
+    BinaryExpression: validator.checkBinaryOperationAllowed,
+  };
+  registry.register(checks, validator);
 }

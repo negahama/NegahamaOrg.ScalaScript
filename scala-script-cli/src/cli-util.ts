@@ -1,9 +1,15 @@
-import type { AstNode, LangiumCoreServices, LangiumDocument } from "langium";
-import chalk from "chalk";
-import * as path from "node:path";
 import * as fs from "node:fs";
+import * as path from "node:path";
+import type { AstNode, LangiumCoreServices, LangiumDocument } from "langium";
 import { URI } from "langium";
+import chalk from "chalk";
 
+/**
+ *
+ * @param fileName
+ * @param services
+ * @returns
+ */
 export async function extractDocument(fileName: string, services: LangiumCoreServices): Promise<LangiumDocument> {
   const extensions = services.LanguageMetaData.fileExtensions;
   if (!extensions.includes(path.extname(fileName))) {
@@ -39,15 +45,30 @@ export async function extractDocument(fileName: string, services: LangiumCoreSer
   return document;
 }
 
+/**
+ *
+ * @param fileName
+ * @param services
+ * @returns
+ */
 export async function extractAstNode<T extends AstNode>(fileName: string, services: LangiumCoreServices): Promise<T> {
   return (await extractDocument(fileName, services)).parseResult?.value as T;
 }
 
+/**
+ *
+ */
 interface FilePathData {
   destination: string;
   name: string;
 }
 
+/**
+ *
+ * @param filePath
+ * @param destination
+ * @returns
+ */
 export function extractDestinationAndName(filePath: string, destination: string | undefined): FilePathData {
   filePath = path.basename(filePath, path.extname(filePath)).replace(/[.-]/g, "");
   return {

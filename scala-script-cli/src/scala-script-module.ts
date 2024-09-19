@@ -1,4 +1,4 @@
-import { DeepPartial, type Module, inject } from "langium";
+import { DeepPartial, type Module, inject, ValidationChecks } from "langium";
 import {
   createDefaultModule,
   createDefaultSharedModule,
@@ -7,13 +7,19 @@ import {
   type LangiumSharedServices,
   type PartialLangiumServices,
 } from "langium/lsp";
+import { ScalaScriptAstType } from "../../language/generated/ast.js";
 import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "../../language/generated/module.js";
 import { ScalaScriptScopeProvider } from "../../language/scala-script-scope.js";
+import { ScalaScriptValidator } from "../../language/scala-script-validator.js";
 
 /**
  * Declaration of custom services - add your own service classes here.
  */
-export type ScalaScriptAddedServices = {};
+export type ScalaScriptAddedServices = {
+  validation: {
+    ScalaScriptValidator: ScalaScriptValidator;
+  };
+};
 
 /**
  * Union of Langium default services and your custom services - use this as constructor parameter
@@ -33,6 +39,9 @@ export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPart
  * selected services, while the custom services must be fully specified.
  */
 export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServices & ScalaScriptAddedServices> = {
+  validation: {
+    ScalaScriptValidator: () => new ScalaScriptValidator(),
+  },
   references: {
     ScopeProvider: (services) => new ScalaScriptScopeProvider(services),
   },
@@ -60,10 +69,28 @@ export function createScalaScriptServices(context: DefaultSharedModuleContext): 
   const shared = inject(createDefaultSharedModule(context), ScalaScriptGeneratedSharedModule, ScalaScriptSharedModule);
   const ScalaScript = inject(createDefaultModule({ shared }), ScalaScriptGeneratedModule, ScalaScriptModule);
   shared.ServiceRegistry.register(ScalaScript);
+  registerValidationChecks(ScalaScript);
   if (!context.connection) {
     // We don't run inside a language server
     // Therefore, initialize the configuration provider instantly
     shared.workspace.ConfigurationProvider.initialized({});
   }
   return { shared, ScalaScript };
+}
+
+/**
+ * Register custom validation checks.
+ */
+export function registerValidationChecks(services: ScalaScriptServices) {
+  const registry = services.validation.ValidationRegistry;
+  const validator = services.validation.ScalaScriptValidator;
+  const checks: ValidationChecks<ScalaScriptAstType> = {
+    VariableDef: validator.checkVariableDef,
+    FunctionDef: validator.checkFunctionDef,
+    ObjectDef: validator.checkClassDeclaration,
+    Assignment: validator.checkAssignment,
+    UnaryExpression: validator.checkUnaryOperationAllowed,
+    BinaryExpression: validator.checkBinaryOperationAllowed,
+  };
+  registry.register(checks, validator);
 }
