@@ -243,7 +243,8 @@ Break: dummy='break';
 
 // Bypass
 Bypass: bypass=BYPASS;
-terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
+// terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
+terminal BYPASS returns string: /\/\*[\s\S]*?\*\/|%%\/\/[^\n\r]*|%%[\s\S]*?%%/;
 
 //-----------------------------------------------------------------------------
 // Expressions
@@ -497,5 +498,5 @@ terminal Id returns string: ID;
 
 // Whitespace and Comments
 hidden terminal WS: /\s+/;
-hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
+// hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
 hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;

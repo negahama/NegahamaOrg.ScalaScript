@@ -76,11 +76,7 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
     result += "break;";
   } else if (ast.isBypass(stmt)) {
     if (stmt.bypass) {
-      result += stmt.bypass
-        .replaceAll("%%\r\n", "")
-        .replaceAll("\r\n%%", "")
-        .replaceAll("%%//", "")
-        .replaceAll("%%", "");
+      result += stmt.bypass.replaceAll("%%\r\n", "").replaceAll("\r\n%%", "").replaceAll("%%", "");
     }
   } else {
     console.log(chalk.red("ERROR in Statement"));
@@ -246,11 +242,7 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
     if (stmt.kind == "val") result += "const ";
   }
   result += stmt.name + (stmt.nullable ? "?" : "") + generateTypes(stmt.type, indent);
-  if (stmt.value) {
-    let i = indent;
-    if (ast.isObjectValue(stmt.value)) i++;
-    result += " = " + generateExpression(stmt.value, i);
-  }
+  result += stmt.value ? " = " + generateExpression(stmt.value, indent) : "";
   result += ";";
   return result;
 }
@@ -393,7 +385,7 @@ function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
     if (ast.isFunctionDef(m)) {
       result += applyIndent(indent + 1, transpileFunctionDef(m, indent + 1, true));
     } else if (ast.isVariableDef(m)) {
-      result += applyIndent(indent + 1, transpileVariableDef(m, indent, true));
+      result += applyIndent(indent + 1, transpileVariableDef(m, indent + 1, true));
     } else if (ast.isBypass(m)) {
       result += applyIndent(indent + 1, generateStatement(m, indent + 1));
     } else {
