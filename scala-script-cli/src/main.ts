@@ -50,7 +50,7 @@ export type GenerateOptions = {
  * @param opts
  */
 export const generateAction = async (fileName: string, opts: GenerateOptions): Promise<void> => {
-  const services = createScalaScriptServices(NodeFileSystem).ScalaScript;
+  const services = createScalaScriptServices(NodeFileSystem).scalaScriptServices;
 
   let root = path.dirname(fileName);
   if (!path.isAbsolute(root)) {

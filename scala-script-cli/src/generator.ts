@@ -123,9 +123,9 @@ function generateExpression(expr: ast.Expression | undefined, indent: number, se
   } else if (ast.isNewExpression(expr)) {
     result += transpileNewExpression(expr, indent);
   } else if (ast.isArrayExpression(expr)) {
-    result += transpileArrayExpression(expr, indent);
+    result += `${expr.element.$refText}[${generateArrayIndex(expr.index, indent)}]`;
   } else if (ast.isArrayValue(expr)) {
-    result += transpileArrayValue(expr, indent);
+    result += "[" + expr.items.map((item) => generateExpression(item.item, indent)).join(", ") + "]";
   } else if (ast.isObjectValue(expr)) {
     result += transpileObjectValue(expr, indent);
   } else if (ast.isFunctionValue(expr)) {
@@ -180,6 +180,8 @@ function generateBlock(
 }
 
 /**
+ * 이것은 가장 많이 사용되는 타입 표기 형태인 ': type' 을 지원한다.
+ * 실제 타입을 표기하는 transpileTypes()과 하나로 합칠 수 없는 것은 타입을 표기하는 다른 방법들이 있기 때문이다.
  *
  * @param type
  * @param indent
@@ -261,15 +263,6 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
  * @returns
  */
 function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMethod: boolean = false): string {
-  const params = stmt.params
-    .map((param) => {
-      let p = (param.spread ? "..." : "") + param.name;
-      p += (param.nullable ? "?" : "") + generateTypes(param.type, indent);
-      p += param.value ? ` = ${generateExpression(param.value, indent)}` : "";
-      return p;
-    })
-    .join(", ");
-
   let result = "";
   if (stmt.annotate == "NotTrans") return result;
   if (stmt.export) result += "export ";
@@ -277,16 +270,8 @@ function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMeth
   if (stmt.static) result += "static ";
 
   if (!isClassMethod) result += "function ";
-  result += `${stmt.name}(${params})${generateTypes(stmt.returnType, indent)} `;
-  // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
-  // 그래서 익명 함수가 받는 indent는 +1되어진 것이다.
-  result += stmt.body
-    ? generateBlock(stmt.body, indent, (lastCode: ast.Code, indent: number) => {
-        if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
-        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true);
-        else return "";
-      })
-    : "";
+  result += `${stmt.name}${transpileFunctionArgs(stmt.params, indent)}${generateTypes(stmt.returnType, indent)} `;
+  result += stmt.body ? transpileFunctionBody(stmt.body, indent, true) : "";
   return result;
 }
 
@@ -298,7 +283,8 @@ function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMeth
  * @returns
  */
 function transpileFunctionType(expr: ast.FunctionType, indent: number): string {
-  const result = transpileFunctionArguments(expr.bindings, indent);
+  const result = transpileFunctionArgs(expr.bindings, indent);
+  // 함수의 리턴 타입을 표기하는 방식이 다르기 때문에 generateTypes()을 사용하지 않는다.
   return result + (expr.returnType ? ` => ${transpileTypes(expr.returnType, indent)}` : "");
 }
 
@@ -310,44 +296,72 @@ function transpileFunctionType(expr: ast.FunctionType, indent: number): string {
  * @returns
  */
 function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string {
-  let result = transpileFunctionArguments(expr.bindings, indent);
-  result += generateTypes(expr.returnType, indent) + " => ";
+  const result = transpileFunctionArgs(expr.bindings, indent) + generateTypes(expr.returnType, indent);
+  return result + " => " + transpileFunctionBody(expr.body, indent);
+}
 
-  // 단일 expression을 괄호로 표시하면 numbers.find(n => n == 0) 과 같은 구문에 항상 return을 사용해야 하는 불편이 있다.
-  // 따라서 expression이 하나이면 괄호를 사용하지 않지만 이것도 return 문과 같이 사용되면 괄호를 사용해야 한다
-  // return처럼 단일 expression으로 처리할 수 없는 것들은 assignment, if, match등이 있다.
-  if (expr.body.codes.length == 0) console.error("block is empty");
-  if (expr.body.codes.length == 1) {
-    const lastCode = expr.body.codes[0];
-    if (ast.isExpression(lastCode)) {
-      if (
-        !(
-          ast.isAssignment(lastCode) ||
-          ast.isIfExpression(lastCode) ||
-          ast.isMatchExpression(lastCode) ||
-          ast.isReturnExpression(lastCode)
+/**
+ *
+ * @param args
+ * @param indent
+ * @returns
+ */
+function transpileFunctionArgs(args: ast.TypeBinding[] | ast.Parameter[], indent: number) {
+  return (
+    "(" +
+    args
+      .map((arg) => {
+        if (ast.isTypeBinding(arg)) return arg.name + generateTypes(arg.type, indent);
+        else if (ast.isParameter(arg)) {
+          let p = (arg.spread ? "..." : "") + arg.name;
+          p += (arg.nullable ? "?" : "") + generateTypes(arg.type, indent);
+          p += arg.value ? ` = ${generateExpression(arg.value, indent)}` : "";
+          return p;
+        } else return "internal error";
+      })
+      .join(", ") +
+    ")"
+  );
+}
+
+/**
+ *
+ * @param body
+ * @param indent
+ * @param isDefinition
+ * @returns
+ */
+function transpileFunctionBody(body: ast.Block, indent: number, isDefinition: boolean = false): string {
+  let result = "";
+  if (!isDefinition) {
+    // 함수가 정의되는 경우에는 단일 식인지의 여부와 관계없이 블럭으로 처리되어야 한다.
+    // 단일 expression을 괄호로 표시하면 numbers.find(n => n == 0) 과 같은 구문에 항상 return을 사용해야 하는 불편이 있다.
+    // 따라서 expression이 하나이면 괄호를 사용하지 않지만 이것도 return 문과 같이 사용되면 괄호를 사용해야 한다
+    // return처럼 단일 expression으로 처리할 수 없는 것들은 assignment, if, match등이 있다.
+    if (body.codes.length == 0) console.error("block is empty");
+    if (body.codes.length == 1) {
+      const lastCode = body.codes[0];
+      if (ast.isExpression(lastCode)) {
+        if (
+          !(
+            ast.isAssignment(lastCode) ||
+            ast.isIfExpression(lastCode) ||
+            ast.isMatchExpression(lastCode) ||
+            ast.isReturnExpression(lastCode)
+          )
         )
-      )
-        return result + generateExpression(lastCode, indent);
+          return result + generateExpression(lastCode, indent);
+      }
     }
   }
 
-  result += generateBlock(expr.body, indent, (lastCode: ast.Code, indent: number) => {
+  // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
+  result += generateBlock(body, indent, (lastCode: ast.Code, indent: number) => {
     if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent);
     else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true);
     else return "";
   });
   return result;
-}
-
-/**
- *
- * @param bindings
- * @param indent
- * @returns
- */
-function transpileFunctionArguments(bindings: ast.TypeBinding[], indent: number) {
-  return "(" + bindings.map((bind) => bind.name + generateTypes(bind.type, indent)).join(", ") + ")";
 }
 
 /**
@@ -535,7 +549,7 @@ function transpileCallChain(expr: ast.CallChain, indent: number): string {
       result += "(";
       expr.args.map((arg, index) => {
         if (index != 0) result += ", ";
-        result += generateExpression(arg, indent) + (found.argIndices.includes(index) ? " - 1" : "");
+        result += found.argIndices.includes(index) ? generateArrayIndex(arg, indent) : generateExpression(arg, indent);
       });
       result += ")";
     } else {
@@ -705,26 +719,6 @@ function transpileNewExpression(expr: ast.NewExpression, indent: number): string
   });
   result += ")";
   return result;
-}
-
-/**
- *
- * @param expr
- * @param indent
- * @returns
- */
-function transpileArrayExpression(expr: ast.ArrayExpression, indent: number): string {
-  return `${expr.element.$refText}[${generateArrayIndex(expr.index, indent)}]`;
-}
-
-/**
- *
- * @param expr
- * @param indent
- * @returns
- */
-function transpileArrayValue(expr: ast.ArrayValue, indent: number): string {
-  return "[" + expr.items.map((item) => generateExpression(item.item, indent)).join(", ") + "]";
 }
 
 /**

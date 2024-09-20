@@ -26,16 +26,16 @@ export class ScalaScriptValidator {
     //   }
     // }
 
-    const log = enterLog("checkVariableDef", expr.name, 0);
-    traceLog(1, "expr.type:", `'${expr.type?.$cstNode?.text}'`);
-    traceLog(1, "expr.value:", `${expr.value?.$type}, '${expr.value?.$cstNode?.text}'`);
+    const log = enterLog("checkVariableDef", expr.name);
+    traceLog("expr.type:", `'${expr.type?.$cstNode?.text}'`);
+    traceLog("expr.value:", `${expr.value?.$type}, '${expr.value?.$cstNode?.text}'`);
 
     if (expr.type && expr.value) {
       const map = getTypeCache();
       const left = TypeSystem.inferType(expr.type, map);
       const right = TypeSystem.inferType(expr.value, map);
 
-      traceLog(1, `${right.$type} = ${left.$type}`);
+      traceLog(`${right.$type} = ${left.$type}`);
 
       if (!isAssignable(right, left)) {
         accept(
@@ -63,32 +63,53 @@ export class ScalaScriptValidator {
    * @returns
    */
   checkFunctionDef(method: ast.FunctionDef, accept: ValidationAcceptor): void {
-    const log = enterLog("checkFunctionDef", method.name, 0);
+    const log = enterLog("checkFunctionDef", method.name);
 
     if (method.body && method.returnType) {
       const map = getTypeCache();
-      const returnStatements = AstUtils.streamAllContents(method.body).filter(ast.isReturnExpression).toArray();
       const expectedType = TypeSystem.inferType(method.returnType, map);
+
+      const returnStatements: ast.ReturnExpression[] = [];
+      this.extractReturnExpression(method.body, returnStatements);
+
       if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
         accept("error", "A function whose declared type is not 'void' must return a value.", {
           node: method.returnType,
         });
         return;
       }
-      //todo
-      // for (const returnStatement of returnStatements) {
-      //   const returnValueType = TypeSystem.inferType(returnStatement, map);
-      //   if (!isAssignable(returnValueType, expectedType)) {
-      //     const msg = `Type '${TypeSystem.typeToString(
-      //       returnValueType
-      //     )}' is not assignable to type '${TypeSystem.typeToString(expectedType)}'.`;
-      //     accept("error", msg, {
-      //       node: returnStatement,
-      //     });
-      //   }
-      // }
+
+      for (const returnStatement of returnStatements) {
+        const returnValueType = TypeSystem.inferType(returnStatement, map);
+        if (!isAssignable(returnValueType, expectedType)) {
+          accept(
+            "error",
+            `Type '${TypeSystem.typeToString(returnValueType)}' is not assignable to type ` +
+              `'${TypeSystem.typeToString(expectedType)}'.`,
+            {
+              node: returnStatement,
+            }
+          );
+        }
+      }
     }
     exitLog(log);
+  }
+
+  /**
+   * Block에서 모든 return문을 추출한다.
+   * 이때 함수 선언 및 람다 함수 호출과 같이 return이 사용되었지만 return의 scope가 해당 블럭과 관련이 없는 것은 제외한다.
+   *
+   * @param node
+   * @param result
+   */
+  extractReturnExpression(node: AstNode, result: ast.ReturnExpression[]) {
+    // return AstUtils.streamAllContents(node).filter(ast.isReturnExpression).toArray();
+    AstUtils.streamContents(node).forEach((n) => {
+      if (ast.isFunctionDef(n) || ast.isFunctionValue(n)) return;
+      else if (ast.isReturnExpression(n)) result.push(n);
+      else this.extractReturnExpression(n, result);
+    });
   }
 
   /**
@@ -97,7 +118,7 @@ export class ScalaScriptValidator {
    * @param accept
    */
   checkClassDeclaration(decl: ast.ObjectDef, accept: ValidationAcceptor): void {
-    const log = enterLog("checkClassDeclaration", decl.name, 0);
+    const log = enterLog("checkClassDeclaration", decl.name);
     // TODO: implement classes
     // accept("error", "Classes are currently unsupported.", {
     //   node: decl,
@@ -112,15 +133,15 @@ export class ScalaScriptValidator {
    * @param accept
    */
   checkAssignment(expr: ast.Assignment, accept: ValidationAcceptor): void {
-    const log = enterLog("checkAssignment", expr.assign.$type, 0);
-    traceLog(1, `left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`);
-    traceLog(1, `right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`);
+    const log = enterLog("checkAssignment", expr.assign.$type);
+    traceLog(`left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`);
+    traceLog(`right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`);
 
     const map = getTypeCache();
     const left = TypeSystem.inferType(expr.assign, map);
     const right = TypeSystem.inferType(expr.value, map);
 
-    traceLog(1, `${right.$type} = ${left.$type}`);
+    traceLog(`${right.$type} = ${left.$type}`);
 
     if (!isAssignable(right, left)) {
       accept(
@@ -141,18 +162,20 @@ export class ScalaScriptValidator {
    * @param accept
    */
   checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
-    const log = enterLog("checkUnaryOperationAllowed", unary.value.$type, 0);
-    // const item = TypeSystem.inferType(unary.value, getTypeCache());
-    // if (!isLegalOperation(unary.operator, item)) {
-    //   accept(
-    //     "error",
-    //     `Cannot perform operation '${unary.operator}' on value of type '${TypeSystem.typeToString(item)}'.`,
-    //     {
-    //       node: unary,
-    //     }
-    //   );
-    // }
-    exitLog(log);
+    if (unary.operator) {
+      const log = enterLog("checkUnaryOperationAllowed", unary.value.$type);
+      const item = TypeSystem.inferType(unary.value, getTypeCache());
+      if (!isLegalOperation(unary.operator, item)) {
+        accept(
+          "error",
+          `Cannot perform operation '${unary.operator}' on value of type '${TypeSystem.typeToString(item)}'.`,
+          {
+            node: unary,
+          }
+        );
+      }
+      exitLog(log);
+    }
   }
 
   /**
@@ -161,29 +184,33 @@ export class ScalaScriptValidator {
    * @param accept
    */
   checkBinaryOperationAllowed(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
-    const log = enterLog("checkBinaryOperationAllowed", binary.operator, 0);
-    traceLog(1, `expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`);
+    const log = enterLog("checkBinaryOperationAllowed", binary.operator);
+    traceLog(`expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`);
 
     const map = getTypeCache();
     const left = TypeSystem.inferType(binary.left, map);
     const right = TypeSystem.inferType(binary.right, map);
 
-    traceLog(1, `${right.$type} = ${left.$type}`);
+    traceLog(`${right.$type} = ${left.$type}`);
 
     if (!isLegalOperation(binary.operator, left, right)) {
-      const msg =
+      accept(
+        "error",
         `Cannot perform operation '${binary.operator}' on values of type ` +
-        `'${TypeSystem.typeToString(left)}' and '${TypeSystem.typeToString(right)}'.`;
-      accept("error", msg, { node: binary });
+          `'${TypeSystem.typeToString(left)}' and '${TypeSystem.typeToString(right)}'.`,
+        { node: binary }
+      );
     } else if (["==", "!="].includes(binary.operator)) {
       if (!isLegalOperation(binary.operator, left, right)) {
-        const msg = `This comparison will always return '${
-          binary.operator === "==" ? "false" : "true"
-        }' as types '${TypeSystem.typeToString(left)}' and '${TypeSystem.typeToString(right)}' are not compatible.`;
-        accept("warning", msg, {
-          node: binary,
-          property: "operator",
-        });
+        accept(
+          "warning",
+          `This comparison will always return '${binary.operator === "==" ? "false" : "true"}' as types ` +
+            `'${TypeSystem.typeToString(left)}' and '${TypeSystem.typeToString(right)}' are not compatible.`,
+          {
+            node: binary,
+            property: "operator",
+          }
+        );
       }
     }
     exitLog(log);
@@ -228,6 +255,13 @@ export function isLegalOperation(operator: string, left: TypeDescription, right?
   return false;
 }
 
+/**
+ *
+ * @param operator
+ * @param left
+ * @param right
+ * @returns
+ */
 function isLegalOperation_(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
   if (TypeSystem.isAnyType(left) || (right != undefined && TypeSystem.isAnyType(right))) {
     return true;
@@ -320,6 +354,11 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
   // const space = "  ".repeat(indent);
   // console.log(space + `isAssignable: ${to.$type} = ${from.$type}`);
 
+  // 성능 향상을 위해 둘의 타입이 동일하거나 어느 하나의 타입이 any이면 바로 return true
+  if (from.$type == to.$type || TypeSystem.isAnyType(from) || TypeSystem.isAnyType(to)) {
+    return true;
+  }
+
   // union type이면 각 세부 타입들의 조합을 검사한다.
   if (TypeSystem.isUnionType(to)) {
     return to.elementTypes.some((t) => isAssignable(from, t, indent));
@@ -349,11 +388,11 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
     // return result;
   }
 
-  if (TypeSystem.isAnyType(from) || TypeSystem.isAnyType(to)) {
-    return true;
-  }
+  // nil type은 다른 타입과 연산이 되지 않지만 같은 nil인 경우에는 assignable될 수 있다.
+  // 이 경우가 허락되지 않으면 nil을 return하는 함수의 경우가 문제가 된다.
   if (TypeSystem.isNilType(from) || TypeSystem.isNilType(to)) {
-    return false;
+    if (TypeSystem.isNilType(from) && TypeSystem.isNilType(to)) return true;
+    else return false;
   }
 
   if (TypeSystem.isClassType(from)) {
@@ -378,9 +417,7 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
     // 둘 다 클래스 타입이면 일단 통과시킨다.
     // return false;
   }
-  if (TypeSystem.isVoidType(from)) {
-    return TypeSystem.isClassType(to);
-  }
+
   if (TypeSystem.isFunctionType(from)) {
     if (!TypeSystem.isFunctionType(to)) {
       return false;

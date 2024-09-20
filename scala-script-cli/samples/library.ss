@@ -1,18 +1,4 @@
-import {
-  AstNode,
-  DefaultWorkspaceManager,
-  LangiumDocument,
-  LangiumDocumentFactory,
-  LangiumSharedCoreServices,
-} from "langium";
-import { WorkspaceFolder } from "vscode-languageserver";
-import { URI } from "vscode-uri";
-
-/**
- *
- */
-export const ScalaScriptBuiltinLibrary = `
-@NotTrans def $string$ {
+@NotTrans def $string$ => {
   // Reflects the length of the string. Read-only.
   var length: number
   // Returns the character (exactly one UTF-16 code unit) at the specified index.
@@ -353,7 +339,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 경고 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
   def warn()
 }
-  
+
 @NotTrans def assert => { def equal() def notEqual() }
 
 @NotTrans def Array => {}
@@ -421,32 +407,3 @@ export const ScalaScriptBuiltinLibrary = `
 @NotTrans def parseFloat()->number
 @NotTrans def parseInt()->number
 @NotTrans def escape()-> string
-`.trim();
-
-/**
- *
- */
-export class ScalaScriptWorkspaceManager extends DefaultWorkspaceManager {
-  private documentFactory: LangiumDocumentFactory;
-
-  constructor(services: LangiumSharedCoreServices) {
-    super(services);
-    this.documentFactory = services.workspace.LangiumDocumentFactory;
-  }
-
-  /**
-   *
-   * @param folders
-   * @param collector
-   */
-  protected override async loadAdditionalDocuments(
-    folders: WorkspaceFolder[],
-    collector: (document: LangiumDocument<AstNode>) => void
-  ): Promise<void> {
-    // console.log("before loadAdditionalDocuments", folders);
-    await super.loadAdditionalDocuments(folders, collector);
-    // console.log("after loadAdditionalDocuments");
-    // Load our library using the `builtin` URI schema
-    collector(this.documentFactory.fromString(ScalaScriptBuiltinLibrary, URI.parse("builtin:///library.ss")));
-  }
-}

@@ -36,11 +36,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   override getScope(context: ReferenceInfo): Scope {
     const scopeId = `${context.container.$type}.${context.property} = '${context.reference.$refText}'`;
-    const scopeLog = enterLog("getScope", scopeId, 0);
+    const scopeLog = enterLog("getScope", scopeId);
 
     // target element of member calls
     if (context.property !== "element") {
-      exitLog(scopeLog.replace("Exit0", "Exit4"));
+      exitLog(scopeLog + "Exit4");
       return super.getScope(context);
     }
 
@@ -50,7 +50,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     if (context.reference.$refText === "this" || context.reference.$refText === "super") {
       const classItem = AstUtils.getContainerOfType(context.container, ast.isObjectDef);
       if (classItem) {
-        traceLog(1, "this or super");
+        traceLog("this or super");
         return this.scopeObjectDef(context, classItem);
       } else {
         console.error("this or super: empty");
@@ -65,14 +65,14 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 이 코드는 이를 확인하기 위한 것이다.
     const callChain = context.container as ast.CallChain;
     if (callChain.args == undefined) {
-      traceLog(1, "CallChain.args is undefined");
+      traceLog("CallChain.args is undefined");
     }
 
     const previous = callChain.previous;
-    traceLog(1, `CallChain.previous is ${previous?.$type}`);
+    traceLog(`CallChain.previous is ${previous?.$type}`);
     if (!previous) {
       const scope = super.getScope(context);
-      exitLog(scopeLog.replace("Exit0", "Exit1"));
+      exitLog(scopeLog + "Exit1");
       return scope;
     }
 
@@ -113,8 +113,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 클래스이면
     // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
     if (TypeSystem.isClassType(classDesc)) {
-      traceLog(1, `FIND Class: ${previous.$type}, ${classDesc.literal?.$type}`);
-      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      traceLog(`FIND Class: ${previous.$type}, ${classDesc.literal?.$type}`);
+      exitLog(scopeLog + "Exit2");
       if (ast.isObjectDef(classDesc.literal)) {
         return this.scopeObjectDef(context, classDesc.literal);
       } else if (ast.isObjectType(classDesc.literal)) {
@@ -128,36 +128,36 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 문자열이나 배열 관련 빌트인 함수들은 전역으로 class $string$ { ... } 형태로 저장되어져 있기 때문에
     // 전역 클래스 중 이름이 $string$인 것의 멤버들을 scope로 구성해서 리턴한다.
     else if (TypeSystem.isStringType(stringDesc)) {
-      traceLog(1, `FIND string type: ${previous.$type}, ${stringDesc.literal?.$type}`);
-      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      traceLog(`FIND string type: ${previous.$type}, ${stringDesc.literal?.$type}`);
+      exitLog(scopeLog + "Exit2");
       return this.scopeSpecificClass(context, "$string$");
     }
 
     // number이면
     else if (TypeSystem.isNumberType(numberDesc)) {
-      traceLog(1, `FIND number type: ${previous.$type}, ${numberDesc.literal?.$type}`);
-      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      traceLog(`FIND number type: ${previous.$type}, ${numberDesc.literal?.$type}`);
+      exitLog(scopeLog + "Exit2");
       return this.scopeSpecificClass(context, "$number$");
     }
 
     // 배열이면
     else if (TypeSystem.isArrayType(arrayDesc)) {
-      traceLog(1, `FIND array type: ${previous.$type}, element-type:${arrayDesc.elementType.$type}`);
-      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      traceLog(`FIND array type: ${previous.$type}, element-type:${arrayDesc.elementType.$type}`);
+      exitLog(scopeLog + "Exit2");
       return this.scopeSpecificClass(context, "$array$");
     }
 
     // any 타입이면
     else if (TypeSystem.isAnyType(anyDesc)) {
-      traceLog(1, `FIND any-type: ${previous.$type}`);
-      exitLog(scopeLog.replace("Exit0", "Exit2"));
+      traceLog(`FIND any-type: ${previous.$type}`);
+      exitLog(scopeLog + "Exit2");
       return this.scopeAnytype(context, previous);
     }
 
     // When the target of our member call isn't a class
     // This means it is either a primitive type or a type resolution error
     // Simply return an empty scope
-    exitLog(scopeLog.replace("Exit0", "Exit3"));
+    exitLog(scopeLog + "Exit3");
     return super.getScope(context);
   }
 
@@ -173,7 +173,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const removedBypass = allMembers.filter((e) => !ast.isBypass(e));
     removedBypass.forEach((e) => {
       if (ast.isVariableDef(e) || ast.isFunctionDef(e)) {
-        traceLog(0, "scopeObjectDef", e.name);
+        traceLog("scopeObjectDef", e.name);
       }
     });
     return this.createScopeForNodes(removedBypass);
@@ -190,7 +190,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const removedBypass = classType.elements.filter((e) => !ast.isBypass(e));
     removedBypass.forEach((e) => {
       if (ast.isVariableDef(e) || ast.isFunctionDef(e)) {
-        traceLog(0, "scopeObjectType", e.name);
+        traceLog("scopeObjectType", e.name);
       }
     });
     return this.createScopeForNodes(removedBypass);

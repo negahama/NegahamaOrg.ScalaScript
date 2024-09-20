@@ -1,7 +1,7 @@
 import { EmptyFileSystem } from "langium";
 import { startLanguageServer } from "langium/lsp";
 import { BrowserMessageReader, BrowserMessageWriter, createConnection } from "vscode-languageserver/browser.js";
-import { createScalaScriptServices } from "../../../language/scala-script-module.js";
+import { createScalaScriptServices } from "./scala-script-module.js";
 
 declare const self: DedicatedWorkerGlobalScope;
 

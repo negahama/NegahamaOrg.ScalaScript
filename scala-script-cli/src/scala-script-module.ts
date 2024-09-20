@@ -64,18 +64,18 @@ export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServic
  */
 export function createScalaScriptServices(context: DefaultSharedModuleContext): {
   shared: LangiumSharedServices;
-  ScalaScript: ScalaScriptServices;
+  scalaScriptServices: ScalaScriptServices;
 } {
   const shared = inject(createDefaultSharedModule(context), ScalaScriptGeneratedSharedModule, ScalaScriptSharedModule);
-  const ScalaScript = inject(createDefaultModule({ shared }), ScalaScriptGeneratedModule, ScalaScriptModule);
-  shared.ServiceRegistry.register(ScalaScript);
-  registerValidationChecks(ScalaScript);
+  const services = inject(createDefaultModule({ shared }), ScalaScriptGeneratedModule, ScalaScriptModule);
+  shared.ServiceRegistry.register(services);
+  registerValidationChecks(services);
   if (!context.connection) {
     // We don't run inside a language server
     // Therefore, initialize the configuration provider instantly
     shared.workspace.ConfigurationProvider.initialized({});
   }
-  return { shared, ScalaScript };
+  return { shared, scalaScriptServices: services };
 }
 
 /**

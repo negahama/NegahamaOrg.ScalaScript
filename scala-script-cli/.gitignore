@@ -1,2 +1,5 @@
 out/
-samples/
+samples/*
+!samples/library.ss
+!samples/sample.ss
+

@@ -2,37 +2,50 @@ import { TypeDescription } from "./scala-script-types.js";
 
 /**
  *
- * @param procKind
- * @param procId
- * @param indent
- * @returns
  */
-var _enableLog_ = false;
+var _enable_log_ = false;
 var _sig_number_ = 0;
+
+/**
+ *
+ * @param enable
+ */
 export function enableLog(enable: boolean) {
-  _enableLog_ = enable;
-}
-export function enterLog(procKind: string, procId: string | undefined, indent: number): string {
-  _sig_number_ += 1;
-  const space = "    ".repeat(indent);
-  if (_enableLog_) console.log(space + `Enter(${_sig_number_}) ${procKind}: ${procId}`);
-  return space + `Exit0(${_sig_number_}) ${procKind}: ${procId}`;
+  _enable_log_ = enable;
 }
 
 /**
  *
- * @param indent
+ * @param procKind
+ * @param procId
+ * @returns
+ */
+export function enterLog(procKind: string, procId?: string): string {
+  if (!_enable_log_) return "";
+  _sig_number_ += 1;
+  const signature = `|${_sig_number_}| ${procKind}: `;
+  console.log(`>${signature}${procId}`);
+  console.group();
+  return `<${signature}`;
+}
+
+/**
+ *
  * @param msg
  * @param optionalParams
  */
-export function traceLog(indent: number, msg: string, ...optionalParams: any[]) {
-  if (_enableLog_) console.log("    ".repeat(indent) + msg, ...optionalParams);
+export function traceLog(msg: string, ...optionalParams: any[]) {
+  if (!_enable_log_) return;
+  console.log(msg, ...optionalParams);
 }
 
 /**
  *
  * @param log
+ * @param type
  */
 export function exitLog(log: string, type?: TypeDescription) {
-  if (_enableLog_) console.log(log + (type ? `, type: ${type?.$type}` : ""));
+  if (!_enable_log_) return;
+  console.groupEnd();
+  console.log(log + (type ? `type: ${type?.$type}` : ""));
 }
