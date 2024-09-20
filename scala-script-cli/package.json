@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "publisher": "NegahamaOrg",

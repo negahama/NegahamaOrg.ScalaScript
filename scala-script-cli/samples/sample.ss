@@ -1,6 +1,6 @@
 @NotTrans def setTimeout()
 
-/*
+/**
   자료형 및 선언과 정의, 다중 대입
 */
 var a: number = 0xff
@@ -16,7 +16,7 @@ c = (1 + 2) * 3 % 2 ** 3
 %%// 삼항 연산자
 var gender = if a == 1 then 'male' else 'female'
 
-/*
+/**
   문자열 관련
 */
 %%// 문자열 접합 연산자
@@ -31,7 +31,7 @@ var list1 = s.concat("2" .. 'def').trim().split(",")
 %%// 문자열 인덱스는 1 부터
 val included = s.includes("is", 1)
 
-/*
+/**
   배열 관련
 */
 %%// array type
@@ -43,7 +43,7 @@ if (array1.length > 0) s = "2"
 %%// 배열의 인덱스는 1 부터
 s = array1[a + b] .. array1[1]
 
-/*
+/**
   조건문
 */
 if not s console log 'a is not true'
@@ -54,7 +54,7 @@ def matchTest(x: number)-> string => x match {
   case _ => return "other"
 }
 
-/*
+/**
   반복문 관련
 */
 %%// for parameter type check
@@ -118,7 +118,7 @@ val lambda3 = arg: number => return arg
 val lambda4 = (arg: number) => return arg
 val lambda5 = (arg: number)-> number => return arg
 
-/*
+/**
   함수 정의 및 호출
 */
 def add(a: number, b: number)-> number => return a + b

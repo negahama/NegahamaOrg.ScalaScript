@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "publisher": "NegahamaOrg",
@@ -30,13 +30,13 @@
     "url": "https://github.com/negahama/NegahamaOrg.ScalaScript.git"
   },
   "scripts": {
-    "all": "npm run langium:generate && npm run build",
+    "all": "npm run langium:generate && npm run build && npm run lint",
     "build": "tsc -b tsconfig.json && node esbuild.mjs",
     "watch": "concurrently -n tsc,esbuild -c blue,yellow \"tsc -b tsconfig.json --watch\" \"node esbuild.mjs --watch\"",
     "lint": "eslint src --ext ts",
     "langium:generate": "langium generate",
     "langium:watch": "langium generate --watch",
-    "vscode:prepublish": "npm run build && npm run lint"
+    "vscode:prepublish": "npm run all"
   },
   "devDependencies": {
     "langium-cli": "~3.1.0",

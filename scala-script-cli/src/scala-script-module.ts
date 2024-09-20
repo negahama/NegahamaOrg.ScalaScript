@@ -1,4 +1,13 @@
-import { DeepPartial, type Module, inject, ValidationChecks } from "langium";
+import {
+  DeepPartial,
+  type Module,
+  inject,
+  ValidationChecks,
+  DefaultLangiumDocumentFactory,
+  LangiumDocument,
+  AstNode,
+  URI,
+} from "langium";
 import {
   createDefaultModule,
   createDefaultSharedModule,
@@ -7,6 +16,7 @@ import {
   type LangiumSharedServices,
   type PartialLangiumServices,
 } from "langium/lsp";
+import { CancellationToken } from "vscode-jsonrpc";
 import { ScalaScriptAstType } from "../../language/generated/ast.js";
 import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "../../language/generated/module.js";
 import { ScalaScriptScopeProvider } from "../../language/scala-script-scope.js";
@@ -31,7 +41,11 @@ export type ScalaScriptServices = LangiumServices & ScalaScriptAddedServices;
  *
  */
 export type ScalaScriptSharedServices = LangiumSharedServices;
-export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPartial<ScalaScriptSharedServices>> = {};
+export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPartial<ScalaScriptSharedServices>> = {
+  workspace: {
+    LangiumDocumentFactory: (services) => new ScalaScriptDocumentFactory(services),
+  },
+};
 
 /**
  * Dependency injection module that overrides Langium default services and contributes the
@@ -93,4 +107,21 @@ export function registerValidationChecks(services: ScalaScriptServices) {
     BinaryExpression: validator.checkBinaryOperationAllowed,
   };
   registry.register(checks, validator);
+}
+
+/**
+ *
+ */
+export class ScalaScriptDocumentFactory extends DefaultLangiumDocumentFactory {
+  override async fromUri<T extends AstNode = AstNode>(
+    uri: URI,
+    cancellationToken = CancellationToken.None
+  ): Promise<LangiumDocument<T>> {
+    const content = await this.fileSystemProvider.readFile(uri);
+    const convert = content.replaceAll(/\/\*\*[\s\S]*?\*\//g, "%%$&%%");
+    // console.log("ScalaScriptDocumentFactory.fromUri:", uri);
+    // console.log("원본:", content);
+    // console.log("변환:", convert);
+    return this.createAsync<T>(uri, convert, cancellationToken);
+  }
 }
