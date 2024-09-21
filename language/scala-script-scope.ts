@@ -38,6 +38,35 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const scopeId = `${context.container.$type}.${context.property} = '${context.reference.$refText}'`;
     const scopeLog = enterLog("getScope", scopeId);
 
+    if (ast.isTypeChain(context.container)) {
+      const typeChain = context.container as ast.TypeChain;
+      const previous = typeChain.previous;
+      traceLog(`TypeChain.previous is ${previous?.$type}`);
+      if (!previous) {
+        const scope = super.getScope(context);
+        exitLog(scopeLog + "Exit5");
+        return scope;
+      }
+
+      // previous 의 타입을 추론한 결과가...
+      const prevTypeDesc = TypeSystem.inferType(previous, new Map(), 1);
+
+      // 클래스이면
+      // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
+      if (TypeSystem.isClassType(prevTypeDesc)) {
+        traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
+        exitLog(scopeLog + "Exit6");
+        if (ast.isObjectDef(prevTypeDesc.literal)) {
+          return this.scopeObjectDef(context, prevTypeDesc.literal);
+        } else if (ast.isObjectType(prevTypeDesc.literal)) {
+          return this.scopeObjectType(context, prevTypeDesc.literal);
+        } else {
+          console.error(chalk.red("find class, but error:", prevTypeDesc.literal?.$type));
+        }
+      } else console.error(chalk.red("internal error in typechain:", prevTypeDesc));
+      return super.getScope(context);
+    }
+
     // target element of member calls
     if (context.property !== "element") {
       exitLog(scopeLog + "Exit4");
@@ -171,11 +200,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // console.log("find class, class name:", classItem.name);
     const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.body.elements);
     const removedBypass = allMembers.filter((e) => !ast.isBypass(e));
-    removedBypass.forEach((e) => {
-      if (ast.isVariableDef(e) || ast.isFunctionDef(e)) {
-        traceLog("scopeObjectDef", e.name);
-      }
-    });
+    // removedBypass.forEach((e) => {
+    //   if (ast.isVariableDef(e) || ast.isFunctionDef(e) || ast.isObjectDef(e)) {
+    //     console.log("scopeObjectDef", e.name);
+    //   }
+    // });
     return this.createScopeForNodes(removedBypass);
   }
 
@@ -188,11 +217,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   private scopeObjectType(context: ReferenceInfo, classType: ast.ObjectType): Scope {
     // console.log("find object, object name:", classType.$cstNode?.text);
     const removedBypass = classType.elements.filter((e) => !ast.isBypass(e));
-    removedBypass.forEach((e) => {
-      if (ast.isVariableDef(e) || ast.isFunctionDef(e)) {
-        traceLog("scopeObjectType", e.name);
-      }
-    });
+    // removedBypass.forEach((e) => {
+    //   if (ast.isVariableDef(e) || ast.isFunctionDef(e) || ast.isObjectDef(e)) {
+    //     console.log("scopeObjectType", e.name);
+    //   }
+    // });
     return this.createScopeForNodes(removedBypass);
   }
 

@@ -57,7 +57,11 @@ SimpleType:
 ElementType:
   FunctionType
   | PrimitiveType
-  | reference=[ObjectDef:Id] (generic=Generic)?;
+  | TypeChain;
+
+TypeChain:
+  // reference=[ObjectDef:Id] (generic=Generic)?;
+  reference=[ObjectDef:Id] ({infer TypeChain.previous=current} "." reference=[ObjectDef:Id] (generic=Generic)?)*;
 
 PrimitiveType:
   type=('any' | 'nil' | 'void' | 'string' | 'number' | 'boolean');
@@ -194,7 +198,7 @@ ObjectDef:
 
 // ex) var obj: { name: string age: number }
 ObjectType:
-  '{' elements+=(Bypass | VariableDef | FunctionDef)* '}';
+  '{' elements+=(Bypass | VariableDef | FunctionDef | ObjectDef)* '}';
 
 // ex) var obj = { name = "samuel" age = 20 ...ary }
 ObjectValue:

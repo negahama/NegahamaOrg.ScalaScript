@@ -270,7 +270,7 @@ function isLegalOperation_(operator: string, left: TypeDescription, right?: Type
   // 문자열 접합 연산자
   if (operator === "..") {
     if (!right) {
-      console.log(chalk.red("internal error"));
+      console.error(chalk.red("internal error"));
       return false;
     }
     // 문자열 접합 연산자이지만 문자열이 아닌 다른 자료형은 암묵적 형변환을 한다고 가정한다.
@@ -284,7 +284,7 @@ function isLegalOperation_(operator: string, left: TypeDescription, right?: Type
   // 동등 연산자
   else if (["==", "!="].includes(operator)) {
     if (!right) {
-      console.log(chalk.red("internal error"));
+      console.error(chalk.red("internal error"));
       return false;
     }
     /**
@@ -315,7 +315,7 @@ function isLegalOperation_(operator: string, left: TypeDescription, right?: Type
   // 각종 산술 연산자, 비교 연산자
   else if (["**", "*", "/", "%", "<", "<=", ">", ">="].includes(operator)) {
     if (!right) {
-      console.log(chalk.red("internal error"));
+      console.error(chalk.red("internal error"));
       return false;
     }
     // 모두 숫자 타입과 관련된 연산자이다
@@ -325,7 +325,7 @@ function isLegalOperation_(operator: string, left: TypeDescription, right?: Type
   // 논리 연산자
   else if (["and", "or", "&&", "||"].includes(operator)) {
     if (!right) {
-      console.log(chalk.red("internal error"));
+      console.error(chalk.red("internal error"));
       return false;
     }
     return TypeSystem.isBooleanType(left) && TypeSystem.isBooleanType(right);

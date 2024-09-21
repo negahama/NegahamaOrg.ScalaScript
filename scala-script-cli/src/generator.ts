@@ -382,14 +382,16 @@ function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
     result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : "{\n";
   }
   stmt.body.elements.forEach((m) => {
-    if (ast.isFunctionDef(m)) {
-      result += applyIndent(indent + 1, transpileFunctionDef(m, indent + 1, true));
-    } else if (ast.isVariableDef(m)) {
+    if (ast.isVariableDef(m)) {
       result += applyIndent(indent + 1, transpileVariableDef(m, indent + 1, true));
+    } else if (ast.isFunctionDef(m)) {
+      result += applyIndent(indent + 1, transpileFunctionDef(m, indent + 1, true));
+    } else if (ast.isObjectDef(m)) {
+      result += applyIndent(indent + 1, transpileObjectDef(m, indent + 1));
     } else if (ast.isBypass(m)) {
       result += applyIndent(indent + 1, generateStatement(m, indent + 1));
     } else {
-      console.log(chalk.red("internal error"));
+      console.error(chalk.red("internal error"));
     }
     result += "\n";
   });
@@ -788,14 +790,16 @@ function transpileArrayType(expr: ast.ArrayType, indent: number): string {
 function transpileObjectType(expr: ast.ObjectType, indent: number): string {
   let result = "{ ";
   expr.elements.forEach((e) => {
-    if (ast.isFunctionDef(e)) {
-      result += transpileFunctionDef(e, indent, true);
-    } else if (ast.isVariableDef(e)) {
+    if (ast.isVariableDef(e)) {
       result += transpileVariableDef(e, indent, true);
+    } else if (ast.isFunctionDef(e)) {
+      result += transpileFunctionDef(e, indent, true);
+    } else if (ast.isObjectDef(e)) {
+      result += transpileObjectDef(e, indent);
     } else if (ast.isBypass(e)) {
       result += generateStatement(e, indent);
     } else {
-      console.log(chalk.red("internal error"));
+      console.error(chalk.red("internal error"));
     }
   });
   result += " }";
@@ -814,17 +818,36 @@ function transpileElementType(expr: ast.ElementType, indent: number): string {
     result += transpileFunctionType(expr, indent);
   } else if (ast.isPrimitiveType(expr)) {
     result += transpilePrimitiveType(expr, indent);
-  } else if (expr.reference) {
-    result += expr.reference.$refText;
-    if (expr.generic) {
-      result += "<";
-      expr.generic.types.forEach((t, index) => {
-        if (index != 0) result += ", ";
-        result += transpileSimpleType(t, indent);
-      });
-      result += ">";
-    }
+  } else if (ast.isTypeChain(expr)) {
+    result += transpileTypeChain(expr, indent);
   } else result += "internal error";
+  return result;
+}
+
+/**
+ *
+ * @param expr
+ * @param indent
+ * @returns
+ */
+function transpileTypeChain(expr: ast.TypeChain, indent: number): string {
+  let result = "";
+  if (expr.previous) {
+    result += transpileTypeChain(expr.previous, indent);
+    result += expr.reference ? "." + expr.reference.$refText : "";
+  } else {
+    if (expr.reference) {
+      result += expr.reference.$refText;
+      if (expr.generic) {
+        result += "<";
+        expr.generic.types.forEach((t, index) => {
+          if (index != 0) result += ", ";
+          result += transpileSimpleType(t, indent);
+        });
+        result += ">";
+      }
+    }
+  }
   return result;
 }
 
