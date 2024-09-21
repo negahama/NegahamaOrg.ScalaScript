@@ -61,7 +61,7 @@ ElementType:
 
 TypeChain:
   // reference=[ObjectDef:Id] (generic=Generic)?;
-  reference=[ObjectDef:Id] ({infer TypeChain.previous=current} "." reference=[ObjectDef:Id] (generic=Generic)?)*;
+  reference=[ObjectDef:Id]  (generic=Generic)? ({infer TypeChain.previous=current} "." reference=[ObjectDef:Id] (generic=Generic)?)*;
 
 PrimitiveType:
   type=('any' | 'nil' | 'void' | 'string' | 'number' | 'boolean');
