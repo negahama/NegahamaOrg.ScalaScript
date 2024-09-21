@@ -94,6 +94,8 @@ export function createScalaScriptServices(context: DefaultSharedModuleContext): 
 
 /**
  * Register custom validation checks.
+ *
+ * @param services
  */
 export function registerValidationChecks(services: ScalaScriptServices) {
   const registry = services.validation.ValidationRegistry;
