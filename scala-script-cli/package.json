@@ -43,20 +43,22 @@
     "watch": "tsc -b tsconfig.json --watch",
     "lint": "eslint src --ext ts",
     "langium:generate": "langium generate",
-    "langium:watch": "langium generate --watch"
+    "langium:watch": "langium generate --watch",
+    "release": "standard-version"
   },
   "dependencies": {
-    "langium": "~3.1.0",
     "chalk": "~5.3.0",
-    "commander": "~11.0.0"
+    "commander": "~11.0.0",
+    "langium": "~3.1.0"
   },
   "devDependencies": {
-    "langium-cli": "~3.1.0",
-    "typescript": "~5.1.6",
-    "eslint": "~8.57.0",
     "@types/node": "^18.0.0",
+    "@typescript-eslint/eslint-plugin": "~7.3.1",
     "@typescript-eslint/parser": "~7.3.1",
-    "@typescript-eslint/eslint-plugin": "~7.3.1"
+    "eslint": "~8.57.0",
+    "langium-cli": "~3.1.0",
+    "standard-version": "^9.5.0",
+    "typescript": "~5.1.6"
   },
   "volta": {
     "node": "18.19.1",

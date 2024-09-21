@@ -36,18 +36,21 @@
     "lint": "eslint src --ext ts",
     "langium:generate": "langium generate",
     "langium:watch": "langium generate --watch",
-    "vscode:prepublish": "npm run all"
+    "vscode:prepublish": "npm run all",
+    "release": "standard-version",
+    "package": "vsce package"
   },
   "devDependencies": {
-    "langium-cli": "~3.1.0",
-    "typescript": "~5.1.6",
-    "eslint": "~8.57.0",
-    "esbuild": "~0.20.2",
-    "concurrently": "~8.2.1",
-    "@types/vscode": "~1.67.0",
     "@types/node": "^18.0.0",
+    "@types/vscode": "~1.67.0",
+    "@typescript-eslint/eslint-plugin": "~7.3.1",
     "@typescript-eslint/parser": "~7.3.1",
-    "@typescript-eslint/eslint-plugin": "~7.3.1"
+    "concurrently": "~8.2.1",
+    "esbuild": "~0.20.2",
+    "eslint": "~8.57.0",
+    "langium-cli": "~3.1.0",
+    "standard-version": "^9.5.0",
+    "typescript": "~5.1.6"
   },
   "volta": {
     "node": "18.19.1",
