@@ -715,7 +715,7 @@ export class TypeSystem {
         traceLog(`'this' refers ${classItem.name}`)
         type = TypeSystem.createClassType(classItem)
       } else {
-        console.error('this or super: empty')
+        console.error('this or super is empty in types.ts')
       }
     }
 

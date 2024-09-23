@@ -82,7 +82,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
         traceLog('this or super')
         return this.scopeObjectDef(context, classItem)
       } else {
-        console.error('this or super: empty')
+        console.error('this or super is empty in scopes.ts')
         return EMPTY_SCOPE
       }
     }

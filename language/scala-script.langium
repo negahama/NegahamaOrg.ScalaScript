@@ -359,7 +359,7 @@ GroupExpression:
   '(' value=Expression ')';
 
 NewExpression:
-  'new' class=[ObjectDef:Id] (generic=Generic)?'(' (args+=Expression (',' args+=Expression)*)? ')';
+  'new' class=[ObjectDef:Id] (generic=Generic)? '(' (args+=Expression (',' args+=Expression)*)? ')';
 
 // Literals
 // There are literals for booleans, integer numbers, floating point numbers, strings, and so on.

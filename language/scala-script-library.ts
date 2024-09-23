@@ -1,3 +1,7 @@
+/**
+ *
+ */
+export const ScalaScriptBuiltinLibrary = `
 @NotTrans def $string$ => {
   // Reflects the length of the string. Read-only.
   var length: number
@@ -339,7 +343,7 @@
   // 경고 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
   def warn()
 }
-
+  
 @NotTrans def assert => { def equal() def notEqual() }
 
 @NotTrans def Array => {}
@@ -407,3 +411,4 @@
 @NotTrans def parseFloat()->number
 @NotTrans def parseInt()->number
 @NotTrans def escape()-> string
+`.trim()
