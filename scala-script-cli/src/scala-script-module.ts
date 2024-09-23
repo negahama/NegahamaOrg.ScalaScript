@@ -121,9 +121,9 @@ export class ScalaScriptDocumentFactory extends DefaultLangiumDocumentFactory {
   ): Promise<LangiumDocument<T>> {
     const content = await this.fileSystemProvider.readFile(uri)
     const convert = content.replaceAll(/\/\*\*[\s\S]*?\*\//g, '%%$&%%')
-    // console.log("ScalaScriptDocumentFactory.fromUri:", uri);
-    // console.log("원본:", content);
-    // console.log("변환:", convert);
+    // console.log("ScalaScriptDocumentFactory.fromUri:", uri)
+    // console.log("원본:", content)
+    // console.log("변환:", convert)
     return this.createAsync<T>(uri, convert, cancellationToken)
   }
 }

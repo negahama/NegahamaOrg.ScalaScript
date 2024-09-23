@@ -69,8 +69,8 @@ export const generateAction = async (fileName: string, opts: GenerateOptions): P
   }
 
   // initializeWorkspace()에서 아래 코드를 실행하기 때문에 이게 끝난 다음에 바로 사용하면 된다.
-  // await services.shared.workspace.LangiumDocuments.getOrCreateDocument(doc.uri);
-  // await services.shared.workspace.DocumentBuilder.build([document], { validation: true });
+  // await services.shared.workspace.LangiumDocuments.getOrCreateDocument(doc.uri)
+  // await services.shared.workspace.DocumentBuilder.build([document], { validation: true })
   services.shared.workspace.WorkspaceManager.initialBuildOptions = { validation: true }
   await services.shared.workspace.WorkspaceManager.initializeWorkspace([
     {

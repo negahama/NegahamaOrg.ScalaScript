@@ -265,7 +265,6 @@ Expression:
   | InfixExpression
   | ReturnExpression
   | SpreadExpression
-  | NewExpression
   | ArrayValue
   | ObjectValue
   | FunctionValue
@@ -333,6 +332,7 @@ SimpleExpression infers Expression:
   | ThisOrSuper
   | ArrayExpression
   | GroupExpression
+  | NewExpression
   | Literal;
 
 // 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
@@ -357,6 +357,9 @@ ThisOrSuper: {infer CallChain} this=('this' | 'super');
 // grouped expression with parentheses
 GroupExpression:
   '(' value=Expression ')';
+
+NewExpression:
+  'new' class=[ObjectDef:Id] (generic=Generic)?'(' (args+=Expression (',' args+=Expression)*)? ')';
 
 // Literals
 // There are literals for booleans, integer numbers, floating point numbers, strings, and so on.
@@ -418,9 +421,6 @@ ReturnExpression:
 
 SpreadExpression:
   '...' spread=[NamedElement:Id];
-
-NewExpression:
-  'new' class=[ObjectDef:Id] (generic=Generic)?'(' (args+=Expression (',' args+=Expression)*)? ')';
 
 //-----------------------------------------------------------------------------
 // terminal & literal

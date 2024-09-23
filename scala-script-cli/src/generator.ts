@@ -40,7 +40,7 @@ export function generateTypeScript(program: ast.Program, filePath: string, desti
 function generateCode(code: ast.Code): string {
   let result = ''
   if (ast.isStatement(code)) result += generateStatement(code, 0)
-  else if (ast.isExpression(code)) result += generateExpression(code, 0, true)
+  else if (ast.isExpression(code)) result += generateExpression(code, 0)
   else console.log(chalk.red('ERROR in Code:', code))
   return result
 }
@@ -71,9 +71,9 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
   } else if (ast.isTryCatchStatement(stmt)) {
     result += transpileTryCatchStatement(stmt, indent)
   } else if (ast.isContinue(stmt)) {
-    result += 'continue;'
+    result += 'continue'
   } else if (ast.isBreak(stmt)) {
-    result += 'break;'
+    result += 'break'
   } else if (ast.isBypass(stmt)) {
     if (stmt.bypass) {
       result += stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', '')
@@ -90,7 +90,7 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
  * @param indent
  * @returns
  */
-function generateExpression(expr: ast.Expression | undefined, indent: number, semicolon: boolean = false): string {
+function generateExpression(expr: ast.Expression | undefined, indent: number): string {
   let result = ''
   if (expr == undefined) return result
   if (ast.isAssignment(expr)) {
@@ -133,9 +133,7 @@ function generateExpression(expr: ast.Expression | undefined, indent: number, se
     console.log(chalk.red('ERROR in Expression:', expr))
   }
 
-  // semi colon 처리
-  if (ast.isIfExpression(expr)) semicolon = false
-  return result + (semicolon ? ';' : '')
+  return result
 }
 
 /**
@@ -152,7 +150,7 @@ function generateBlock(
 ): string {
   const defaultDoIt = (lastCode: ast.Code, indent: number) => {
     if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
-    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true)
+    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
     else return ''
   }
 
@@ -166,7 +164,7 @@ function generateBlock(
       else element += doItForLastCode(code, indent + 1)
     } else {
       if (ast.isStatement(code)) element += generateStatement(code, indent + 1)
-      else if (ast.isExpression(code)) element += generateExpression(code, indent + 1, true)
+      else if (ast.isExpression(code)) element += generateExpression(code, indent + 1)
       else console.log(chalk.red('ERROR in Block:', code))
     }
     result += applyIndent(indent + 1, element + '\n')
@@ -243,7 +241,6 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
   }
   result += stmt.name + (stmt.nullable ? '?' : '') + generateTypes(stmt.type, indent)
   result += stmt.value ? ' = ' + generateExpression(stmt.value, indent) : ''
-  result += ';'
   return result
 }
 
@@ -350,7 +347,7 @@ function transpileFunctionBody(body: ast.Block, indent: number, isDefinition: bo
   // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
   result += generateBlock(body, indent, (lastCode: ast.Code, indent: number) => {
     if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
-    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true)
+    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
     else return ''
   })
   return result
@@ -462,7 +459,7 @@ function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number)
     if (mc.body) {
       result += generateBlock(mc.body, indent + 1, (lastCode, indent) => {
         if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
-        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true)
+        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
         else return ''
       })
     }
@@ -485,7 +482,7 @@ function transpileAssignment(expr: ast.Assignment, indent: number): string {
   result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`
 
   // n++ 을 대신해서 n += 1 이 argument로 사용되거나 할 때는 semi colon을 표시하면 안되므로 지원하지 않는다
-  // result += ast.isAssignment(expr.value) ? "" : ";";
+  // result += ast.isAssignment(expr.value) ? "" : ";"
   return result
 }
 
@@ -641,7 +638,7 @@ function transpileMatchExpression(expr: ast.MatchExpression, indent: number): st
     if (mc.body) {
       result += generateBlock(mc.body, indent + 1, (lastCode, indent) => {
         if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
-        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent, true)
+        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
         else return ''
       })
     }
@@ -788,21 +785,22 @@ function transpileArrayType(expr: ast.ArrayType, indent: number): string {
  * @returns
  */
 function transpileObjectType(expr: ast.ObjectType, indent: number): string {
-  let result = '{ '
+  let result = '{\n'
   expr.elements.forEach(e => {
     if (ast.isVariableDef(e)) {
-      result += transpileVariableDef(e, indent, true)
+      result += applyIndent(indent + 1, transpileVariableDef(e, indent + 1, true))
     } else if (ast.isFunctionDef(e)) {
-      result += transpileFunctionDef(e, indent, true)
+      result += applyIndent(indent + 1, transpileFunctionDef(e, indent + 1, true))
     } else if (ast.isObjectDef(e)) {
-      result += transpileObjectDef(e, indent)
+      result += applyIndent(indent + 1, transpileObjectDef(e, indent + 1))
     } else if (ast.isBypass(e)) {
-      result += generateStatement(e, indent)
+      result += applyIndent(indent + 1, generateStatement(e, indent + 1))
     } else {
       console.error(chalk.red('internal error'))
     }
+    result += '\n'
   })
-  result += ' }'
+  result += applyIndent(indent, '}')
   return result
 }
 

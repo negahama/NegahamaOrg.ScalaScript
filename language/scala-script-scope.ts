@@ -197,14 +197,14 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns
    */
   private scopeObjectDef(context: ReferenceInfo, classItem: ast.ObjectDef): Scope {
-    // console.log("find class, class name:", classItem.name);
+    // console.log("find class, class name:", classItem.name)
     const allMembers = TypeSystem.getClassChain(classItem).flatMap(e => e.body.elements)
     const removedBypass = allMembers.filter(e => !ast.isBypass(e))
     // removedBypass.forEach((e) => {
     //   if (ast.isVariableDef(e) || ast.isFunctionDef(e) || ast.isObjectDef(e)) {
-    //     console.log("scopeObjectDef", e.name);
+    //     console.log("scopeObjectDef", e.name)
     //   }
-    // });
+    // })
     return this.createScopeForNodes(removedBypass)
   }
 
@@ -215,13 +215,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns
    */
   private scopeObjectType(context: ReferenceInfo, classType: ast.ObjectType): Scope {
-    // console.log("find object, object name:", classType.$cstNode?.text);
+    // console.log("find object, object name:", classType.$cstNode?.text)
     const removedBypass = classType.elements.filter(e => !ast.isBypass(e))
     // removedBypass.forEach((e) => {
     //   if (ast.isVariableDef(e) || ast.isFunctionDef(e) || ast.isObjectDef(e)) {
-    //     console.log("scopeObjectType", e.name);
+    //     console.log("scopeObjectType", e.name)
     //   }
-    // });
+    // })
     return this.createScopeForNodes(removedBypass)
   }
 
@@ -232,14 +232,14 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns
    */
   private scopeSpecificClass(context: ReferenceInfo, className: string): Scope {
-    // console.log("find specific class, class name:", className);
+    // console.log("find specific class, class name:", className)
     const scope: Scope = this.getGlobalScope('ObjectDef', context)
     const sc = scope.getAllElements().find(d => d.name == className)
     if (ast.isObjectDef(sc?.node)) {
       const allMembers = sc?.node.body.elements
       if (allMembers) {
-        // const names = allMembers.map((m) => m.$cstNode?.text ?? "unknown");
-        // console.log(`FIND string: '${context.reference.$refText}' in`, names);
+        // const names = allMembers.map((m) => m.$cstNode?.text ?? "unknown")
+        // console.log(`FIND string: '${context.reference.$refText}' in`, names)
         return this.createScopeForNodes(allMembers)
       }
     }
@@ -254,7 +254,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns
    */
   private scopeAnytype(context: ReferenceInfo, previous: ast.Expression): Scope {
-    // console.log("find any type, ref text:", context.reference.$refText);
+    // console.log("find any type, ref text:", context.reference.$refText)
     const elements: AstNode[] = [previous]
     const s = stream(elements)
       .map(e => {

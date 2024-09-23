@@ -14,15 +14,15 @@ export class ScalaScriptValidator {
    * @param accept
    */
   checkVariableDef(expr: ast.VariableDef, accept: ValidationAcceptor): void {
-    // const text = AstUtils.getDocument(expr).parseResult.value.$cstNode?.text;
-    // const text = (AstUtils.getDocument(expr).parseResult.value.$cstNode as RootCstNode).fullText;
-    // console.log(text);
-    // const thenKeyword = GrammarUtils.findNodeForKeyword(expr.$cstNode, "=");
+    // const text = AstUtils.getDocument(expr).parseResult.value.$cstNode?.text
+    // const text = (AstUtils.getDocument(expr).parseResult.value.$cstNode as RootCstNode).fullText
+    // console.log(text)
+    // const thenKeyword = GrammarUtils.findNodeForKeyword(expr.$cstNode, "=")
     // if (thenKeyword) {
-    //   const index = thenKeyword.offset;
-    //   const previousChar = text.charAt(index - 1);
+    //   const index = thenKeyword.offset
+    //   const previousChar = text.charAt(index - 1)
     //   if (previousChar !== ' ') {
-    //     acceptor('error', ...);
+    //     acceptor('error', ...)
     //   }
     // }
 
@@ -104,7 +104,7 @@ export class ScalaScriptValidator {
    * @param result
    */
   extractReturnExpression(node: AstNode, result: ast.ReturnExpression[]) {
-    // return AstUtils.streamAllContents(node).filter(ast.isReturnExpression).toArray();
+    // return AstUtils.streamAllContents(node).filter(ast.isReturnExpression).toArray()
     AstUtils.streamContents(node).forEach(n => {
       if (ast.isFunctionDef(n) || ast.isFunctionValue(n)) return
       else if (ast.isReturnExpression(n)) result.push(n)
@@ -123,7 +123,7 @@ export class ScalaScriptValidator {
     // accept("error", "Classes are currently unsupported.", {
     //   node: decl,
     //   property: "name",
-    // });
+    // })
     exitLog(log)
   }
 
@@ -351,8 +351,8 @@ function isLegalOperation_(operator: string, left: TypeDescription, right?: Type
  * @returns
  */
 export function isAssignable(from: TypeDescription, to: TypeDescription, indent: number = 0): boolean {
-  // const space = "  ".repeat(indent);
-  // console.log(space + `isAssignable: ${to.$type} = ${from.$type}`);
+  // const space = "  ".repeat(indent)
+  // console.log(space + `isAssignable: ${to.$type} = ${from.$type}`)
 
   // 성능 향상을 위해 둘의 타입이 동일하거나 어느 하나의 타입이 any이면 바로 return true
   if (from.$type == to.$type || TypeSystem.isAnyType(from) || TypeSystem.isAnyType(to)) {
@@ -365,13 +365,13 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
     // console.log(
     //   space + "to's union type:",
     //   to.elementTypes.map((t) => t.$type)
-    // );
-    // let result: boolean = false;
+    // )
+    // let result: boolean = false
     // to.elementTypes.forEach((t) => {
-    //   console.log(space + "type compare:", t.$type, "=", from.$type);
-    //   if (isAssignable(from, t, indent + 1)) result = true;
-    // });
-    // return result;
+    //   console.log(space + "type compare:", t.$type, "=", from.$type)
+    //   if (isAssignable(from, t, indent + 1)) result = true
+    // })
+    // return result
   }
 
   if (TypeSystem.isUnionType(from)) {
@@ -379,13 +379,13 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
     // console.log(
     //   space + "from's union type:",
     //   from.elementTypes.map((t) => t.$type)
-    // );
-    // let result: boolean = false;
+    // )
+    // let result: boolean = false
     // from.elementTypes.forEach((t) => {
-    //   console.log(space + "type compare:", to.$type, "=", t.$type);
-    //   if (isAssignable(t, to, indent + 1)) result = true;
-    // });
-    // return result;
+    //   console.log(space + "type compare:", to.$type, "=", t.$type)
+    //   if (isAssignable(t, to, indent + 1)) result = true
+    // })
+    // return result
   }
 
   // nil type은 다른 타입과 연산이 되지 않지만 같은 nil인 경우에는 assignable될 수 있다.
@@ -401,7 +401,7 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
     }
     const fromLit = from.literal
     if (ast.isObjectDef(fromLit)) {
-      // console.log(space + `from is object: '${fromLit.name}'`);
+      // console.log(space + `from is object: '${fromLit.name}'`)
       const fromChain = TypeSystem.getClassChain(fromLit)
       const toClass = to.literal
       for (const fromClass of fromChain) {
@@ -410,12 +410,12 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
         }
       }
     } else if (ast.isObjectType(fromLit)) {
-      // console.log(space + "from is object type", fromLit.$cstNode?.text);
+      // console.log(space + "from is object type", fromLit.$cstNode?.text)
     } else if (ast.isObjectValue(fromLit)) {
-      // console.log(space + "from is object value", fromLit.$cstNode?.text);
+      // console.log(space + "from is object value", fromLit.$cstNode?.text)
     }
     // 둘 다 클래스 타입이면 일단 통과시킨다.
-    // return false;
+    // return false
   }
 
   if (TypeSystem.isFunctionType(from)) {

@@ -24,7 +24,7 @@ export class ScalaScriptSemanticTokenProvider extends AbstractSemanticTokenProvi
       acceptor({ node, property: 'name', type: SemanticTokenTypes.property })
     }
     // else {
-    //   if (node.$cstNode) acceptor({ cst: node.$cstNode, type: SemanticTokenTypes.property });
+    //   if (node.$cstNode) acceptor({ cst: node.$cstNode, type: SemanticTokenTypes.property })
     // }
   }
 }

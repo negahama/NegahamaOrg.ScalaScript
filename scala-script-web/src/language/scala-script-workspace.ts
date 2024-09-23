@@ -329,9 +329,9 @@ export class ScalaScriptWorkspaceManager extends DefaultWorkspaceManager {
     folders: WorkspaceFolder[],
     collector: (document: LangiumDocument<AstNode>) => void
   ): Promise<void> {
-    // console.log("before loadAdditionalDocuments", folders);
+    // console.log("before loadAdditionalDocuments", folders)
     await super.loadAdditionalDocuments(folders, collector)
-    // console.log("after loadAdditionalDocuments");
+    // console.log("after loadAdditionalDocuments")
     // Load our library using the `builtin` URI schema
     collector(this.documentFactory.fromString(ScalaScriptBuiltinLibrary, URI.parse('builtin:///library.ss')))
   }
