@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.4.5",
+  "version": "0.4.8",
   "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "publisher": "NegahamaOrg",
@@ -56,6 +56,7 @@
     "npm": "10.2.4"
   },
   "main": "./out/extension/main.cjs",
+  "icon": "assets/logo.png",
   "activationEvents": [
     "onLanguage:scala-script",
     "onFileSystem:builtin"
