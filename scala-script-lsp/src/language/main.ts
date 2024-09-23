@@ -1,13 +1,13 @@
-import { startLanguageServer } from "langium/lsp";
-import { NodeFileSystem } from "langium/node";
-import { createConnection, ProposedFeatures } from "vscode-languageserver/node.js";
-import { createScalaScriptServices } from "./scala-script-module.js";
+import { startLanguageServer } from 'langium/lsp'
+import { NodeFileSystem } from 'langium/node'
+import { createConnection, ProposedFeatures } from 'vscode-languageserver/node.js'
+import { createScalaScriptServices } from './scala-script-module.js'
 
 // Create a connection to the client
-const connection = createConnection(ProposedFeatures.all);
+const connection = createConnection(ProposedFeatures.all)
 
 // Inject the shared services and language-specific services
-const { shared } = createScalaScriptServices({ connection, ...NodeFileSystem });
+const { shared } = createScalaScriptServices({ connection, ...NodeFileSystem })
 
 // Start the language server with the shared services
-startLanguageServer(shared);
+startLanguageServer(shared)

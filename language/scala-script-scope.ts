@@ -7,19 +7,19 @@ import {
   Scope,
   stream,
   StreamScope,
-} from "langium";
-import * as ast from "./generated/ast.js";
-import { LangiumServices } from "langium/lsp";
-import { TypeSystem } from "./scala-script-types.js";
-import { enterLog, exitLog, traceLog } from "../language/scala-script-util.js";
-import chalk from "chalk";
+} from 'langium'
+import * as ast from './generated/ast.js'
+import { LangiumServices } from 'langium/lsp'
+import { TypeSystem } from './scala-script-types.js'
+import { enterLog, exitLog, traceLog } from '../language/scala-script-util.js'
+import chalk from 'chalk'
 
 /**
  *
  */
 export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   constructor(services: LangiumServices) {
-    super(services);
+    super(services)
   }
 
   /**
@@ -35,55 +35,55 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns
    */
   override getScope(context: ReferenceInfo): Scope {
-    const scopeId = `${context.container.$type}.${context.property} = '${context.reference.$refText}'`;
-    const scopeLog = enterLog("getScope", scopeId);
+    const scopeId = `${context.container.$type}.${context.property} = '${context.reference.$refText}'`
+    const scopeLog = enterLog('getScope', scopeId)
 
     if (ast.isTypeChain(context.container)) {
-      const typeChain = context.container as ast.TypeChain;
-      const previous = typeChain.previous;
-      traceLog(`TypeChain.previous is ${previous?.$type}`);
+      const typeChain = context.container as ast.TypeChain
+      const previous = typeChain.previous
+      traceLog(`TypeChain.previous is ${previous?.$type}`)
       if (!previous) {
-        const scope = super.getScope(context);
-        exitLog(scopeLog + "Exit5");
-        return scope;
+        const scope = super.getScope(context)
+        exitLog(scopeLog + 'Exit5')
+        return scope
       }
 
       // previous 의 타입을 추론한 결과가...
-      const prevTypeDesc = TypeSystem.inferType(previous, new Map(), 1);
+      const prevTypeDesc = TypeSystem.inferType(previous, new Map(), 1)
 
       // 클래스이면
       // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
       if (TypeSystem.isClassType(prevTypeDesc)) {
-        traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`);
-        exitLog(scopeLog + "Exit6");
+        traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`)
+        exitLog(scopeLog + 'Exit6')
         if (ast.isObjectDef(prevTypeDesc.literal)) {
-          return this.scopeObjectDef(context, prevTypeDesc.literal);
+          return this.scopeObjectDef(context, prevTypeDesc.literal)
         } else if (ast.isObjectType(prevTypeDesc.literal)) {
-          return this.scopeObjectType(context, prevTypeDesc.literal);
+          return this.scopeObjectType(context, prevTypeDesc.literal)
         } else {
-          console.error(chalk.red("find class, but error:", prevTypeDesc.literal?.$type));
+          console.error(chalk.red('find class, but error:', prevTypeDesc.literal?.$type))
         }
-      } else console.error(chalk.red("internal error in typechain:", prevTypeDesc));
-      return super.getScope(context);
+      } else console.error(chalk.red('internal error in typechain:', prevTypeDesc))
+      return super.getScope(context)
     }
 
     // target element of member calls
-    if (context.property !== "element") {
-      exitLog(scopeLog + "Exit4");
-      return super.getScope(context);
+    if (context.property !== 'element') {
+      exitLog(scopeLog + 'Exit4')
+      return super.getScope(context)
     }
 
     // for now, `this` and `super` simply target the container class type
     // this, super가 [NamedElement:'this'] 인 경우에 호출된다. 지금처럼 keyword 인 경우에는
     // ref 처리가 되지 않아서 여기가 호출되지 않는다.
-    if (context.reference.$refText === "this" || context.reference.$refText === "super") {
-      const classItem = AstUtils.getContainerOfType(context.container, ast.isObjectDef);
+    if (context.reference.$refText === 'this' || context.reference.$refText === 'super') {
+      const classItem = AstUtils.getContainerOfType(context.container, ast.isObjectDef)
       if (classItem) {
-        traceLog("this or super");
-        return this.scopeObjectDef(context, classItem);
+        traceLog('this or super')
+        return this.scopeObjectDef(context, classItem)
       } else {
-        console.error("this or super: empty");
-        return EMPTY_SCOPE;
+        console.error('this or super: empty')
+        return EMPTY_SCOPE
       }
     }
 
@@ -92,49 +92,49 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해 함수의 인수가 있는 경우 즉
     // callChain.args가 있는 경우에 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고
     // 이 코드는 이를 확인하기 위한 것이다.
-    const callChain = context.container as ast.CallChain;
+    const callChain = context.container as ast.CallChain
     if (callChain.args == undefined) {
-      traceLog("CallChain.args is undefined");
+      traceLog('CallChain.args is undefined')
     }
 
-    const previous = callChain.previous;
-    traceLog(`CallChain.previous is ${previous?.$type}`);
+    const previous = callChain.previous
+    traceLog(`CallChain.previous is ${previous?.$type}`)
     if (!previous) {
-      const scope = super.getScope(context);
-      exitLog(scopeLog + "Exit1");
-      return scope;
+      const scope = super.getScope(context)
+      exitLog(scopeLog + 'Exit1')
+      return scope
     }
 
     // previous 의 타입을 추론한 결과가...
-    const prevTypeDesc = TypeSystem.inferType(previous, new Map(), 1);
+    const prevTypeDesc = TypeSystem.inferType(previous, new Map(), 1)
 
     // union type이면 포함된 타입중에 class, string, ... 등이 있는지 확인하고 있으면 이를 추론 타입으로 사용한다.
-    let classDesc = prevTypeDesc;
-    let stringDesc = prevTypeDesc;
-    let numberDesc = prevTypeDesc;
-    let arrayDesc = prevTypeDesc;
-    let anyDesc = prevTypeDesc;
+    let classDesc = prevTypeDesc
+    let stringDesc = prevTypeDesc
+    let numberDesc = prevTypeDesc
+    let arrayDesc = prevTypeDesc
+    let anyDesc = prevTypeDesc
     if (TypeSystem.isUnionType(prevTypeDesc)) {
       for (const t of prevTypeDesc.elementTypes) {
         if (TypeSystem.isClassType(t)) {
-          classDesc = t;
-          break;
+          classDesc = t
+          break
         }
         if (TypeSystem.isStringType(t)) {
-          stringDesc = t;
-          break;
+          stringDesc = t
+          break
         }
         if (TypeSystem.isNumberType(t)) {
-          numberDesc = t;
-          break;
+          numberDesc = t
+          break
         }
         if (TypeSystem.isArrayType(t)) {
-          arrayDesc = t;
-          break;
+          arrayDesc = t
+          break
         }
         if (TypeSystem.isAnyType(t)) {
-          anyDesc = t;
-          break;
+          anyDesc = t
+          break
         }
       }
     }
@@ -142,14 +142,14 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 클래스이면
     // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
     if (TypeSystem.isClassType(classDesc)) {
-      traceLog(`FIND Class: ${previous.$type}, ${classDesc.literal?.$type}`);
-      exitLog(scopeLog + "Exit2");
+      traceLog(`FIND Class: ${previous.$type}, ${classDesc.literal?.$type}`)
+      exitLog(scopeLog + 'Exit2')
       if (ast.isObjectDef(classDesc.literal)) {
-        return this.scopeObjectDef(context, classDesc.literal);
+        return this.scopeObjectDef(context, classDesc.literal)
       } else if (ast.isObjectType(classDesc.literal)) {
-        return this.scopeObjectType(context, classDesc.literal);
+        return this.scopeObjectType(context, classDesc.literal)
       } else {
-        console.log(chalk.red("find class, but error:", classDesc.literal?.$type));
+        console.log(chalk.red('find class, but error:', classDesc.literal?.$type))
       }
     }
 
@@ -157,37 +157,37 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 문자열이나 배열 관련 빌트인 함수들은 전역으로 class $string$ { ... } 형태로 저장되어져 있기 때문에
     // 전역 클래스 중 이름이 $string$인 것의 멤버들을 scope로 구성해서 리턴한다.
     else if (TypeSystem.isStringType(stringDesc)) {
-      traceLog(`FIND string type: ${previous.$type}, ${stringDesc.literal?.$type}`);
-      exitLog(scopeLog + "Exit2");
-      return this.scopeSpecificClass(context, "$string$");
+      traceLog(`FIND string type: ${previous.$type}, ${stringDesc.literal?.$type}`)
+      exitLog(scopeLog + 'Exit2')
+      return this.scopeSpecificClass(context, '$string$')
     }
 
     // number이면
     else if (TypeSystem.isNumberType(numberDesc)) {
-      traceLog(`FIND number type: ${previous.$type}, ${numberDesc.literal?.$type}`);
-      exitLog(scopeLog + "Exit2");
-      return this.scopeSpecificClass(context, "$number$");
+      traceLog(`FIND number type: ${previous.$type}, ${numberDesc.literal?.$type}`)
+      exitLog(scopeLog + 'Exit2')
+      return this.scopeSpecificClass(context, '$number$')
     }
 
     // 배열이면
     else if (TypeSystem.isArrayType(arrayDesc)) {
-      traceLog(`FIND array type: ${previous.$type}, element-type:${arrayDesc.elementType.$type}`);
-      exitLog(scopeLog + "Exit2");
-      return this.scopeSpecificClass(context, "$array$");
+      traceLog(`FIND array type: ${previous.$type}, element-type:${arrayDesc.elementType.$type}`)
+      exitLog(scopeLog + 'Exit2')
+      return this.scopeSpecificClass(context, '$array$')
     }
 
     // any 타입이면
     else if (TypeSystem.isAnyType(anyDesc)) {
-      traceLog(`FIND any-type: ${previous.$type}`);
-      exitLog(scopeLog + "Exit2");
-      return this.scopeAnytype(context, previous);
+      traceLog(`FIND any-type: ${previous.$type}`)
+      exitLog(scopeLog + 'Exit2')
+      return this.scopeAnytype(context, previous)
     }
 
     // When the target of our member call isn't a class
     // This means it is either a primitive type or a type resolution error
     // Simply return an empty scope
-    exitLog(scopeLog + "Exit3");
-    return super.getScope(context);
+    exitLog(scopeLog + 'Exit3')
+    return super.getScope(context)
   }
 
   /**
@@ -198,14 +198,14 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   private scopeObjectDef(context: ReferenceInfo, classItem: ast.ObjectDef): Scope {
     // console.log("find class, class name:", classItem.name);
-    const allMembers = TypeSystem.getClassChain(classItem).flatMap((e) => e.body.elements);
-    const removedBypass = allMembers.filter((e) => !ast.isBypass(e));
+    const allMembers = TypeSystem.getClassChain(classItem).flatMap(e => e.body.elements)
+    const removedBypass = allMembers.filter(e => !ast.isBypass(e))
     // removedBypass.forEach((e) => {
     //   if (ast.isVariableDef(e) || ast.isFunctionDef(e) || ast.isObjectDef(e)) {
     //     console.log("scopeObjectDef", e.name);
     //   }
     // });
-    return this.createScopeForNodes(removedBypass);
+    return this.createScopeForNodes(removedBypass)
   }
 
   /**
@@ -216,13 +216,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   private scopeObjectType(context: ReferenceInfo, classType: ast.ObjectType): Scope {
     // console.log("find object, object name:", classType.$cstNode?.text);
-    const removedBypass = classType.elements.filter((e) => !ast.isBypass(e));
+    const removedBypass = classType.elements.filter(e => !ast.isBypass(e))
     // removedBypass.forEach((e) => {
     //   if (ast.isVariableDef(e) || ast.isFunctionDef(e) || ast.isObjectDef(e)) {
     //     console.log("scopeObjectType", e.name);
     //   }
     // });
-    return this.createScopeForNodes(removedBypass);
+    return this.createScopeForNodes(removedBypass)
   }
 
   /**
@@ -233,17 +233,17 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   private scopeSpecificClass(context: ReferenceInfo, className: string): Scope {
     // console.log("find specific class, class name:", className);
-    const scope: Scope = this.getGlobalScope("ObjectDef", context);
-    const sc = scope.getAllElements().find((d) => d.name == className);
+    const scope: Scope = this.getGlobalScope('ObjectDef', context)
+    const sc = scope.getAllElements().find(d => d.name == className)
     if (ast.isObjectDef(sc?.node)) {
-      const allMembers = sc?.node.body.elements;
+      const allMembers = sc?.node.body.elements
       if (allMembers) {
         // const names = allMembers.map((m) => m.$cstNode?.text ?? "unknown");
         // console.log(`FIND string: '${context.reference.$refText}' in`, names);
-        return this.createScopeForNodes(allMembers);
+        return this.createScopeForNodes(allMembers)
       }
     }
-    return super.getScope(context);
+    return super.getScope(context)
   }
 
   /**
@@ -255,14 +255,14 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   private scopeAnytype(context: ReferenceInfo, previous: ast.Expression): Scope {
     // console.log("find any type, ref text:", context.reference.$refText);
-    const elements: AstNode[] = [previous];
+    const elements: AstNode[] = [previous]
     const s = stream(elements)
-      .map((e) => {
-        const name = this.nameProvider.getName(e);
-        if (name) return this.descriptions.createDescription(e, name);
-        return this.descriptions.createDescription(e, context.reference.$refText);
+      .map(e => {
+        const name = this.nameProvider.getName(e)
+        if (name) return this.descriptions.createDescription(e, name)
+        return this.descriptions.createDescription(e, context.reference.$refText)
       })
-      .nonNullable();
-    return new StreamScope(s);
+      .nonNullable()
+    return new StreamScope(s)
   }
 }

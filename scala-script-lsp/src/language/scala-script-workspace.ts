@@ -4,9 +4,9 @@ import {
   LangiumDocument,
   LangiumDocumentFactory,
   LangiumSharedCoreServices,
-} from "langium";
-import { WorkspaceFolder } from "vscode-languageserver";
-import { URI } from "vscode-uri";
+} from 'langium'
+import { WorkspaceFolder } from 'vscode-languageserver'
+import { URI } from 'vscode-uri'
 
 /**
  *
@@ -421,17 +421,17 @@ export const ScalaScriptBuiltinLibrary = `
 @NotTrans def parseFloat()->number
 @NotTrans def parseInt()->number
 @NotTrans def escape()-> string
-`.trim();
+`.trim()
 
 /**
  *
  */
 export class ScalaScriptWorkspaceManager extends DefaultWorkspaceManager {
-  private documentFactory: LangiumDocumentFactory;
+  private documentFactory: LangiumDocumentFactory
 
   constructor(services: LangiumSharedCoreServices) {
-    super(services);
-    this.documentFactory = services.workspace.LangiumDocumentFactory;
+    super(services)
+    this.documentFactory = services.workspace.LangiumDocumentFactory
   }
 
   /**
@@ -444,9 +444,9 @@ export class ScalaScriptWorkspaceManager extends DefaultWorkspaceManager {
     collector: (document: LangiumDocument<AstNode>) => void
   ): Promise<void> {
     // console.log("before loadAdditionalDocuments", folders);
-    await super.loadAdditionalDocuments(folders, collector);
+    await super.loadAdditionalDocuments(folders, collector)
     // console.log("after loadAdditionalDocuments");
     // Load our library using the `builtin` URI schema
-    collector(this.documentFactory.fromString(ScalaScriptBuiltinLibrary, URI.parse("builtin:///library.ss")));
+    collector(this.documentFactory.fromString(ScalaScriptBuiltinLibrary, URI.parse('builtin:///library.ss')))
   }
 }

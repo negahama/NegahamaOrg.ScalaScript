@@ -1,17 +1,17 @@
-import { TypeDescription } from "./scala-script-types.js";
+import { TypeDescription } from './scala-script-types.js'
 
 /**
  *
  */
-var _enable_log_ = false;
-var _sig_number_ = 0;
+var _enable_log_ = false
+var _sig_number_ = 0
 
 /**
  *
  * @param enable
  */
 export function enableLog(enable: boolean) {
-  _enable_log_ = enable;
+  _enable_log_ = enable
 }
 
 /**
@@ -21,12 +21,12 @@ export function enableLog(enable: boolean) {
  * @returns
  */
 export function enterLog(procKind: string, procId?: string): string {
-  if (!_enable_log_) return "";
-  _sig_number_ += 1;
-  const signature = `|${_sig_number_}| ${procKind}: `;
-  console.log(`>${signature}${procId}`);
-  console.group();
-  return `<${signature}`;
+  if (!_enable_log_) return ''
+  _sig_number_ += 1
+  const signature = `|${_sig_number_}| ${procKind}: `
+  console.log(`>${signature}${procId}`)
+  console.group()
+  return `<${signature}`
 }
 
 /**
@@ -35,8 +35,8 @@ export function enterLog(procKind: string, procId?: string): string {
  * @param optionalParams
  */
 export function traceLog(msg: string, ...optionalParams: any[]) {
-  if (!_enable_log_) return;
-  console.log(msg, ...optionalParams);
+  if (!_enable_log_) return
+  console.log(msg, ...optionalParams)
 }
 
 /**
@@ -45,7 +45,7 @@ export function traceLog(msg: string, ...optionalParams: any[]) {
  * @param type
  */
 export function exitLog(log: string, type?: TypeDescription) {
-  if (!_enable_log_) return;
-  console.groupEnd();
-  console.log(log + (type ? `type: ${type?.$type}` : ""));
+  if (!_enable_log_) return
+  console.groupEnd()
+  console.log(log + (type ? `type: ${type?.$type}` : ''))
 }

@@ -7,7 +7,7 @@ import {
   LangiumDocument,
   AstNode,
   URI,
-} from "langium";
+} from 'langium'
 import {
   createDefaultModule,
   createDefaultSharedModule,
@@ -15,37 +15,37 @@ import {
   type LangiumServices,
   type LangiumSharedServices,
   type PartialLangiumServices,
-} from "langium/lsp";
-import { CancellationToken } from "vscode-jsonrpc";
-import { ScalaScriptAstType } from "../../language/generated/ast.js";
-import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from "../../language/generated/module.js";
-import { ScalaScriptScopeProvider } from "../../language/scala-script-scope.js";
-import { ScalaScriptValidator } from "../../language/scala-script-validator.js";
+} from 'langium/lsp'
+import { CancellationToken } from 'vscode-jsonrpc'
+import { ScalaScriptAstType } from '../../language/generated/ast.js'
+import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from '../../language/generated/module.js'
+import { ScalaScriptScopeProvider } from '../../language/scala-script-scope.js'
+import { ScalaScriptValidator } from '../../language/scala-script-validator.js'
 
 /**
  * Declaration of custom services - add your own service classes here.
  */
 export type ScalaScriptAddedServices = {
   validation: {
-    ScalaScriptValidator: ScalaScriptValidator;
-  };
-};
+    ScalaScriptValidator: ScalaScriptValidator
+  }
+}
 
 /**
  * Union of Langium default services and your custom services - use this as constructor parameter
  * of custom service classes.
  */
-export type ScalaScriptServices = LangiumServices & ScalaScriptAddedServices;
+export type ScalaScriptServices = LangiumServices & ScalaScriptAddedServices
 
 /**
  *
  */
-export type ScalaScriptSharedServices = LangiumSharedServices;
+export type ScalaScriptSharedServices = LangiumSharedServices
 export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPartial<ScalaScriptSharedServices>> = {
   workspace: {
-    LangiumDocumentFactory: (services) => new ScalaScriptDocumentFactory(services),
+    LangiumDocumentFactory: services => new ScalaScriptDocumentFactory(services),
   },
-};
+}
 
 /**
  * Dependency injection module that overrides Langium default services and contributes the
@@ -57,9 +57,9 @@ export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServic
     ScalaScriptValidator: () => new ScalaScriptValidator(),
   },
   references: {
-    ScopeProvider: (services) => new ScalaScriptScopeProvider(services),
+    ScopeProvider: services => new ScalaScriptScopeProvider(services),
   },
-};
+}
 
 /**
  * Create the full set of services required by Langium.
@@ -77,19 +77,19 @@ export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServic
  * @returns An object wrapping the shared services and the language-specific services
  */
 export function createScalaScriptServices(context: DefaultSharedModuleContext): {
-  shared: LangiumSharedServices;
-  scalaScriptServices: ScalaScriptServices;
+  shared: LangiumSharedServices
+  scalaScriptServices: ScalaScriptServices
 } {
-  const shared = inject(createDefaultSharedModule(context), ScalaScriptGeneratedSharedModule, ScalaScriptSharedModule);
-  const services = inject(createDefaultModule({ shared }), ScalaScriptGeneratedModule, ScalaScriptModule);
-  shared.ServiceRegistry.register(services);
-  registerValidationChecks(services);
+  const shared = inject(createDefaultSharedModule(context), ScalaScriptGeneratedSharedModule, ScalaScriptSharedModule)
+  const services = inject(createDefaultModule({ shared }), ScalaScriptGeneratedModule, ScalaScriptModule)
+  shared.ServiceRegistry.register(services)
+  registerValidationChecks(services)
   if (!context.connection) {
     // We don't run inside a language server
     // Therefore, initialize the configuration provider instantly
-    shared.workspace.ConfigurationProvider.initialized({});
+    shared.workspace.ConfigurationProvider.initialized({})
   }
-  return { shared, scalaScriptServices: services };
+  return { shared, scalaScriptServices: services }
 }
 
 /**
@@ -98,8 +98,8 @@ export function createScalaScriptServices(context: DefaultSharedModuleContext): 
  * @param services
  */
 export function registerValidationChecks(services: ScalaScriptServices) {
-  const registry = services.validation.ValidationRegistry;
-  const validator = services.validation.ScalaScriptValidator;
+  const registry = services.validation.ValidationRegistry
+  const validator = services.validation.ScalaScriptValidator
   const checks: ValidationChecks<ScalaScriptAstType> = {
     VariableDef: validator.checkVariableDef,
     FunctionDef: validator.checkFunctionDef,
@@ -107,8 +107,8 @@ export function registerValidationChecks(services: ScalaScriptServices) {
     Assignment: validator.checkAssignment,
     UnaryExpression: validator.checkUnaryOperationAllowed,
     BinaryExpression: validator.checkBinaryOperationAllowed,
-  };
-  registry.register(checks, validator);
+  }
+  registry.register(checks, validator)
 }
 
 /**
@@ -119,11 +119,11 @@ export class ScalaScriptDocumentFactory extends DefaultLangiumDocumentFactory {
     uri: URI,
     cancellationToken = CancellationToken.None
   ): Promise<LangiumDocument<T>> {
-    const content = await this.fileSystemProvider.readFile(uri);
-    const convert = content.replaceAll(/\/\*\*[\s\S]*?\*\//g, "%%$&%%");
+    const content = await this.fileSystemProvider.readFile(uri)
+    const convert = content.replaceAll(/\/\*\*[\s\S]*?\*\//g, '%%$&%%')
     // console.log("ScalaScriptDocumentFactory.fromUri:", uri);
     // console.log("원본:", content);
     // console.log("변환:", convert);
-    return this.createAsync<T>(uri, convert, cancellationToken);
+    return this.createAsync<T>(uri, convert, cancellationToken)
   }
 }
