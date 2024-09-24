@@ -308,7 +308,7 @@ function transpileFunctionArgs(args: ast.TypeBinding[] | ast.Parameter[], indent
     })
     .join(', ')
 
-  if (args.length == 1 && args[0].type == undefined) return argsText
+  if (args.length == 1 && args[0].type == undefined && ast.isTypeBinding(args[0])) return argsText
   return '(' + argsText + ')'
 }
 
