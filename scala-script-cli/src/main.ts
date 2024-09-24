@@ -14,10 +14,12 @@ import { createScalaScriptServices } from './scala-script-module.js'
 import { generateTypeScript } from './generator.js'
 import { extractAstNode } from './cli-util.js'
 
+// import.meta.url: file:///D:/Samuel/NegahamaOrg.ScalaScript/scala-script-cli/out/scala-script-cli/src/main.js
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url))
 
-const packagePath = path.resolve(__dirname, '..', '..', 'package.json')
+const packagePath = path.resolve(__dirname, '..', '..', '..', 'package.json')
 const packageContent = await fs.readFile(packagePath, 'utf-8')
+const packageVersion = JSON.parse(packageContent).version
 
 /**
  *
@@ -25,14 +27,14 @@ const packageContent = await fs.readFile(packagePath, 'utf-8')
 export default function (): void {
   const program = new Command()
 
-  program.version(JSON.parse(packageContent).version)
+  program.version(packageVersion)
 
   const fileExtensions = ScalaScriptLanguageMetaData.fileExtensions.join(', ')
   program
     .command('generate')
     .argument('<file>', `source file (possible file extensions: ${fileExtensions})`)
     .option('-d, --destination <dir>', 'destination directory of generating')
-    .description('generates TypeScript code')
+    .description('generates TypeScript codes from ScalaScript codes')
     .action(generateAction)
 
   program.parse(process.argv)
@@ -69,8 +71,11 @@ export const generateAction = async (fileName: string, opts: GenerateOptions): P
   console.log('Processing:', library.uri.path)
   workspace.DocumentBuilder.build([library])
 
+  let baseName = path.basename(fileName)
+  if (baseName == '*') baseName = '*.ss'
+
   // 단일 파일만 트랜스파일하는 경우
-  if (path.basename(fileName) != '*.ss') {
+  if (baseName != '*.ss') {
     const model = await extractAstNode<Program>(fileName, services)
     const generatedFilePath = generateTypeScript(model, fileName, opts.destination)
     console.log(chalk.green(`TypeScript code generated successfully: ${generatedFilePath}`))
@@ -90,10 +95,6 @@ export const generateAction = async (fileName: string, opts: GenerateOptions): P
 
   for (const doc of workspace.LangiumDocuments.all) {
     console.log('Processing:', doc.uri.path)
-
-    // fileName이 * 이 아니면 동일한 파일명을, * 인 경우는 모든 ss 파일을 변환한다
-    if (!(doc.uri.path.endsWith(fileName) || (path.basename(fileName) == '*.ss' && doc.uri.path.endsWith('.ss'))))
-      continue
 
     const validationErrors = (doc.diagnostics ?? []).filter(e => e.severity === 1)
     if (validationErrors.length > 0) {

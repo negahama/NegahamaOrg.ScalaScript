@@ -296,21 +296,20 @@ function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string
  * @returns
  */
 function transpileFunctionArgs(args: ast.TypeBinding[] | ast.Parameter[], indent: number) {
-  return (
-    '(' +
-    args
-      .map(arg => {
-        if (ast.isTypeBinding(arg)) return arg.name + generateTypes(arg.type, indent)
-        else if (ast.isParameter(arg)) {
-          let p = (arg.spread ? '...' : '') + arg.name
-          p += (arg.nullable ? '?' : '') + generateTypes(arg.type, indent)
-          p += arg.value ? ` = ${generateExpression(arg.value, indent)}` : ''
-          return p
-        } else return 'internal error'
-      })
-      .join(', ') +
-    ')'
-  )
+  const argsText = args
+    .map(arg => {
+      if (ast.isTypeBinding(arg)) return arg.name + generateTypes(arg.type, indent)
+      else if (ast.isParameter(arg)) {
+        let p = (arg.spread ? '...' : '') + arg.name
+        p += (arg.nullable ? '?' : '') + generateTypes(arg.type, indent)
+        p += arg.value ? ` = ${generateExpression(arg.value, indent)}` : ''
+        return p
+      } else return 'internal error'
+    })
+    .join(', ')
+
+  if (args.length == 1 && args[0].type == undefined) return argsText
+  return '(' + argsText + ')'
 }
 
 /**
