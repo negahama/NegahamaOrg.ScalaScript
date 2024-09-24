@@ -2,12 +2,22 @@ import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient
 import type * as vscode from 'vscode'
 import * as path from 'node:path'
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node.js'
+import { DslLibraryFileSystemProvider } from './file-system-provider.js'
+
+// import { createTsAstViewer } from './TsAstViewerMain.js'
 
 let client: LanguageClient
 
 // This function is called when the extension is activated.
 export function activate(context: vscode.ExtensionContext): void {
+  DslLibraryFileSystemProvider.register(context)
+  console.log('DslLibraryFileSystemProvider.register')
+
   client = startLanguageClient(context)
+  console.log('startLanguageClient')
+
+  // createTsAstViewer(context)
+  // console.log('createTsAstViewer')
 }
 
 // This function is called when the extension is deactivated.

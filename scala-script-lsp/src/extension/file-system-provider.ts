@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { ScalaScriptBuiltinLibrary } from '../language/scala-script-workspace.js'
+import { ScalaScriptBuiltinLibrary } from '../../../language/scala-script-library.js'
 
 /**
  *
@@ -61,10 +61,4 @@ export class DslLibraryFileSystemProvider implements vscode.FileSystemProvider {
   rename() {
     throw vscode.FileSystemError.NoPermissions()
   }
-}
-
-// register the file system provider on extension activation
-export function activate(context: vscode.ExtensionContext) {
-  console.log('DslLibraryFileSystemProvider.register')
-  DslLibraryFileSystemProvider.register(context)
 }
