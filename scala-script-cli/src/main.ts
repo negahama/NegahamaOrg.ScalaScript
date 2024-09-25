@@ -86,12 +86,15 @@ export const generateAction = async (fileName: string, opts: GenerateOptions): P
   // await workspace.LangiumDocuments.getOrCreateDocument(doc.uri)
   // await workspace.DocumentBuilder.build([document], { validation: true })
   workspace.WorkspaceManager.initialBuildOptions = { validation: true }
+  const start = Date.now()
+  console.log(chalk.yellowBright('initializeWorkspace'))
   await workspace.WorkspaceManager.initializeWorkspace([
     {
       name: path.basename(root),
       uri: URI.file(root).toString(),
     },
   ])
+  console.log(chalk.yellowBright(`elapsed time: ${Date.now() - start}ms`))
 
   for (const doc of workspace.LangiumDocuments.all) {
     console.log('Processing:', doc.uri.path)

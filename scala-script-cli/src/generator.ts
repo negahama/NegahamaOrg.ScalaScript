@@ -654,8 +654,12 @@ function transpileMatchExpression(expr: ast.MatchExpression, indent: number): st
  * @returns
  */
 function transpileUnaryExpression(expr: ast.UnaryExpression, indent: number): string {
-  if (expr.operator) return `${expr.operator} ${generateExpression(expr.value, indent)}`
-  else return generateExpression(expr.value, indent)
+  if (expr.operator) {
+    // typeof만 공백을 포함하고 나머지(+, -)는 공백없이 표현한다
+    let operator = expr.operator
+    if (expr.operator == 'typeof') operator += ' '
+    return `${operator}${generateExpression(expr.value, indent)}`
+  } else return generateExpression(expr.value, indent)
 }
 
 /**

@@ -112,7 +112,9 @@ export function registerValidationChecks(services: ScalaScriptServices) {
 }
 
 /**
- *
+ * JSDoc style comment는 특별히 그대로 bypass한다.
+ * 원래 주석을 bypass하기 위해서는 %% ... %% 으로 처리해야 하지만 이렇게 하면 JSDoc의 편이 기능을 사용할 수 없고
+ * 그렇다고 주석을 bypass 안 할수도 없기 때문에 편집시에는 주석 형태로 사용하고 변환을 하기 전에만 %%을 붙여서 빌드한다.
  */
 export class ScalaScriptDocumentFactory extends DefaultLangiumDocumentFactory {
   override async fromUri<T extends AstNode = AstNode>(

@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.4.9",
+  "version": "0.4.11",
   "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "publisher": "NegahamaOrg",
@@ -37,7 +37,6 @@
     "langium:generate": "langium generate",
     "langium:watch": "langium generate --watch",
     "vscode:prepublish": "npm run all",
-    "release": "standard-version",
     "package": "vsce package"
   },
   "devDependencies": {
@@ -59,7 +58,8 @@
   "icon": "assets/logo.png",
   "activationEvents": [
     "onLanguage:scala-script",
-    "onFileSystem:builtin"
+    "onFileSystem:builtin",
+    "onView:scala-script"
   ],
   "contributes": {
     "languages": [
@@ -80,6 +80,41 @@
         "language": "scala-script",
         "scopeName": "source.scala-script",
         "path": "./theme/scala-script.tmLanguage.json"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "scala-script",
+          "title": "ScalaScript Ast Viewer",
+          "icon": "assets/logo.png"
+        }
+      ]
+    },
+    "views": {
+      "scala-script": [
+        {
+          "id": "ss-ast-viewer",
+          "name": "ScalaScript Ast Viewer",
+          "icon": "assets/logo.png",
+          "when": "no-tslib == false"
+        },
+        {
+          "id": "ss-ast-welcome",
+          "name": "ScalaScript Ast Viewer",
+          "icon": "assets/logo.png",
+          "when": "no-tslib == true"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "ss-ast-viewer",
+        "contents": "Please open a file to parse."
+      },
+      {
+        "view": "ss-ast-welcome",
+        "contents": "try run `npm install -D typescript` and reload to enable."
       }
     ]
   },

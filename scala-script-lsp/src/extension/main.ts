@@ -2,9 +2,9 @@ import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient
 import type * as vscode from 'vscode'
 import * as path from 'node:path'
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node.js'
-import { DslLibraryFileSystemProvider } from './file-system-provider.js'
+import { DslLibraryFileSystemProvider } from './scala-script-file-provider.js'
 
-// import { createTsAstViewer } from './TsAstViewerMain.js'
+import { createTsAstViewer } from './TsAstViewerMain.js'
 
 let client: LanguageClient
 
@@ -16,8 +16,8 @@ export function activate(context: vscode.ExtensionContext): void {
   client = startLanguageClient(context)
   console.log('startLanguageClient')
 
-  // createTsAstViewer(context)
-  // console.log('createTsAstViewer')
+  createTsAstViewer(context)
+  console.log('createTsAstViewer')
 }
 
 // This function is called when the extension is deactivated.

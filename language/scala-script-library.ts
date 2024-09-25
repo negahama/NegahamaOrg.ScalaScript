@@ -2,7 +2,7 @@
  *
  */
 export const ScalaScriptBuiltinLibrary = `
-@NotTrans def $string$ => {
+@NotTrans export def $string$ => {
   // Reflects the length of the string. Read-only.
   var length: number
   // Returns the character (exactly one UTF-16 code unit) at the specified index.
@@ -69,7 +69,7 @@ export const ScalaScriptBuiltinLibrary = `
   def valueOf()-> string
 }
 
-@NotTrans def $array$ => {
+@NotTrans export def $array$ => {
   // 순회 가능 또는 유사 배열 객체에서 새 Array인스턴스를 생성합니다.
   def from()-> any[]
   // 비동기 순회 가능, 순회 가능, 또는 유사 배열 객체에서 새 Array 인스턴스를 생성합니다.
@@ -148,7 +148,7 @@ export const ScalaScriptBuiltinLibrary = `
   def values()-> any
 }
 
-@NotTrans def $number$ => {
+@NotTrans export def $number$ => {
   // 주어진 값이 NaN인지 확인합니다.
   def isNaN()-> boolean
   // 주어진 값이 유한수 인지 확인합니다.
@@ -175,7 +175,7 @@ export const ScalaScriptBuiltinLibrary = `
   def valueOf()-> number
 }
 
-@NotTrans def Number => {
+@NotTrans export def Number => {
   // 두 개의 표현 가능한 숫자 사이의 최소 간격.
   val EPSILON: number
   // JavaScript에서 안전한 최대 정수. (2^53 - 1)
@@ -218,7 +218,7 @@ export const ScalaScriptBuiltinLibrary = `
   def valueOf()-> number
 }
 
-@NotTrans def Math => {
+@NotTrans export def Math => {
   // 오일러의 상수이며 자연로그의 밑. 약 2.718.
   val E: number
   // 원의 둘레와 지름의 비율. 약 3.14159.
@@ -305,7 +305,7 @@ export const ScalaScriptBuiltinLibrary = `
   def trunc(x: number)-> number
 }
 
-@NotTrans def console => {
+@NotTrans export def console => {
   // 첫 번째 매개변수가 false인 경우 메시지와 스택 추적을 출력합니다.
   def assert()
   // 콘솔의 내용을 지웁니다.
@@ -344,11 +344,11 @@ export const ScalaScriptBuiltinLibrary = `
   def warn()
 }
   
-@NotTrans def assert => { def equal() def notEqual() }
+@NotTrans export def assert => { def equal() def notEqual() }
 
-@NotTrans def Array => {}
+@NotTrans export def Array => {}
 
-@NotTrans def Map => {
+@NotTrans export def Map => {
   // 요소의 개수를 반환합니다.
   var size: number
   // key를 이용해 value를 저장합니다.
@@ -371,7 +371,7 @@ export const ScalaScriptBuiltinLibrary = `
   def forEach()
 }
 
-@NotTrans def Set => {
+@NotTrans export def Set => {
   // 셋에 몇 개의 값이 있는지 세줍니다.
   var size: number
   // 값을 추가하고 셋 자신을 반환합니다.
@@ -392,14 +392,14 @@ export const ScalaScriptBuiltinLibrary = `
   def forEach()
 }
 
-@NotTrans def JSON => {
+@NotTrans export def JSON => {
   // 주어진 값에 해당하는 JSON 문자열을 반환합니다. 선택 사항으로 특정 속성만 포함하거나 사용자 정의 방식으로 속성을 대체합니다.
   def stringify()-> string
   // 문자열을 JSON으로서 구문 분석하고, 선택적으로 분석 결과의 값과 속성을 변환해 반환합니다.
   def parse()
 }
 
-@NotTrans def fs => { 
+@NotTrans export def fs => { 
   def existsSync()-> boolean
   def mkdirSync()
   def readdirSync()-> string[]
@@ -408,7 +408,7 @@ export const ScalaScriptBuiltinLibrary = `
   def appendFileSync()
 }
 
-@NotTrans def parseFloat()->number
-@NotTrans def parseInt()->number
-@NotTrans def escape()-> string
+@NotTrans export def parseFloat()->number
+@NotTrans export def parseInt()->number
+@NotTrans export def escape()-> string
 `.trim()
