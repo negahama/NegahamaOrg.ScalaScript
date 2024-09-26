@@ -16,11 +16,12 @@ import {
   type LangiumSharedServices,
   type PartialLangiumServices,
 } from 'langium/lsp'
-import { CancellationToken } from 'vscode-jsonrpc'
+import { CancellationToken } from 'vscode-languageserver'
 import { ScalaScriptAstType } from '../../language/generated/ast.js'
 import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from '../../language/generated/module.js'
 import { ScalaScriptScopeProvider } from '../../language/scala-script-scope.js'
 import { ScalaScriptValidator } from '../../language/scala-script-validator.js'
+import { ScalaScriptWorkspaceManager } from './scala-script-workspace.js'
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -44,6 +45,7 @@ export type ScalaScriptSharedServices = LangiumSharedServices
 export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPartial<ScalaScriptSharedServices>> = {
   workspace: {
     LangiumDocumentFactory: services => new ScalaScriptDocumentFactory(services),
+    WorkspaceManager: services => new ScalaScriptWorkspaceManager(services),
   },
 }
 
