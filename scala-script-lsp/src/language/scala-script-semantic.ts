@@ -12,7 +12,7 @@ export class ScalaScriptSemanticTokenProvider extends AbstractSemanticTokenProvi
       let type = SemanticTokenTypes.variable
       if (node.isFunction) type = SemanticTokenTypes.function
       acceptor({ node, property: 'element', type })
-    } else if (ast.isFunctionCall(node)) {
+    } else if (ast.isRefCall(node)) {
       acceptor({ node, property: 'element', type: SemanticTokenTypes.function })
     } else if (ast.isVariableDef(node)) {
       acceptor({ node, property: 'name', type: SemanticTokenTypes.variable })

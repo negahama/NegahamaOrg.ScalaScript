@@ -118,8 +118,6 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
     return '...' + expr.spread.$refText
   } else if (ast.isNewExpression(expr)) {
     result += transpileNewExpression(expr, indent)
-  } else if (ast.isArrayExpression(expr)) {
-    result += `${expr.element.$refText}[${generateArrayIndex(expr.index, indent)}]`
   } else if (ast.isArrayValue(expr)) {
     result += '[' + expr.items.map(item => generateExpression(item.item, indent)).join(', ') + ']'
   } else if (ast.isObjectValue(expr)) {

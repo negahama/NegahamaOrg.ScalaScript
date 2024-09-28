@@ -94,7 +94,7 @@ export const generateAction = async (fileName: string, opts: GenerateOptions): P
       uri: URI.file(root).toString(),
     },
   ])
-  console.log(chalk.yellowBright(`elapsed time: ${Date.now() - start}ms`))
+  console.log(chalk.yellowBright(`elapsed time: ${(Date.now() - start) / 1000} sec`))
 
   for (const doc of workspace.LangiumDocuments.all) {
     console.log('Processing:', doc.uri.path)

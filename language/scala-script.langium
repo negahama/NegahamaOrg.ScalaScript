@@ -79,10 +79,7 @@ ArrayValue:
 ArrayItem:
   item=Expression;
 
-// Array의 실제 사용... function의 function call 동일
-// ex) ary[ 1 ]
-ArrayExpression:
-  element=[NamedElement:Id] isArray?='[' index=Expression ']';
+// ArrayExpression - CallChain 참고
 
 //todo
 // TupleType:
@@ -164,7 +161,7 @@ FunctionValue:
   ('(' Bindings? ')' ('->' returnType=Types)? | bindings+=TypeBinding) '=>' body=Block;
 
 Block:
-  (isBracket?='{' codes+=Code* '}') | codes+=Expression;
+  (isBracket?='{' codes+=Code+ '}') | codes+=Expression;
 
 fragment Bindings:
   bindings+=TypeBinding (',' bindings+=TypeBinding)*;
@@ -254,14 +251,12 @@ terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
 //-----------------------------------------------------------------------------
 // Logical rule은 많은 rule을 내포하고 있다.
 // 이것은 관계 연산 뿐만 아니라 비교 연산과 사칙 연산을 모두 포함하고 있으며
-// CallChain을 거쳐 SimpleExpression까지 포함한다. SimpleExpression은 Literal,
-// GroupExpression, FunctionCall(괄호가 없은 경우도 포함)등이 포함된다.
+// CallChain을 거쳐 SimpleExpression까지 포함한다.
 Expression:
   Logical
   | LogicalNot
   | Assignment
   | IfExpression
-  | MatchExpression
   | InfixExpression
   | ReturnExpression
   | SpreadExpression
@@ -271,6 +266,7 @@ Expression:
   ;
 
 // Binary Operators
+// 논리 연산자 처리
 Logical infers Expression:
   InstanceOf     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '&&' | '||') right=InstanceOf)*;
 
@@ -278,17 +274,39 @@ Logical infers Expression:
 InstanceOf infers Expression:
   Comparison     ({infer BinaryExpression.left=current} operator=('instanceof') right=Comparison)*;
 
+// 비교 연산자
 Comparison infers Expression:
   Addition       ({infer BinaryExpression.left=current} operator=('<' | '<=' | '>' | '>=' | '==' | '!=') right=Addition)*;
 
+// 산술 연산자 중 덧셈, 뺄셈, 문자열 접합 연산
 Addition infers Expression:
   Multiplication ({infer BinaryExpression.left=current} operator=('+' | '-' | '..') right=Multiplication)*;
 
+// 산술 연산자 중 곱셈, 나눗셈, 나머지
 Multiplication infers Expression:
   Exponentiation ({infer BinaryExpression.left=current} operator=('*' | '/' | '%') right=Exponentiation)*;
 
+// 거듭제곱의 처리 - 산술 연산 중에서는 가장 우선 순위가 높다.  
 Exponentiation infers Expression:
-  UnaryOperator  ({infer BinaryExpression.left=current} operator=('**') right=UnaryOperator)*;
+  MatchOperator  ({infer BinaryExpression.left=current} operator=('**') right=MatchOperator)*;
+
+// Match expression
+// 이것을 별도의 expression(예를들어 assignment와 같이)으로 취급하는 것이 자연스러워 보인다.
+// 실제로도 그렇게 처리하고 있었는데 문제는 이것의 원래 구문인 
+// MatchExpression:
+//   expr=CallChain 'match' '{' cases+=CaseClause+ '}';
+// 은 문법적으로는 에러가 없지만 parser가 구문분석을 할때 lookahead 처리에 너무나 많은 시간이 소비되는 단점이 있다.
+// 이것을 아래와 같이 switch 문으로 변경하면 구문이 분명해져서 lookahead 처리에 드는 시간을 모두 없앨 수 있지만
+//  'switch' '(' expr=Expression ')' '{' cases+=CaseClause+ '}';
+// 스칼라스크립트의 특징 중에 하나인 match문을 포기할 수 없어서 여기로 정하였다.
+MatchOperator infers Expression:
+  UnaryOperator ({infer MatchExpression.expr=current} 'match' '{' cases+=CaseClause+ '}')*;
+
+CaseClause:
+  'case' pattern=(CaseDefalut | CasePattern) '=>' (body=Block)?;
+
+CaseDefalut returns string: '_';
+CasePattern: Literal;
 
 // Unary operators
 // 이것은 거듭제곱보다 우선순위가 높은 연산이다.
@@ -296,9 +314,28 @@ UnaryOperator infers Expression:
   {infer UnaryExpression} (operator=('-' | '+' | 'typeof'))? value=CallChain;
 
 // Member call and Chaining of Member calls
-// 아래 규칙은 개체의 fields, methods, functions를 모두 호출할 수 있으며 체인닝될 수 있다.
+// CallChain은 RefCall의 연장선이라고 할 수 있다.
+// CallChain의 시작은 RefCall만 있는 것이 아니기 때문에 둘은 분명 다르지만 . 이후의 체이닝에서는 RefCall과 거의 동일하다.
+// 또한 CallChain은 모든 산술, 비교, 관계 연산의 기본 element이며 value를 가지는 expression 이라고 할 수 있다.
+// RefCall과 함께 CallChain은 체이닝된 모든 variables, functions, arrays, fields, methods를 모두 포함한다.
 //
-// CallableElement는 '.' 다음에 올 수 있는 것들로써 필드(프로퍼티), 메서드, 배열이 있다.
+// CallChain(또는 RefCall)은 Array expression을 포함한다.
+// 즉 Array를 실제로 사용하는 ary[ 1 ]와 같은 구문을 function의 function call과 동일하게 취급하고 있다.
+// ArrayExpression:
+//   element=[NamedElement:Id] isArray?='[' index=Expression ']';
+//
+// CallChain을 아래와 같이 정의한 이유...
+// CallChain을 정의하는 다양한 방법들이 있을 수 있는데 아래와 같이 정의하게 된 과정을 살펴보면...
+// 
+// CallChain infers Expression:
+//   SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
+// fragment CallableElements:
+//   element=[NamedElement:Id] ( FunctionCallSignature | ArrayCallSignature )?;
+// FunctionCallSignature:
+//   isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')';
+// ArrayCallSignature:
+//   isArray?='[' index=Expression ']';
+//
 // 여기서 isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')'는
 // FunctionCallSignature와 동일하지만 FunctionCallSignature를 사용할 수 없다.
 // 심지어 FunctionCallSignature의 내용인 isFunction?='(' Arguments? ')'을 사용하는 것도 안된다.
@@ -306,36 +343,26 @@ UnaryOperator infers Expression:
 // 이것은 fragment를 사용하지 않는 경우와는 다르게 처리된다는 의미이다. 이로 인해 fragment로 사용하는 경우에는
 // AST node has no document 에러가 발생된다. 개발 노트를 참고
 //
-// CallChain은 전역변수급에 해당하는 this, super를 가지고 있는데 사실 이것의 처리가 애매모호하다.
-// 먼저 이것의 위치는 CallChain에 있는 것이 좋아 보인다. 이전에는 FeatureCall에 있었지만 this() 와 같은 것이
-// 가능하다는 문제가 있어 별도로 처리된다.
-//
-// this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
-// this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
-// 설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
-// 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
-// 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 CallChain infers Expression:
-  // SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
   SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
   (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')?
   (assertion=('!'|'?'))? )*;
 
-// fragment CallableElements:
-//   element=[NamedElement:Id] (
-//     // FunctionCallSignature | ArrayCallSignature
-//     isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']'
-//   )?;
-
+// CallChain의 시작점으로 사용되는 atomic expressions
+// 이것은 RefCall(변수, 함수, 배열)과 this, super, (expr), new를 포함하며
+// Literal도 포함된다. Literal은 'abc'.split() 또는 1 + 2 와 같은 구문을 위해 필수적이다. 
 SimpleExpression infers Expression:
-  FunctionCall
+  RefCall
   | ThisOrSuper
-  | ArrayExpression
   | GroupExpression
   | NewExpression
   | Literal;
 
-// 이것은 전역적인 개체들(전역변수, 전역함수)을 의미한다.
+// RefCall은 reference개체의 호출, 사용을 의미하는데 이것은 일반적인 변수, 함수, 배열을 포함하고 있다.
+// 이것은 주로 CallChain의 시작점으로 사용되며 CallChain이 이것을 포함하는 보다 일반적인 개념이기 때문에
+// 주로 CallChain이 사용되며 이것이 개별적으로 사용되는 경우는 semantic token으로 색상 구별을 하기 위한
+// 경우가 거의 유일하다.
+//
 // ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은
 // 예를들면 console.log의 console은 정의되지 않았기 때문에 에러가 된다. 그래서 타입스크립트의 라이브러리를
 // 사용할때는 cross-reference를 처리하기 위해 다음과 같은 추가적인 코드가 필요하다.
@@ -346,18 +373,24 @@ SimpleExpression infers Expression:
 // @NotTrans def string.repeat(count: number): string
 // @NotTrans def string.replace(searchFor: string, replaceWith: string): string
 // @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
-FunctionCall: {infer CallChain}
-  // (export?='export')? element=[NamedElement:Id] (FunctionCallSignature)?;
-  (export?='export')? element=[NamedElement:Id]
-  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')')?
+RefCall: {infer CallChain}
+  element=[NamedElement:Id]
+  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')?
   (assertion=('!'|'?'))?;
 
+// CallChain의 시작점으로 this, super를 가지고 있다.
+// this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
+// this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
+// 설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
+// 따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
+// 이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
 
 // grouped expression with parentheses
 GroupExpression:
   '(' value=Expression ')';
 
+// new expression
 NewExpression:
   'new' class=[ObjectDef:Id] (generic=Generic)? '(' (args+=Expression (',' args+=Expression)*)? ')';
 
@@ -401,16 +434,6 @@ fragment ConditionClause:
 
 IfElseExpression:
   ('elif' | 'else if') ConditionClause elif=Block?;
-
-// Match expression
-MatchExpression:
-  expr=CallChain 'match' '{' cases+=CaseClause+ '}';
-
-CaseClause:
-  'case' pattern=(CaseDefalut | CasePattern) '=>' (body=Block)?;
-
-CaseDefalut returns string: '_';
-CasePattern: Literal;
 
 InfixExpression:
   e1=Id name=Id e2=Literal;

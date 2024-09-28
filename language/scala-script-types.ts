@@ -448,9 +448,10 @@ export class TypeSystem {
     } else if (ast.isIfExpression(node)) {
       type = TypeSystem.inferTypeIfExpression(node, cache)
     } else if (ast.isMatchExpression(node)) {
-      type = TypeSystem.inferTypeMatchExpression(node, cache)
-    } else if (ast.isArrayExpression(node)) {
-      type = TypeSystem.inferTypeArrayExpression(node, cache)
+      const log = enterLog('isMatchExpression', node.$type)
+      type = TypeSystem.createErrorType('internal error', node)
+      //todo
+      exitLog(log, type)
     } else if (ast.isGroupExpression(node)) {
       const log = enterLog('isGroup', `'${node.$cstNode?.text}'`)
       type = TypeSystem.inferType(node.value, cache)
@@ -725,9 +726,14 @@ export class TypeSystem {
     }
 
     // 배열인 경우
+    // ArrayExpression의 타입은 array가 아니라 element-type이다.
     else if (node.isArray) {
       //todo 해당 배열의 자료형이 무엇인지 어떻게 알아낼 수 있을까
-      type = TypeSystem.createArrayType(TypeSystem.createAnyType())
+      // type = TypeSystem.createArrayType(TypeSystem.createAnyType())
+      // 다른 것들은 node의 타입을 통해서 타입을 추론하지만 이것은 ref을 이용해서 추론해야만 한다.
+      const ref = node.element?.ref
+      type = TypeSystem.inferType(ref, cache)
+      if (TypeSystem.isArrayType(type)) type = type.elementType
     }
 
     // 아무것도 아닌 경우
@@ -849,39 +855,6 @@ export class TypeSystem {
    * @param indent
    * @returns
    */
-  static inferTypeMatchExpression(node: ast.MatchExpression, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
-    const log = enterLog('isMatchExpression', node.$type)
-    exitLog(log, type)
-    return type
-  }
-
-  /**
-   * ArrayExpression의 타입은 array가 아니라 element-type이다.
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
-  static inferTypeArrayExpression(node: ast.ArrayExpression, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
-    // 다른 것들은 node의 타입을 통해서 타입을 추론하지만 이것은 ref을 이용해서 추론해야만 한다.
-    const log = enterLog('isArrayExpression', `'${node.element.$refText}'`)
-    const ref = node.element.ref
-    type = TypeSystem.inferType(ref, cache)
-    if (TypeSystem.isArrayType(type)) type = type.elementType
-    exitLog(log, type)
-    return type
-  }
-
-  /**
-   *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
-   */
   static inferTypeUnaryExpression(node: ast.UnaryExpression, cache: CacheType): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
     const log = enterLog('isUnaryExpression', node.operator)
@@ -941,14 +914,14 @@ export class TypeSystem {
   }
 
   /**
-   * //todo 모두 동일한 타입을 가지는지 검사해야 한다.
-   * //todo 또한 함수의 경우 CallChain에서 처리되는데 이것도 거기서 처리되어야 하지 않을까
    *
    * @param node
    * @param cache
    * @param indent
    * @returns
    */
+  //todo 모두 동일한 타입을 가지는지 검사해야 한다.
+  //todo 또한 함수의 경우 CallChain에서 처리되는데 이것도 거기서 처리되어야 하지 않을까
   static inferTypeArrayValue(node: ast.ArrayValue, cache: CacheType): TypeDescription {
     let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
     const log = enterLog('isArrayValue', node.items.toString())
