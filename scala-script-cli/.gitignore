@@ -1,5 +1,4 @@
 out/
-samples/generated
-!samples/library.ss
+samples
 !samples/sample.ss
 
