@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "publisher": "NegahamaOrg",
@@ -80,41 +80,6 @@
         "language": "scala-script",
         "scopeName": "source.scala-script",
         "path": "./theme/scala-script.tmLanguage.json"
-      }
-    ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "scala-script",
-          "title": "ScalaScript Ast Viewer",
-          "icon": "assets/logo.png"
-        }
-      ]
-    },
-    "views": {
-      "scala-script": [
-        {
-          "id": "ss-ast-viewer",
-          "name": "ScalaScript Ast Viewer",
-          "icon": "assets/logo.png",
-          "when": "no-tslib == false"
-        },
-        {
-          "id": "ss-ast-welcome",
-          "name": "ScalaScript Ast Viewer",
-          "icon": "assets/logo.png",
-          "when": "no-tslib == true"
-        }
-      ]
-    },
-    "viewsWelcome": [
-      {
-        "view": "ss-ast-viewer",
-        "contents": "Please open a file to parse."
-      },
-      {
-        "view": "ss-ast-welcome",
-        "contents": "try run `npm install -D typescript` and reload to enable."
       }
     ]
   },
