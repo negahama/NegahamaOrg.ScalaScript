@@ -11,3 +11,4 @@ const { shared } = createScalaScriptServices({ connection, ...NodeFileSystem })
 
 // Start the language server with the shared services
 startLanguageServer(shared)
+console.log('Language server started')

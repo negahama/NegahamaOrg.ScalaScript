@@ -105,7 +105,7 @@ for (a <- 1 to 10; b <- 1 to 10; c <-  1 to 10) {
 %%// 그리고 인수가 하나만 있는 경우라도 괄호가 반드시 필요하다.
 %%// 스칼라스크립트는 타입스크립트와 동일하다.
 var t1: ()-> number
-var t2: (arg: number)-> number
+var t2: (arg: number)-> number[]
 
 %%// 스칼라는 익명 함수를 표현할때 그냥 인수(또는 `_`) 하나만 달랑 쓰거나 아니면
 %%// 인수의 타입을 명시해야 하거나 인수가 여러 개이면 괄호로 묶어야 하고
@@ -121,7 +121,9 @@ val lambda5 = (arg: number)-> number => return arg
 /**
   함수 정의 및 호출
 */
-def add(a: number, b: number)-> number => return a + b
+// def add(a: number, b: number)-> number => return a + b
+val add = (a: number, b: number)-> number => return a + b
+var returnValue = add(1, 2)
 
 /**
  * 

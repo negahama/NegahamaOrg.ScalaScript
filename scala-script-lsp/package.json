@@ -58,8 +58,7 @@
   "icon": "assets/logo.png",
   "activationEvents": [
     "onLanguage:scala-script",
-    "onFileSystem:builtin",
-    "onView:scala-script"
+    "onFileSystem:builtin"
   ],
   "contributes": {
     "languages": [
@@ -81,7 +80,24 @@
         "scopeName": "source.scala-script",
         "path": "./theme/scala-script.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "ScalaScript language server configuration",
+      "properties": {
+        "scala-script.trace.server": {
+          "scope": "window",
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        }
+      }
+    }
   },
   "configurationDefaults": {
     "scala-script": {

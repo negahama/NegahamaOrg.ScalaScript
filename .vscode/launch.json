@@ -6,22 +6,45 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Launch Client",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceRoot}/scala-script-lsp"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/scala-script-lsp/out/**/*.js"
+      ],
+      "sourceMaps": true,
+      "autoAttachChildProcesses": true
+    },
+    {
       "name": "Run Extension",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}/scala-script-lsp"],
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/scala-script-lsp"
+      ],
       "sourceMaps": true,
-      "outFiles": ["${workspaceFolder}/scala-script-lsp/out/**/*.js"]
+      "outFiles": [
+        "${workspaceFolder}/scala-script-lsp/out/**/*.js"
+      ]
     },
     {
       "name": "Attach to Language Server",
       "type": "node",
       "port": 6009,
       "request": "attach",
-      "skipFiles": ["<node_internals>/**"],
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
       "sourceMaps": true,
-      "outFiles": ["${workspaceFolder}/scala-script-lsp/out/**/*.js", "${workspaceFolder}/node_modules/langium"]
+      "outFiles": [
+        "${workspaceFolder}/scala-script-lsp/out/**/*.js",
+        "${workspaceFolder}/node_modules/langium"
+      ]
     }
   ]
 }

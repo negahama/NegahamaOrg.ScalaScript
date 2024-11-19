@@ -61,7 +61,7 @@ SimpleType:
 // ex) var ary: number[]
 ArrayType:
   // SimpleType ({infer ArrayType.elementType=current} '[' ']')? ;
-  elementType=(ObjectType | ElementType) '[' ']';
+  elementType=(ObjectType | PrimitiveType | TypeChain) '[' ']';
 
 // ex) var obj: { name: string age: number }
 ObjectType:
