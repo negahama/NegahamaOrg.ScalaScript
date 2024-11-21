@@ -1,4 +1,4 @@
-@NotTrans val setTimeout: ()-> void
+@NotTrans val setTimeout: () -> void
 
 /**
   자료형 및 선언과 정의, 다중 대입
@@ -48,7 +48,7 @@ s = array1[a + b] .. array1[1]
 */
 if not s console log 'a is not true'
 
-val matchTest = (x: number)-> string => x match {
+val matchTest = (x: number) -> string => x match {
   case 1 => return "one"
   case 2 => return "two"
   case _ => return "other"
@@ -104,8 +104,8 @@ for (a <- 1 to 10; b <- 1 to 10; c <-  1 to 10) {
 %%// 반면 타입스크립트는 형식적인 인수명이 있어야 한다.
 %%// 그리고 인수가 하나만 있는 경우라도 괄호가 반드시 필요하다.
 %%// 스칼라스크립트는 타입스크립트와 동일하다.
-var t1: ()-> number
-var t2: (arg: number)-> number[]
+var t1: () -> number
+var t2: (arg: number) -> number[]
 
 %%// 스칼라는 익명 함수를 표현할때 그냥 인수(또는 `_`) 하나만 달랑 쓰거나 아니면
 %%// 인수의 타입을 명시해야 하거나 인수가 여러 개이면 괄호로 묶어야 하고
@@ -116,13 +116,13 @@ val lambda1 = () => return 1
 val lambda2 = arg => return arg
 val lambda3 = arg: number => return arg
 val lambda4 = (arg: number) => return arg
-val lambda5 = (arg: number)-> number => return arg
+val lambda5 = (arg: number) -> number => return arg
 
 /**
   함수 정의 및 호출
 */
-// def add(a: number, b: number)-> number => return a + b
-val add = (a: number, b: number)-> number => return a + b
+// def add(a: number, b: number) -> number => return a + b
+val add = (a: number, b: number) -> number => return a + b
 var returnValue = add(1, 2)
 
 /**
@@ -130,7 +130,7 @@ var returnValue = add(1, 2)
  * @param N 
  * @returns 
  */
-val factorial = (N: number)-> number => {
+val factorial = (N: number) -> number => {
   var sum: number = 0
   for (d <- 1 to N) {
     sum += d
@@ -142,12 +142,12 @@ val timeFlies1 = (msg: string) => {
   console.log("time flies like an arrow... ", msg)
 }
 
-val timeFlies2 = (msg: string)-> void => {
+val timeFlies2 = (msg: string) -> void => {
   console.log("time flies like an arrow... ", msg)
 }
 
-val oncePerSecond = (callback: (p:string)-> void)-> void => {
-%%//def oncePerSecond(callback: (p: string)-> void)-> void => {
+val oncePerSecond = (callback: (p:string) -> void) -> void => {
+%%//def oncePerSecond(callback: (p: string) -> void) -> void => {
   setTimeout(() => { callback('1초 지남!') }, 1000)
 }
 
@@ -164,7 +164,7 @@ val main = () => {
  * @param to
  * @param mid 
  */
-val hanoi = (n: number, from: string, to: string, mid: string)-> void => {
+val hanoi = (n: number, from: string, to: string, mid: string) -> void => {
   val move = (from: string, to: string) => {
     console.log(`${from} ${to}`)
   }
@@ -183,14 +183,14 @@ val hanoi = (n: number, from: string, to: string, mid: string)-> void => {
  * @param ary 
  * @returns 
  */
-val concatenate = (ary: string[])-> string => {
+val concatenate = (ary: string[]) -> string => {
   var result = ""
   for (e <- ary)
     result = result .. e
   return result
 }
 
-val generateBypassElement = (bypass: string[])-> string => {
+val generateBypassElement = (bypass: string[]) -> string => {
   var result: string = ""
   var t = result.trim()
   bypass.forEach(s:string => {
@@ -212,7 +212,7 @@ def Work = {
 def Person = {
   var name: string
   var work: Work
-  val calc = (hour: number, bonus: Bonus)-> number => {
+  val calc = (hour: number, bonus: Bonus) -> number => {
     return this.work.wage * hour + bonus.amount
   }
 }

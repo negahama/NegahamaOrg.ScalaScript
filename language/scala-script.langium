@@ -27,9 +27,9 @@ Code: Statement | Expression;
   def는 일반적으로 오브젝트의 선언인데 이것은 오브젝트 개체를 선언하는 것이 아니라 타입 자체를 선언하는 것이다.
   예를들어 name과 age를 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
   이 타입을 매번 이렇게 쓰기가 불편하기 때문에 이를 Person 이라는 이름으로 사용하는 것이다.
-  이는 함수도 마찬가지이다. 예를 들어 def display = (msg: string)-> void 는 (msg: string)을 파라메터로 가지고
+  이는 함수도 마찬가지이다. 예를 들어 def display = (msg: string) -> void 는 (msg: string)을 파라메터로 가지고
   void를 리턴하는 함수들의 이름으로 display를 사용하는 것이며 display는 함수 타입의 이름이지 함수가 아니라는 점이
-  중요하다. 하지만 (msg: string)-> void 의 형식을 가지는 함수가 하나가 아니고 이들을 모두 display라는 이름으로
+  중요하다. 하지만 (msg: string) -> void 의 형식을 가지는 함수가 하나가 아니고 이들을 모두 display라는 이름으로
   사용하는 것은 맞지 않기 때문에 스칼라스크립트에서는 함수 타입을 정의할 일은 거의 없다.
 
   또한 스칼라스크립트는 오브젝트와 클래스가 하나로 합쳐져 있다.
@@ -150,7 +150,7 @@ fragment Annotation:
   ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
 
   FunctionValue란 함수 자체를 말하는 것으로 변수에 함수를 할당할 때 우변에 있어야 하는 것이 FunctionValue이다.
-  함수를 가지는 변수의 완전한 표현은 var f:(msg: string)-> void = (msg: string)-> void => { ... } 이다.
+  함수를 가지는 변수의 완전한 표현은 var f:(msg: string) -> void = (msg: string) -> void => { ... } 이다.
   f 변수의 타입을 별도로 기술할 필요가 없기 때문에 var f = FunctionValue 형태로 표시할 수 있다. 
   즉 FunctionValue는 함수 타입과 함수 바디를 포함하는 것으로 람다 함수라고도 하며 expression이다.
   함수의 값에 함수 타입이 포함되는 점은 혼란의 여지가 있지만 이것이 없는 함수 바디는 그냥 block일 뿐이다.

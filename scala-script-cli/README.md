@@ -16,7 +16,7 @@ val greeting = 'hello world'
 if not greeting console log greeting
 if (!greeting) console.log(greeitng)
 
-val matchTest = (x: number)-> string => x match {
+val matchTest = (x: number) -> string => x match {
   case 1 => return "one"
   case 2 => return "two"
   case _ => return "other"
@@ -68,7 +68,7 @@ I'll get it ready as soon as possible.
 
 ### ScalaScript Develop blog
 
-[This site](https://blog.naver.com/hsk141/223549212519) is about how I develop the ScalaScript language in detail.
+[This site](https://blog.naver.com/hsk141/223549212519) is about how I am developing the ScalaScript language in detail.
 But It's written by Korean language. if you know Korean, this site is very useful to get insight and informations about ScalaScript and Langium
 
 ### Langium offical site

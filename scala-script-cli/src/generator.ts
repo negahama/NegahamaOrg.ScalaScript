@@ -176,27 +176,39 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
   if (stmt.static) result += 'static '
 
   // 함수형 변수 중에는 함수로 변환되어야 하는 것들이 있다.
-  // constructor, argument가 값을 가지는 경우, super 호출이 있는 경우등은 함수로 변환되어야 한다.
+  // 그중 가장 중요한 것은 var 로 선언된 변수는 함수로 변환되어야 한다는 것이다.
+  // constructor, argument가 값을 가지는 경우, super 호출이 있는 경우등도 함수로 변환되어야 한다.
   let isFunctionDef = false
-  if (stmt.name == 'constructor') {
-    isFunctionDef = true
-  } else if (stmt.value && ast.isFunctionValue(stmt.value)) {
+  let isOverrideDef = false
+  let isOverridable = false
+  if (stmt.value && ast.isFunctionValue(stmt.value)) {
+    if (stmt.kind == 'var') {
+      isFunctionDef = true
+      isOverridable = true
+    }
+
+    if (stmt.name == 'constructor') {
+      isFunctionDef = true
+    }
+
     stmt.value.params.forEach(param => {
       if (param.value) {
         isFunctionDef = true
       }
     })
+
     // 함수의 바디에 super 호출이 있는 경우
-    //todo 이것만 변경하는 걸로 부족하다. 상위 클래스의 메서드도 함수로 변경해야 한다.
     const callchain = AstUtils.streamAllContents(stmt.value.body).filter(ast.isThisOrSuper)
     callchain.forEach(cc => {
       if (cc.this == 'super') {
         isFunctionDef = true
+        if (isOverridable) isOverrideDef = true
       }
     })
   }
 
   if (isFunctionDef) {
+    if (isOverrideDef) result += 'override '
     if (stmt.value && ast.isFunctionValue(stmt.value)) {
       result += generateFunction({
         includeFunction: !isClassMember,

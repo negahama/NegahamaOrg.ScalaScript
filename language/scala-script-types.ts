@@ -359,7 +359,7 @@ export class TypeSystem {
       return item.literal.$cstNode?.text ?? 'unknown'
     } else if (TypeSystem.isFunctionType(item)) {
       const params = item.parameters.map(e => `${e.name}: ${TypeSystem.typeToString(e.type)}`).join(', ')
-      return `(${params})-> ${TypeSystem.typeToString(item.returnType)}`
+      return `(${params}) -> ${TypeSystem.typeToString(item.returnType)}`
     } else {
       return item.$type
     }

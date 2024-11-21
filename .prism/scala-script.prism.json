@@ -19,7 +19,7 @@
           "category": "Bugs",
           "importance": "Medium",
           "createdAt": "2024-11-19T07:41:53.300Z",
-          "content": "ArrayType을 아래와 같이 선언하면\r\n\r\n```\r\nArrayType:\r\n  elementType=(ObjectType | ElementType) '[' ']';\r\n```\r\n\r\nElementType에 FunctionType이 포함되어져 있어 다음과 같은 것이 파싱되지 않는다.\r\n\r\n`var t: (arg: number)-> number[]`\r\n\r\n`(arg: number)-> number` 의 배열로 인식된다."
+          "content": "ArrayType을 아래와 같이 선언하면\r\n\r\n```\r\nArrayType:\r\n  elementType=(ObjectType | ElementType) '[' ']';\r\n```\r\n\r\nElementType에 FunctionType이 포함되어져 있어 다음과 같은 것이 파싱되지 않는다.\r\n\r\n`var t: (arg: number) -> number[]`\r\n\r\n`(arg: number) -> number` 의 배열로 인식된다."
         }
       ]
     }
