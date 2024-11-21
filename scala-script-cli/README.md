@@ -35,20 +35,18 @@ for (i <- 1 to 10; j <- arr) {
 
 Anyway **ScalaScript is transpiler which is transpiled to TypeScript**. It means that you can get the TypeScript code when you code with ScalaScript.
 
-> 🚨 But this Extension is ScalaScript's language server extension for VS Code. So you can NOT transpile using this extension only.
->
-> If you want to do that, you need to download ScalaScript CLI by follow command
->
+If you want to do that, you need to download ScalaScript CLI by follow command
+
 > `npm i --save-dev scala-script`
->
-> and add script in `package.json`
->
+
+and add script in `package.json`
+
 > `"scripts": {`  
 > `   "transpile": "ssc generate src/*.ss -d src"`  
 > ` }`
->
-> and then run script
->
+
+and then run script
+
 > `npm run transpile`
 
 This project is based on the Langium and provided you the insigt of creating your DSL with using the Langium

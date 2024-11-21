@@ -97,6 +97,46 @@ export class ScalaScriptValidator {
   }
 
   /**
+   *
+   * @param method
+   * @param accept
+   * @returns
+   */
+  checkFunctionValue(method: ast.FunctionValue, accept: ValidationAcceptor): void {
+    const log = enterLog('checkFunctionValue', method.$cstNode?.text)
+
+    if (method.body && method.returnType) {
+      const map = getTypeCache()
+      const expectedType = TypeSystem.inferType(method.returnType, map)
+
+      const returnStatements: ast.ReturnExpression[] = []
+      this.extractReturnExpression(method.body, returnStatements)
+
+      if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
+        accept('error', "A function whose declared type is not 'void' must return a value.", {
+          node: method.returnType,
+        })
+        return
+      }
+
+      for (const returnStatement of returnStatements) {
+        const returnValueType = TypeSystem.inferType(returnStatement, map)
+        if (!isAssignable(returnValueType, expectedType)) {
+          accept(
+            'error',
+            `Type '${TypeSystem.typeToString(returnValueType)}' is not assignable to type ` +
+              `'${TypeSystem.typeToString(expectedType)}'.`,
+            {
+              node: returnStatement,
+            }
+          )
+        }
+      }
+    }
+    exitLog(log)
+  }
+
+  /**
    * Block에서 모든 return문을 추출한다.
    * 이때 함수 선언 및 람다 함수 호출과 같이 return이 사용되었지만 return의 scope가 해당 블럭과 관련이 없는 것은 제외한다.
    *
@@ -106,7 +146,7 @@ export class ScalaScriptValidator {
   extractReturnExpression(node: AstNode, result: ast.ReturnExpression[]) {
     // return AstUtils.streamAllContents(node).filter(ast.isReturnExpression).toArray()
     AstUtils.streamContents(node).forEach(n => {
-      if (ast.isFunctionDef(n) || ast.isFunctionValue(n)) return
+      if (ast.isFunctionDef(n) || ast.isFunctionType(n) || ast.isFunctionValue(n)) return
       else if (ast.isReturnExpression(n)) result.push(n)
       else this.extractReturnExpression(n, result)
     })

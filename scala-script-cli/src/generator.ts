@@ -1,8 +1,9 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { AstUtils } from 'langium'
 import { expandToNode, joinToNode, toString } from 'langium/generate'
-import * as ast from '../../language/generated/ast.js'
 import { extractDestinationAndName } from './cli-util.js'
+import * as ast from '../../language/generated/ast.js'
 import chalk from 'chalk'
 
 /**
@@ -33,9 +34,15 @@ export function generateTypeScript(program: ast.Program, filePath: string, desti
 }
 
 /**
+ * Generates code from the given AST (Abstract Syntax Tree) node.
  *
- * @param code
- * @returns
+ * @param code - The AST node representing the code to be generated.
+ * @returns The generated code as a string.
+ *
+ * @remarks
+ * This function determines whether the given AST node is a statement or an expression
+ * and generates the corresponding code. If the node is neither a statement nor an expression,
+ * an error message is logged.
  */
 function generateCode(code: ast.Code): string {
   let result = ''
@@ -46,10 +53,11 @@ function generateCode(code: ast.Code): string {
 }
 
 /**
+ * Generates a string representation of a given AST statement with the specified indentation.
  *
- * @param stmt
- * @param indent
- * @returns
+ * @param stmt - The AST statement to generate. It can be undefined.
+ * @param indent - The number of spaces to use for indentation.
+ * @returns The generated string representation of the statement.
  */
 function generateStatement(stmt: ast.Statement | undefined, indent: number): string {
   let result = ''
@@ -61,13 +69,13 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
   } else if (ast.isObjectDef(stmt)) {
     result += transpileObjectDef(stmt, indent)
   } else if (ast.isDoStatement(stmt)) {
-    result += `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition, indent)}`
+    result += transpileDoStatement(stmt, indent)
   } else if (ast.isForStatement(stmt)) {
     result += transpileForStatement(stmt, indent)
   } else if (ast.isWhileStatement(stmt)) {
-    result += `while ${generateCondition(stmt.condition, indent)} ${generateBlock(stmt.loop, indent)}`
+    result += transpileWhileStatement(stmt, indent)
   } else if (ast.isThrowStatement(stmt)) {
-    result += `throw ${generateExpression(stmt.throw, indent)}`
+    result += transpileThrowStatement(stmt, indent)
   } else if (ast.isTryCatchStatement(stmt)) {
     result += transpileTryCatchStatement(stmt, indent)
   } else if (ast.isContinue(stmt)) {
@@ -75,9 +83,7 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
   } else if (ast.isBreak(stmt)) {
     result += 'break'
   } else if (ast.isBypass(stmt)) {
-    if (stmt.bypass) {
-      result += stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', '')
-    }
+    result += transpileBypass(stmt, indent)
   } else {
     console.log(chalk.red('ERROR in Statement'))
   }
@@ -85,10 +91,31 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
 }
 
 /**
+ * Generates a string representation of the given AST expression.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The AST expression to generate the string for. It can be of various types defined in the `ast` module.
+ * @param indent - The current indentation level for formatting the generated string.
+ * @returns The string representation of the given AST expression.
+ *
+ * The function handles different types of expressions including:
+ * - Assignment expressions
+ * - Logical NOT expressions
+ * - Call chain expressions
+ * - If expressions
+ * - Match expressions
+ * - Group expressions
+ * - Unary expressions
+ * - Binary expressions
+ * - Infix expressions
+ * - Return expressions
+ * - Spread expressions
+ * - New expressions
+ * - Array values
+ * - Object values
+ * - Function values
+ * - Literals (with special handling for `nil` to `undefined`)
+ *
+ * If the expression type is not recognized, an error message is logged.
  */
 function generateExpression(expr: ast.Expression | undefined, indent: number): string {
   let result = ''
@@ -104,22 +131,21 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
   } else if (ast.isMatchExpression(expr)) {
     result += transpileMatchExpression(expr, indent)
   } else if (ast.isGroupExpression(expr)) {
-    result += '(' + generateExpression(expr.value, indent) + ')'
+    result += transpileGroupExpression(expr, indent)
   } else if (ast.isUnaryExpression(expr)) {
     result += transpileUnaryExpression(expr, indent)
   } else if (ast.isBinaryExpression(expr)) {
     result += transpileBinaryExpression(expr, indent)
   } else if (ast.isInfixExpression(expr)) {
-    result += `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`
+    result += transpileInfixExpression(expr, indent)
   } else if (ast.isReturnExpression(expr)) {
-    if (expr.value) result += `return ${generateExpression(expr.value, indent)}`
-    else result += 'return'
+    result += transpileReturnExpression(expr, indent)
   } else if (ast.isSpreadExpression(expr)) {
-    return '...' + expr.spread.$refText
+    result += transplieSpreadExpression(expr, indent)
   } else if (ast.isNewExpression(expr)) {
     result += transpileNewExpression(expr, indent)
   } else if (ast.isArrayValue(expr)) {
-    result += '[' + expr.items.map(item => generateExpression(item.item, indent)).join(', ') + ']'
+    result += transpileArrayValue(expr, indent)
   } else if (ast.isObjectValue(expr)) {
     result += transpileObjectValue(expr, indent)
   } else if (ast.isFunctionValue(expr)) {
@@ -135,97 +161,12 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
 }
 
 /**
+ * Transpiles a variable definition statement into a string representation.
  *
- * @param body
- * @param indent
- * @param doItForLastCode
- * @returns
- */
-function generateBlock(
-  body: ast.Block,
-  indent: number,
-  doItForLastCode?: (lastCode: ast.Code, indent: number) => string
-): string {
-  const defaultDoIt = (lastCode: ast.Code, indent: number) => {
-    if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
-    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
-    else return ''
-  }
-
-  // 단일 expression으로 되어져 있어도 괄호로 둘러싸인 형태로 변환된다.
-  // 괄호 내부의 모든 코드는 indent가 하나 증가되어진 상태로 처리되어야 한다.
-  let result = '{\n'
-  body.codes.forEach((code, index) => {
-    let element = ''
-    if (index == body.codes.length - 1) {
-      if (doItForLastCode == undefined) element += defaultDoIt(code, indent + 1)
-      else element += doItForLastCode(code, indent + 1)
-    } else {
-      if (ast.isStatement(code)) element += generateStatement(code, indent + 1)
-      else if (ast.isExpression(code)) element += generateExpression(code, indent + 1)
-      else console.log(chalk.red('ERROR in Block:', code))
-    }
-    result += applyIndent(indent + 1, element + '\n')
-  })
-  result += applyIndent(indent, '}')
-  return result
-}
-
-/**
- * 이것은 가장 많이 사용되는 타입 표기 형태인 ': type' 을 지원한다.
- * 실제 타입을 표기하는 transpileTypes()과 하나로 합칠 수 없는 것은 타입을 표기하는 다른 방법들이 있기 때문이다.
- *
- * @param type
- * @param indent
- * @returns
- */
-function generateTypes(type: ast.Types | undefined, indent: number): string {
-  if (!type) return ''
-  const result = transpileTypes(type, indent)
-  return result ? ': ' + result : ''
-}
-
-/**
- *
- * @param condition
- * @param indent
- * @returns
- */
-function generateCondition(condition: ast.Expression, indent: number): string {
-  const e = generateExpression(condition, indent)
-  return ast.isGroupExpression(condition) || ast.isUnaryExpression(condition) ? e : '(' + e + ')'
-}
-
-/**
- * 배열은 1 부터 카운트되기 때문에 TypeScript로 변환될 때는 -1을 해 주어야 한다.
- * 이때 숫자로 되어져 있으면 -1을 한 값을 바로 사용하고 그렇지 않으면 -1을 추가해 준다.
- * IntegerLiteral 인지의 여부를 판별하기 위해서는 여러 단계를 거쳐야만 한다.
- *
- * @param expr
- * @param indent
- */
-function generateArrayIndex(expr: ast.Expression | undefined, indent: number): string {
-  if (ast.isUnaryExpression(expr) && ast.isLiteral(expr.value) && typeof expr.value.value == 'number') {
-    return (expr.value.value - 1).toString()
-  }
-  return generateExpression(expr, indent) + ' - 1'
-}
-
-/**
- *
- * @param lv
- * @param s
- * @returns
- */
-function applyIndent(lv: number, s: string) {
-  return '  '.repeat(lv) + s
-}
-
-/**
- *
- * @param stmt
- * @param indent
- * @returns
+ * @param stmt - The variable definition statement to transpile.
+ * @param indent - The current indentation level.
+ * @param isClassMember - Indicates if the variable is a class member.
+ * @returns The transpiled string representation of the variable definition.
  */
 function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMember: boolean = false): string {
   let result = ''
@@ -233,21 +174,63 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
   if (stmt.export) result += 'export '
   if (stmt.private) result += 'private '
   if (stmt.static) result += 'static '
+
+  // 함수형 변수 중에는 함수로 변환되어야 하는 것들이 있다.
+  // constructor, argument가 값을 가지는 경우, super 호출이 있는 경우등은 함수로 변환되어야 한다.
+  let isFunctionDef = false
+  if (stmt.name == 'constructor') {
+    isFunctionDef = true
+  } else if (stmt.value && ast.isFunctionValue(stmt.value)) {
+    stmt.value.params.forEach(param => {
+      if (param.value) {
+        isFunctionDef = true
+      }
+    })
+    // 함수의 바디에 super 호출이 있는 경우
+    //todo 이것만 변경하는 걸로 부족하다. 상위 클래스의 메서드도 함수로 변경해야 한다.
+    const callchain = AstUtils.streamAllContents(stmt.value.body).filter(ast.isThisOrSuper)
+    callchain.forEach(cc => {
+      if (cc.this == 'super') {
+        isFunctionDef = true
+      }
+    })
+  }
+
+  if (isFunctionDef) {
+    if (stmt.value && ast.isFunctionValue(stmt.value)) {
+      result += generateFunction({
+        includeFunction: !isClassMember,
+        name: stmt.name,
+        params: stmt.value.params,
+        paramsForceBracket: true,
+        returnType: stmt.value.returnType,
+        body: stmt.value.body,
+        bodyForceBracket: true,
+        indent,
+      })
+      return result
+    } else {
+      console.error(chalk.red('internal error'))
+    }
+  }
+
   if (!isClassMember) {
     if (stmt.kind == 'var') result += 'let '
     if (stmt.kind == 'val') result += 'const '
   }
-  result += stmt.name + (stmt.nullable ? '?' : '') + generateTypes(stmt.type, indent)
+  result += stmt.name + (stmt.nullable ? '?' : '')
+  result += stmt.type ? `: ${generateTypes(stmt.type, indent)}` : ''
   result += stmt.value ? ' = ' + generateExpression(stmt.value, indent) : ''
   return result
 }
 
 /**
+ * Transpiles an AST function definition into a TypeScript function declaration.
  *
- * @param stmt
- * @param indent
- * @param isClassMethod
- * @returns
+ * @param stmt - The AST node representing the function definition.
+ * @param indent - The current indentation level.
+ * @param isClassMethod - A boolean indicating if the function is a class method. Defaults to `false`.
+ * @returns The transpiled TypeScript function declaration as a string.
  */
 function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMethod: boolean = false): string {
   let result = ''
@@ -256,105 +239,33 @@ function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMeth
   if (stmt.private) result += 'private '
   if (stmt.static) result += 'static '
 
-  if (!isClassMethod) result += 'function '
-  result += `${stmt.name}${transpileFunctionArgs(stmt.params, indent)}${generateTypes(stmt.returnType, indent)} `
-  result += stmt.body ? transpileFunctionBody(stmt.body, indent, true) : ''
-  return result
-}
-
-/**
- * function type은 TypeScript로 변환될 때 (arg: number) => number 형태로 변환된다.
- *
- * @param expr
- * @param indent
- * @returns
- */
-function transpileFunctionType(expr: ast.FunctionType, indent: number): string {
-  const result = transpileFunctionArgs(expr.bindings, indent)
-  // 함수의 리턴 타입을 표기하는 방식이 다르기 때문에 generateTypes()을 사용하지 않는다.
-  return result + (expr.returnType ? ` => ${transpileTypes(expr.returnType, indent)}` : '')
-}
-
-/**
- * function value는 TypeScript로 변환될 때 (arg: number): number => { ... } 형태로 변환된다.
- *
- * @param expr
- * @param indent
- * @returns
- */
-function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string {
-  const result = transpileFunctionArgs(expr.bindings, indent) + generateTypes(expr.returnType, indent)
-  return result + ' => ' + transpileFunctionBody(expr.body, indent)
-}
-
-/**
- *
- * @param args
- * @param indent
- * @returns
- */
-function transpileFunctionArgs(args: ast.TypeBinding[] | ast.Parameter[], indent: number) {
-  const argsText = args
-    .map(arg => {
-      if (ast.isTypeBinding(arg)) return arg.name + generateTypes(arg.type, indent)
-      else if (ast.isParameter(arg)) {
-        let p = (arg.spread ? '...' : '') + arg.name
-        p += (arg.nullable ? '?' : '') + generateTypes(arg.type, indent)
-        p += arg.value ? ` = ${generateExpression(arg.value, indent)}` : ''
-        return p
-      } else return 'internal error'
-    })
-    .join(', ')
-
-  if (args.length == 1 && args[0].type == undefined && ast.isTypeBinding(args[0])) return argsText
-  return '(' + argsText + ')'
-}
-
-/**
- *
- * @param body
- * @param indent
- * @param isDefinition
- * @returns
- */
-function transpileFunctionBody(body: ast.Block, indent: number, isDefinition: boolean = false): string {
-  let result = ''
-  if (!isDefinition) {
-    // 함수가 정의되는 경우에는 단일 식인지의 여부와 관계없이 블럭으로 처리되어야 한다.
-    // 단일 expression을 괄호로 표시하면 numbers.find(n => n == 0) 과 같은 구문에 항상 return을 사용해야 하는 불편이 있다.
-    // 따라서 expression이 하나이면 괄호를 사용하지 않지만 이것도 return 문과 같이 사용되면 괄호를 사용해야 한다
-    // return처럼 단일 expression으로 처리할 수 없는 것들은 assignment, if, match등이 있다.
-    if (body.codes.length == 0) console.error('block is empty')
-    if (body.codes.length == 1) {
-      const lastCode = body.codes[0]
-      if (ast.isExpression(lastCode)) {
-        if (
-          !(
-            ast.isAssignment(lastCode) ||
-            ast.isIfExpression(lastCode) ||
-            ast.isMatchExpression(lastCode) ||
-            ast.isReturnExpression(lastCode)
-          )
-        )
-          return result + generateExpression(lastCode, indent)
-      }
-    }
-  }
-
-  // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
-  result += generateBlock(body, indent, (lastCode: ast.Code, indent: number) => {
-    if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
-    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
-    else return ''
+  result += generateFunction({
+    includeFunction: !isClassMethod,
+    name: stmt.name,
+    params: stmt.params,
+    returnType: stmt.returnType,
+    body: stmt.body,
+    bodyForceBracket: true,
+    indent,
   })
   return result
 }
 
 /**
+ * Transpiles an object definition statement into a TypeScript class or interface definition.
  *
- * @param stmt
- * @param indent
- * @returns
+ * @param stmt - The object definition statement to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled TypeScript code as a string.
+ *
+ * The function checks if the object definition should be annotated as 'NotTrans' and returns an empty string if so.
+ * If the object definition is marked for export, it adds the 'export' keyword to the result.
+ * It determines whether the object should be transpiled as an interface or a class based on the elements in the body.
+ * If the body contains function definitions or assignment statements, it is transpiled as a class.
+ * Otherwise, it is transpiled as an interface.
+ * The function iterates over the elements in the body and transpiles each element accordingly.
+ * It handles variable definitions, function definitions, nested object definitions, and bypass statements.
+ * If an unknown element type is encountered, it logs an internal error.
  */
 function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
   let result = ''
@@ -394,10 +305,22 @@ function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
 }
 
 /**
+ * Transpiles a DoStatement AST node into a string representation.
  *
- * @param stmt
- * @param indent
- * @returns
+ * @param stmt - The DoStatement AST node to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled string representation of the DoStatement.
+ */
+function transpileDoStatement(stmt: ast.DoStatement, indent: number): string {
+  return `do ${generateBlock(stmt.loop, indent)} while ${generateCondition(stmt.condition, indent)}`
+}
+
+/**
+ * Transpiles a ForStatement AST node into a JavaScript for loop string.
+ *
+ * @param stmt - The ForStatement AST node to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled JavaScript for loop as a string.
  */
 function transpileForStatement(stmt: ast.ForStatement, indent: number): string {
   let result = ''
@@ -437,10 +360,33 @@ function transpileForStatement(stmt: ast.ForStatement, indent: number): string {
 }
 
 /**
+ * Transpiles a WhileStatement AST node into a string representation of the corresponding code.
  *
- * @param stmt
- * @param indent
- * @returns
+ * @param stmt - The WhileStatement AST node to transpile.
+ * @param indent - The current indentation level for formatting the output code.
+ * @returns The transpiled string representation of the WhileStatement.
+ */
+function transpileWhileStatement(stmt: ast.WhileStatement, indent: number): string {
+  return `while ${generateCondition(stmt.condition, indent)} ${generateBlock(stmt.loop, indent)}`
+}
+
+/**
+ * Transpiles a ThrowStatement AST node into a string representation.
+ *
+ * @param stmt - The ThrowStatement AST node to transpile.
+ * @param indent - The current indentation level.
+ * @returns The string representation of the ThrowStatement.
+ */
+function transpileThrowStatement(stmt: ast.ThrowStatement, indent: number): string {
+  return `throw ${generateExpression(stmt.throw, indent)}`
+}
+
+/**
+ * Transpiles a TryCatchStatement AST node into a string representation.
+ *
+ * @param stmt - The TryCatchStatement AST node to transpile.
+ * @param indent - The current indentation level for formatting the output string.
+ * @returns The string representation of the transpiled TryCatchStatement.
  */
 function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number): string {
   let result = ''
@@ -468,10 +414,33 @@ function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number)
 }
 
 /**
+ * Transpiles a bypass statement by removing specific patterns from the bypass string.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param stmt - The bypass statement to be transpiled.
+ * @param indent - The current indentation level (not used in this function).
+ * @returns The transpiled bypass string with specific patterns removed.
+ */
+function transpileBypass(stmt: ast.Bypass, indent: number): string {
+  let result = ''
+  if (stmt.bypass) {
+    result += stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', '')
+  }
+  return result
+}
+
+/**
+ * Transpiles an assignment expression into a string representation.
+ *
+ * @param expr - The assignment expression to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled assignment expression as a string.
+ *
+ * @remarks
+ * This function generates a string representation of an assignment expression.
+ * It concatenates the left-hand side (assign) and the right-hand side (value) of the assignment
+ * with the assignment operator in between. Note that it does not append a semicolon at the end
+ * of the expression to support cases where the assignment is used as an argument (e.g., `n++`
+ * being replaced with `n += 1`).
  */
 function transpileAssignment(expr: ast.Assignment, indent: number): string {
   let result = ''
@@ -484,10 +453,11 @@ function transpileAssignment(expr: ast.Assignment, indent: number): string {
 }
 
 /**
+ * Transpiles a logical NOT expression from the abstract syntax tree (AST) to a string representation.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The logical NOT expression node from the AST.
+ * @param indent - The current indentation level for formatting the output string.
+ * @returns The string representation of the logical NOT expression.
  */
 function transpileLogicalNot(expr: ast.LogicalNot, indent: number): string {
   let op = ''
@@ -504,10 +474,18 @@ function transpileLogicalNot(expr: ast.LogicalNot, indent: number): string {
 }
 
 /**
+ * Transpiles a call chain expression into a string representation.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The call chain expression to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled string representation of the call chain.
+ *
+ * The function handles different parts of the call chain:
+ * - If there is a previous expression, it generates the expression for it and appends the current element.
+ * - If there is no previous expression, it handles the current element directly.
+ * - If the expression is a function call, it handles specific methods that use array indices and adjusts the arguments accordingly.
+ * - If the expression is an array access, it generates the array index.
+ * - If there is an assertion, it appends it to the result.
  */
 function transpileCallChain(expr: ast.CallChain, indent: number): string {
   let result = ''
@@ -563,10 +541,20 @@ function transpileCallChain(expr: ast.CallChain, indent: number): string {
 }
 
 /**
+ * Transpiles an AST IfExpression into a string representation of the corresponding JavaScript code.
  *
- * @param expr
- * @param indent
- * @returns
+ * This function handles two cases:
+ * 1. If the if-expression can be converted into a ternary operator, it does so.
+ * 2. Otherwise, it generates the standard if-else statement.
+ *
+ * The ternary operator conversion is applied if:
+ * - The `then` block exists, is not wrapped in braces, contains exactly one expression, and is not a return expression.
+ * - The `else` block exists, is not wrapped in braces, contains exactly one expression, and is not a return expression.
+ * - There are no `elif` blocks.
+ *
+ * @param expr - The AST IfExpression to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled string representation of the if-expression.
  */
 function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
   let result = ''
@@ -617,10 +605,12 @@ function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
 }
 
 /**
+ * Transpiles a match expression (similar to a switch-case statement) from an abstract syntax tree (AST) representation
+ * into a TypeScript switch statement string.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The match expression AST node to transpile.
+ * @param indent - The current indentation level for formatting the output string.
+ * @returns The transpiled switch statement as a formatted string.
  */
 function transpileMatchExpression(expr: ast.MatchExpression, indent: number): string {
   let result = ''
@@ -646,10 +636,22 @@ function transpileMatchExpression(expr: ast.MatchExpression, indent: number): st
 }
 
 /**
+ * Transpiles a GroupExpression AST node into a string representation.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The GroupExpression AST node to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled string representation of the GroupExpression.
+ */
+function transpileGroupExpression(expr: ast.GroupExpression, indent: number): string {
+  return `(${generateExpression(expr.value, indent)})`
+}
+
+/**
+ * Transpiles a unary expression into a string representation.
+ *
+ * @param expr - The unary expression to transpile.
+ * @param indent - The current indentation level.
+ * @returns The string representation of the unary expression.
  */
 function transpileUnaryExpression(expr: ast.UnaryExpression, indent: number): string {
   if (expr.operator) {
@@ -661,10 +663,11 @@ function transpileUnaryExpression(expr: ast.UnaryExpression, indent: number): st
 }
 
 /**
+ * Transpiles a binary expression from the abstract syntax tree (AST) into a string representation.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The binary expression node from the AST.
+ * @param indent - The current indentation level for formatting the output string.
+ * @returns The transpiled string representation of the binary expression.
  */
 function transpileBinaryExpression(expr: ast.BinaryExpression, indent: number): string {
   let op = ''
@@ -689,10 +692,46 @@ function transpileBinaryExpression(expr: ast.BinaryExpression, indent: number): 
 }
 
 /**
+ * Transpiles an infix expression into a string representation.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The infix expression to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled infix expression as a string.
+ */
+function transpileInfixExpression(expr: ast.InfixExpression, indent: number): string {
+  return `${expr.e1}.${expr.name}(${generateExpression(expr.e2, indent)})`
+}
+
+/**
+ * Transpiles a return expression into a string representation.
+ *
+ * @param expr - The return expression to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled return expression as a string.
+ */
+function transpileReturnExpression(expr: ast.ReturnExpression, indent: number): string {
+  let result = 'return'
+  if (expr.value) result += ` ${generateExpression(expr.value, indent)}`
+  return result
+}
+
+/**
+ * Transpiles a SpreadExpression AST node into a string representation.
+ *
+ * @param expr - The SpreadExpression AST node to transpile.
+ * @param indent - The current indentation level (not used in this function).
+ * @returns The string representation of the SpreadExpression.
+ */
+function transplieSpreadExpression(expr: ast.SpreadExpression, indent: number): string {
+  return '...' + expr.spread.$refText
+}
+
+/**
+ * Transpiles a NewExpression AST node into a string representation.
+ *
+ * @param expr - The NewExpression AST node to transpile.
+ * @param indent - The current indentation level.
+ * @returns The string representation of the NewExpression.
  */
 function transpileNewExpression(expr: ast.NewExpression, indent: number): string {
   let result = `new ${expr.class.$refText}`
@@ -700,7 +739,7 @@ function transpileNewExpression(expr: ast.NewExpression, indent: number): string
     result += '<'
     expr.generic.types.forEach((t, index) => {
       if (index != 0) result += ', '
-      result += transpileSimpleType(t, indent)
+      result += generateSimpleType(t, indent)
     })
     result += '>'
   }
@@ -714,10 +753,22 @@ function transpileNewExpression(expr: ast.NewExpression, indent: number): string
 }
 
 /**
+ * Transpiles an array value expression into a string representation.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The array value expression to transpile.
+ * @param indent - The current indentation level.
+ * @returns The string representation of the array value.
+ */
+function transpileArrayValue(expr: ast.ArrayValue, indent: number): string {
+  return '[' + expr.items.map(item => generateExpression(item.item, indent)).join(', ') + ']'
+}
+
+/**
+ * Transpiles an AST object value into a formatted string representation.
+ *
+ * @param expr - The AST object value to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled string representation of the object value.
  */
 function transpileObjectValue(expr: ast.ObjectValue, indent: number): string {
   let result = '{\n'
@@ -736,103 +787,103 @@ function transpileObjectValue(expr: ast.ObjectValue, indent: number): string {
 }
 
 /**
+ * Transpiles a function value from the abstract syntax tree (AST) into a string representation.
+ * function value는 TypeScript로 변환될 때 (arg: number): number => { ... } 형태로 변환된다.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The function value expression from the AST.
+ * @param indent - The current indentation level for formatting the output string.
+ * @returns The transpiled function value as a string.
  */
-function transpileTypes(expr: ast.Types | undefined, indent: number): string {
+function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string {
+  return generateFunction({
+    params: expr.params,
+    returnType: expr.returnType,
+    body: expr.body,
+    bodyDelimiter: '=>',
+    indent,
+  })
+}
+
+//-----------------------------------------------------------------------------
+// helper functions
+//-----------------------------------------------------------------------------
+
+/**
+ * Transpiles a given AST (Abstract Syntax Tree) expression of type `ast.Types` into a string representation.
+ * If the expression is undefined, it returns an empty string.
+ *
+ * @param expr - The AST expression of type `ast.Types` to be transpiled. Can be undefined.
+ * @param indent - The current indentation level for formatting purposes.
+ * @returns The transpiled string representation of the given AST expression.
+ */
+function generateTypes(expr: ast.Types | undefined, indent: number): string {
   let result = ''
   if (expr == undefined) return result
   expr.types.forEach((t, index) => {
     if (index != 0) result += ' | '
-    result += transpileSimpleType(t, indent)
+    result += generateSimpleType(t, indent)
   })
   return result
 }
 
 /**
+ * Transpiles a given SimpleType AST node into its corresponding string representation.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The SimpleType AST node to transpile.
+ * @param indent - The current indentation level for formatting the output string.
+ * @returns The transpiled string representation of the SimpleType.
  */
-function transpileSimpleType(expr: ast.SimpleType, indent: number): string {
+function generateSimpleType(expr: ast.SimpleType, indent: number): string {
   let result = ''
   if (ast.isArrayType(expr)) {
-    result += transpileArrayType(expr, indent)
+    result += generateSimpleType(expr.elementType, indent) + '[]'
   } else if (ast.isObjectType(expr)) {
-    result += transpileObjectType(expr, indent)
+    result += '{\n'
+    expr.elements.forEach(e => {
+      if (ast.isVariableDef(e)) {
+        result += applyIndent(indent + 1, transpileVariableDef(e, indent + 1, true))
+      } else if (ast.isFunctionDef(e)) {
+        result += applyIndent(indent + 1, transpileFunctionDef(e, indent + 1, true))
+      } else if (ast.isObjectDef(e)) {
+        result += applyIndent(indent + 1, transpileObjectDef(e, indent + 1))
+      } else if (ast.isBypass(e)) {
+        result += applyIndent(indent + 1, generateStatement(e, indent + 1))
+      } else {
+        console.error(chalk.red('internal error'))
+      }
+      result += '\n'
+    })
+    result += applyIndent(indent, '}')
   } else if (ast.isElementType(expr)) {
-    result += transpileElementType(expr, indent)
+    if (ast.isFunctionType(expr)) {
+      result += generateFunction({
+        params: expr.params,
+        returnType: expr.returnType,
+        returnDelimiter: '=>',
+        indent,
+      })
+    } else if (ast.isPrimitiveType(expr)) {
+      // nil 만 undefined로 바꿔준다.
+      if (expr.type == 'nil') result += 'undefined'
+      else result += expr.type
+    } else if (ast.isTypeChain(expr)) {
+      result += generateTypeChain(expr, indent)
+    } else result += 'internal error'
   }
   return result
 }
 
 /**
+ * Transpiles a TypeChain expression into a string representation.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param expr - The TypeChain expression to transpile.
+ * @param indent - The current indentation level.
+ * @returns The string representation of the TypeChain expression.
  */
-function transpileArrayType(expr: ast.ArrayType, indent: number): string {
-  return transpileSimpleType(expr.elementType, indent) + '[]'
-}
-
-/**
- *
- * @param expr
- * @param indent
- * @returns
- */
-function transpileObjectType(expr: ast.ObjectType, indent: number): string {
-  let result = '{\n'
-  expr.elements.forEach(e => {
-    if (ast.isVariableDef(e)) {
-      result += applyIndent(indent + 1, transpileVariableDef(e, indent + 1, true))
-    } else if (ast.isFunctionDef(e)) {
-      result += applyIndent(indent + 1, transpileFunctionDef(e, indent + 1, true))
-    } else if (ast.isObjectDef(e)) {
-      result += applyIndent(indent + 1, transpileObjectDef(e, indent + 1))
-    } else if (ast.isBypass(e)) {
-      result += applyIndent(indent + 1, generateStatement(e, indent + 1))
-    } else {
-      console.error(chalk.red('internal error'))
-    }
-    result += '\n'
-  })
-  result += applyIndent(indent, '}')
-  return result
-}
-
-/**
- *
- * @param expr
- * @param indent
- * @returns
- */
-function transpileElementType(expr: ast.ElementType, indent: number): string {
-  let result = ''
-  if (ast.isFunctionType(expr)) {
-    result += transpileFunctionType(expr, indent)
-  } else if (ast.isPrimitiveType(expr)) {
-    result += transpilePrimitiveType(expr, indent)
-  } else if (ast.isTypeChain(expr)) {
-    result += transpileTypeChain(expr, indent)
-  } else result += 'internal error'
-  return result
-}
-
-/**
- *
- * @param expr
- * @param indent
- * @returns
- */
-function transpileTypeChain(expr: ast.TypeChain, indent: number): string {
+function generateTypeChain(expr: ast.TypeChain, indent: number): string {
   let result = ''
   if (expr.previous) {
-    result += transpileTypeChain(expr.previous, indent)
+    result += generateTypeChain(expr.previous, indent)
     result += expr.reference ? '.' + expr.reference.$refText : ''
   } else {
     if (expr.reference) {
@@ -841,7 +892,7 @@ function transpileTypeChain(expr: ast.TypeChain, indent: number): string {
         result += '<'
         expr.generic.types.forEach((t, index) => {
           if (index != 0) result += ', '
-          result += transpileSimpleType(t, indent)
+          result += generateSimpleType(t, indent)
         })
         result += '>'
       }
@@ -851,13 +902,218 @@ function transpileTypeChain(expr: ast.TypeChain, indent: number): string {
 }
 
 /**
+ * Generates a string representation of a block of code with proper indentation.
  *
- * @param expr
- * @param indent
- * @returns
+ * @param body - The block of code to generate.
+ * @param indent - The current level of indentation.
+ * @param doItForLastCode - An optional function to handle the last code element in the block.
+ *                          If not provided, a default function will be used.
+ * @returns The generated string representation of the block of code.
  */
-function transpilePrimitiveType(expr: ast.PrimitiveType, indent: number): string {
-  // nil 만 undefined로 바꿔준다.
-  if (expr.type == 'nil') return 'undefined'
-  return expr.type
+function generateBlock(
+  body: ast.Block,
+  indent: number,
+  doItForLastCode?: (lastCode: ast.Code, indent: number) => string
+): string {
+  const defaultDoIt = (lastCode: ast.Code, indent: number) => {
+    if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
+    else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
+    else return ''
+  }
+
+  // 단일 expression으로 되어져 있어도 괄호로 둘러싸인 형태로 변환된다.
+  // 괄호 내부의 모든 코드는 indent가 하나 증가되어진 상태로 처리되어야 한다.
+  let result = '{\n'
+  body.codes.forEach((code, index) => {
+    let element = ''
+    if (index == body.codes.length - 1) {
+      if (doItForLastCode == undefined) element += defaultDoIt(code, indent + 1)
+      else element += doItForLastCode(code, indent + 1)
+    } else {
+      if (ast.isStatement(code)) element += generateStatement(code, indent + 1)
+      else if (ast.isExpression(code)) element += generateExpression(code, indent + 1)
+      else console.log(chalk.red('ERROR in Block:', code))
+    }
+    result += applyIndent(indent + 1, element + '\n')
+  })
+  result += applyIndent(indent, '}')
+  return result
+}
+
+/**
+ * Parameters for generating a function.
+ */
+interface GenerateFunctionParams {
+  /**
+   * if this is true, 'function' keyword is included in the generated code.
+   * @default false
+   */
+  includeFunction?: boolean
+
+  /**
+   * The name of the function.
+   * if this is undefined, the name of the function is not included in the generated code.
+   */
+  name?: string
+
+  /**
+   * The parameters of the function.
+   */
+  params: ast.Parameter[]
+
+  /**
+   * Whether to include parentheses around the parameters by force.
+   * name이 있으면 이 설정은 무조건 true로 처리된다.
+   * @default false
+   */
+  paramsForceBracket?: boolean
+
+  /**
+   * The return type of the function.
+   */
+  returnType?: ast.Types | undefined
+
+  /**
+   * returnDelimiter는 파라메터 리스트와 리턴타입 사이에 들어갈 구분자이다.
+   * (arg: string) : string 에서 : 가 returnDelimiter이다.
+   * default는 ':' 이며 returnType이 있을때만 표시된다.
+   */
+  returnDelimiter?: string
+
+  /**
+   * The body of the function.
+   */
+  body?: ast.Block | undefined
+
+  /**
+   * bodyDelimiter는 body 앞에 들어갈 구분자이다.
+   * (arg: string) : string => { ... } 에서 => 가 bodyDelimiter이다.
+   * default는 ' ' 이며 body가 있을때만 표시된다.
+   */
+  bodyDelimiter?: string
+
+  /**
+   * Whether to include curly brackets around the body by force.
+   * @default false
+   */
+  bodyForceBracket?: boolean
+
+  /**
+   * The indentation level for the generated code.
+   */
+  indent: number
+}
+
+/**
+ * Generates a function declaration or expression as a string based on the provided parameters.
+ */
+function generateFunction(param: GenerateFunctionParams): string {
+  let result = param.includeFunction ? 'function ' : ''
+  result += param.name ? param.name : ''
+
+  const paramsText = param.params
+    .map(arg => {
+      if (ast.isParameter(arg)) {
+        let p = (arg.spread ? '...' : '') + arg.name
+        p += arg.nullable ? '?' : ''
+        p += arg.type ? `: ${generateTypes(arg.type, param.indent)}` : ''
+        p += arg.value ? ` = ${generateExpression(arg.value, param.indent)}` : ''
+        return p
+      } else return 'internal error'
+    })
+    .join(', ')
+
+  // name이 있으면 무조건 괄호를 표시한다.
+  param.paramsForceBracket = param.name ? true : param.paramsForceBracket
+
+  if (
+    param.paramsForceBracket == false &&
+    param.params.length == 1 &&
+    param.params[0].type == undefined &&
+    ast.isParameter(param.params[0])
+  )
+    result += paramsText
+  else result += '(' + paramsText + ')'
+
+  if (param.returnType) {
+    result += param.returnDelimiter ? ` ${param.returnDelimiter} ` : ': '
+    result += generateTypes(param.returnType, param.indent)
+  }
+
+  if (param.body) {
+    result += param.bodyDelimiter ? ` ${param.bodyDelimiter} ` : ' '
+
+    if (!param.bodyForceBracket) {
+      // 함수가 정의되는 경우에는 단일 식인지의 여부와 관계없이 블럭으로 처리되어야 한다.
+      // 단일 expression을 괄호로 표시하면 numbers.find(n => n == 0) 과 같은 구문에 항상 return을 사용해야 하는 불편이 있다.
+      // 따라서 expression이 하나이면 괄호를 사용하지 않지만 이것도 return 문과 같이 사용되면 괄호를 사용해야 한다
+      // return처럼 단일 expression으로 처리할 수 없는 것들은 assignment, if, match등이 있다.
+      if (param.body.codes.length == 0) console.error('block is empty')
+      if (param.body.codes.length == 1) {
+        const lastCode = param.body.codes[0]
+        if (ast.isExpression(lastCode)) {
+          if (
+            !(
+              ast.isAssignment(lastCode) ||
+              ast.isIfExpression(lastCode) ||
+              ast.isMatchExpression(lastCode) ||
+              ast.isReturnExpression(lastCode)
+            )
+          )
+            return result + generateExpression(lastCode, param.indent)
+        }
+      }
+    }
+
+    // generateBlock에 전달되는 indent는 function level인데 generateBlock에서는 이를 모두 +1 해서 쓰고 있다.
+    result += generateBlock(param.body, param.indent, (lastCode: ast.Code, indent: number) => {
+      if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
+      else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
+      else return ''
+    })
+  }
+  return result
+}
+
+/**
+ * Generates a string representation of a given condition expression.
+ *
+ * @param condition - The AST expression to generate the condition for.
+ * @param indent - The indentation level to use for formatting the generated string.
+ * @returns The string representation of the condition expression, wrapped in parentheses if necessary.
+ */
+function generateCondition(condition: ast.Expression, indent: number): string {
+  const e = generateExpression(condition, indent)
+  return ast.isGroupExpression(condition) || ast.isUnaryExpression(condition) ? e : '(' + e + ')'
+}
+
+/**
+ * Generates a string representation of an array index based on the given expression.
+ * If the expression is a unary expression with a numeric literal value, it returns the value minus one.
+ * Otherwise, it generates the expression and appends ' - 1' to it.
+ *
+ * 배열은 1 부터 카운트되기 때문에 TypeScript로 변환될 때는 -1을 해 주어야 한다.
+ * 이때 숫자로 되어져 있으면 -1을 한 값을 바로 사용하고 그렇지 않으면 -1을 추가해 준다.
+ * IntegerLiteral 인지의 여부를 판별하기 위해서는 여러 단계를 거쳐야만 한다.
+ *
+ * @param expr - The expression to generate the array index from. It can be an AST expression or undefined.
+ * @param indent - The indentation level to use when generating the expression.
+ * @returns A string representing the array index.
+ */
+function generateArrayIndex(expr: ast.Expression | undefined, indent: number): string {
+  if (ast.isUnaryExpression(expr) && ast.isLiteral(expr.value) && typeof expr.value.value == 'number') {
+    return (expr.value.value - 1).toString()
+  }
+  return generateExpression(expr, indent) + ' - 1'
+}
+
+/**
+ * Applies indentation to a given string by repeating a specified number of spaces.
+ *
+ * @param lv - The level of indentation, representing the number of times to repeat the indentation string.
+ * @param s - The string to which the indentation will be applied.
+ * @returns The indented string.
+ */
+function applyIndent(lv: number, s: string) {
+  return '  '.repeat(lv) + s
 }

@@ -8,34 +8,29 @@ Code: Statement | Expression;
 // 스칼라스크립트의 자료형 관련
 //-----------------------------------------------------------------------------
 /*
-  타입의 선언이란 클래스, 오브젝트, 함수 타입에 이름을 부여하는 것이다.
   선언 또는 정의에서 중요한 것은 대상이다. 선언의 대상은 변수일 수도 있고 타입 자체일 수도 있다.
   우리가 보통 val array: number[] 와 같이 선언하는 것은 숫자형 배열을 타입으로 가지는 array라는
   변수를 선언하는 것이며 class Person { ... } 은 Person이라는 이름을 가지는 타입을 선언하는 것이다.
-  Person은 타입이기 때문에 array처럼 값으로 사용될 수 없고 인스턴스화되어야만 사용할 수 있다.
   그럼 function display(msg: string) { ... } 와 같은 함수의 선언은 무엇을 선언한 것일까?
   함수의 선언은 타입에 대한 선언이 아니라 변수 선언처럼 값에 대한 선언에 가깝다.
-  선언에 대한 애매한 구분은 편할지는 모르겠지만 언어에 대한 이해도를 떨어뜨린다.
-  그래서 스칼라스크립트에서는 이를 명확히 구분하기로 했다.
-  우선 다른 언어에 존재하는 함수의 정의가 존재하지 않는다.
-  다른 언어에서의 함수 정의는 함수의 값에 이름을 부여한 것인데 다른 자료형은 모두 변수에 할당하는 방식을
-  사용하면서 함수만 특수하게 값에 이름을 부여한 것이라고 할 수 있다. 물론 함수를 값으로 취급하는 함수형 언어들은
-  기본적으로 함수를 변수에 할당할 수 있다. 함수 선언은 관행적으로 널리 사용되는 방법도 지원하기 위한 예외 사항일 뿐이다.
-  하지만 스칼라스크립트에서는 (함수선언처럼) 값에 이름을 부여할 수 없다. 이유는 거의 필요하지 않기 때문이다.
+  다른 타입들은 특정 값을 명시하는 방법으로 상수를 사용하는데 반해 함수는 별도의 문법이 있는 것이다.
+  함수 선언은 함수형 언어에서는 전역 상수(함수형 변수)의 선언과 동일한 개념이다. 기존 언어 사용자들을 위해
+  새로운 언어들도 이런 관행적인 문법들을 포함하지만 이는 언어에 대한 이해도를 떨어뜨린다고 생각한다.
+  그래서 스칼라스크립트에서는 다른 언어에 존재하는 함수의 정의가 존재하지 않는다.
+  함수의 정의는 예를들면 return a + b 라는 값에 sum 이라는 이름을 부여하는 것인데
+  스칼라스크립트에서는 값에 이름을 부여할 수 없다. 이유는 거의 필요하지 않기 때문이다.
   3.14159 라는 값에 PI 라는 이름을 부여하기 위해서 별도의 언어적인 장치가 필요하진 않다.
-  왜냐하면 일반적인 상수 선언으로 충분하기 때문이다. 상수 선언은 변경되지 않는 변수의 선언이지
-  값에 이름을 부여하는 것은 아니다. 즉 값은 변수에 할당되므로써 고유한 이름을 가질 수 있다.
+  일반적인 상수 선언으로도 충분하다. 즉 값은 변수에 할당되므로써 고유한 이름을 가질 수 있다.
   반면 타입에는 이름을 부여할 수 있다. 이를 타입 별칭이라고도 할 수 있다.
   스칼라스크립트에서 def 로 시작하는 것은 모두 타입에 대해 이름을 부여하는 것이다.
   스칼라스크립트에서는 클래스, 오브젝트등의 사용자 정의 자료구조의 구분이 없기 때문에(모두 오브젝트라고 칭함)
   def는 일반적으로 오브젝트의 선언인데 이것은 오브젝트 개체를 선언하는 것이 아니라 타입 자체를 선언하는 것이다.
   예를들어 name과 age를 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
   이 타입을 매번 이렇게 쓰기가 불편하기 때문에 이를 Person 이라는 이름으로 사용하는 것이다.
-  즉 타입을 정의한 것이고 타입에 이름을 부여한 것일 뿐 오브젝트를 선언한 것이 아니다.
   이는 함수도 마찬가지이다. 예를 들어 def display = (msg: string)-> void 는 (msg: string)을 파라메터로 가지고
-  void를 리턴하는 함수들의 이름으로 display를 사용하는 것이며 display가 함수 타입의 이름이지 함수가 아니라는 점이 중요하다.
-  하지만 (msg: string)-> void 의 형식을 가지는 함수가 하나가 아니고 이들을 모두 display라는 이름으로 사용하는 것은 맞지 않기 때문에
-  스칼라스크립트에서는 함수 타입을 정의할 일은 거의 없다. 함수는 다른 타입처럼 상수에 저장해서 사용해야 한다.
+  void를 리턴하는 함수들의 이름으로 display를 사용하는 것이며 display는 함수 타입의 이름이지 함수가 아니라는 점이
+  중요하다. 하지만 (msg: string)-> void 의 형식을 가지는 함수가 하나가 아니고 이들을 모두 display라는 이름으로
+  사용하는 것은 맞지 않기 때문에 스칼라스크립트에서는 함수 타입을 정의할 일은 거의 없다.
 
   또한 스칼라스크립트는 오브젝트와 클래스가 하나로 합쳐져 있다.
   메서드를 가지지 않는 클래스는 오브젝트(인터페이스)로 변환되며 타입으로 사용할 수 있고 값을 할당할 수도 있다.
@@ -77,9 +72,10 @@ PrimitiveType:
   type=('any' | 'nil' | 'void' | 'string' | 'number' | 'boolean');
 
 // 함수 타입이란 함수의 파라메터와 리턴 타입을 명시한 것을 말한다.
-// 파라메터의 이름과 타입을 매칭하는 것을 Binding이라고 표현한다.
+// 일반적으로 FunctionValue와 FunctionCall(CallChain에 포함됨)이 주로 쓰이지만 변수의 타입으로 사용되는 경우에 단독으로 사용된다.
+// ex) (msg: string) -> void
 FunctionType:
-  '(' Bindings? ')' '->' returnType=Types;
+  '(' Parameters? ')' FunctionReturn;
 
 TypeChain:
   reference=[ObjectDef:Id] (generic=Generic)? ({infer TypeChain.previous=current} "." reference=[ObjectDef:Id] (generic=Generic)?)*;
@@ -98,7 +94,6 @@ type NamedElement =
   | ObjectDef
   | Iterator
   | Parameter
-  | TypeBinding
   | AssignBinding;
 
 //-----------------------------------------------------------------------------
@@ -123,8 +118,8 @@ Statement:
   -----------------------------------------------------------------------------
   모든 변수는 다음의 규칙을 가지고 있다.
   이름 : 타입 = 값
-  타입이나 값을 통해서 변수의 타입을 정할 수 있어야 한다.
-  Rule 자체는 타입과 값이 모두 없을 수 있지만 둘 다 있거나 적어도 하나는 있어야 한다.
+  타입이나 값을 통해서 변수의 타입을 알수 있어야 한다.
+  VariableDef Rule 자체는 타입과 값이 모두 없을 수 있지만 둘 다 있거나 적어도 하나는 있어야 한다.
   타입과 값은 모두 있으면 값은 명시된 타입으로 변환되며 이 변환이 실패하면 에러가 된다.
 
   이전에 다중 선언문을 지원했지만 삭제하기로 했다.
@@ -134,12 +129,14 @@ Statement:
   그런데 이것은 GlobalScope에서는 정상동작하지만 LocalScope에서는 동작하지 않았다.
   원인을 분석하고 계속 지원하기에는 다중 선언문 자체가 너무 유용성이 적어 포기했다.
 
-  var, val 은 변수를 선언하는 것이지만 엄밀하게 말하면 변수의 성격을 결정하는 것으로써
+  var, val 은 스칼라의 문법을 차용한 것으로 엄밀하게 말하면 변수의 성격을 결정하는 것이다.
   var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
+  하지만 스칼라스크립트는 타입스크립트의 let, const와 동일하기 때문에 스칼라의 var, val와 엄밀히는 다르다.
 */
 VariableDef:
   (Annotation)? (export?='export')? (private?='private')? (static?='static')?
-  kind=('val' | 'var') name=Id (nullable?='?')? (':' type=Types)? ('=' value=Expression)?;
+  kind=('val' | 'var') name=Id (nullable?='?')? (':' type=Types)?
+  ('=' value=Expression)?;
 
 fragment Annotation:
   '@' annotate=Id;
@@ -148,28 +145,34 @@ fragment Annotation:
   Function Defintion
   -----------------------------------------------------------------------------
   스칼라스크립트에서는 함수의 정의가 없다. 함수는 다른 자료형과 동일하게 그냥 변수에 할당되어져 사용되어진다.
-  함수는 파라메터와 리턴타입, 함수의 바디로 구성되고 함수를 표시할때 (msg: string) -> void => { ... } 와 같이
+  함수는 파라메터와 리턴타입, 함수의 바디로 구성되고 함수를 표시할때 `(msg: string) -> void => { ... }` 와 같이
   리턴 타입은 -> 으로 표시하고 함수의 바디는 => 으로 표시한다. 함수의 리턴 타입을 -> 으로 표기하는 것은
   ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
 
   FunctionValue란 함수 자체를 말하는 것으로 변수에 함수를 할당할 때 우변에 있어야 하는 것이 FunctionValue이다.
   함수를 가지는 변수의 완전한 표현은 var f:(msg: string)-> void = (msg: string)-> void => { ... } 이다.
-  f 변수의 타입을 별도로 기술할 필요가 없기 때문에 var f = 함수값 형태로 표시할 수 있다. 
+  f 변수의 타입을 별도로 기술할 필요가 없기 때문에 var f = FunctionValue 형태로 표시할 수 있다. 
   즉 FunctionValue는 함수 타입과 함수 바디를 포함하는 것으로 람다 함수라고도 하며 expression이다.
   함수의 값에 함수 타입이 포함되는 점은 혼란의 여지가 있지만 이것이 없는 함수 바디는 그냥 block일 뿐이다.
-  인수의 이름과 타입을 매칭하는 것을 Binding이라고 표현하며 인수는 괄호를 사용해서 묶어야 하지만
-  인수가 하나인 경우에는 괄호없이 사용할 수도 있다.
+  인수는 괄호를 사용해서 묶어야 하지만 인수가 하나인 경우에는 괄호없이 사용할 수도 있다.
 */
 FunctionValue:
-  ('(' Bindings? ')' | bindings+=TypeBinding) ('->' returnType=Types)? '=>' body=Block;
+  ('(' Parameters? ')' | params+=Parameter) (FunctionReturn)? FunctionBody;
 
-Block:
-  (isBracket?='{' codes+=Code+ '}') | codes+=Expression;
+// parameter와 argument는 다르다.
+// parameter는 함수의 매개변수를 의미하는 용어이며 초기값을 가질 수 있지만
+// argument는 함수의 호출에서 함수에 전달되는 값으로 초기값 같은 선언적 의미가 없다.
+Parameter:
+  (spread?='...')? name=Id (nullable?='?')? (':' type=Types)? ('=' value=Expression)?;
 
-fragment Bindings:
-  bindings+=TypeBinding (',' bindings+=TypeBinding)*;
+fragment Parameters:
+  params+=Parameter (',' params+=Parameter)*;
 
-TypeBinding: name=Id (':' type=Types)? | Spread;
+fragment FunctionReturn:
+  '->' returnType=Types;
+
+fragment FunctionBody:
+  '=>' body=Block;
 
 fragment Spread:
   '...' spread=[NamedElement:Id];
@@ -177,14 +180,17 @@ fragment Spread:
 // 함수의 정의 자체는 값에 대한 이름 부여이고 ScalaScript의 Type system에 부합되지 않지만
 // 편이를 위해 제공하고 있다. 실제로도 타입스크립트의 function으로 transpile되어지기는 하지만
 // 이것 대신 val function_name = FuncionValue를 사용해야 한다.
+// 모든 것을 함수형 변수로 처리하고 싶었는데 많은 장애물이 있었다.
+// 생성자와 디폴트 파라메터를 가지는 함수는 람다 함수로 변환이 안되기 때문에 일반 함수로 변환해야 한다.
+// 하지만 치명적인 문제는 함수의 override이다. override되어질 베이스 클래스의 함수를 알 수 있는 방법이 없어서
+// 그냥 람다 함수로 변환하면 override 함수에서 super를 사용할 수 없게 된다.
 FunctionDef:
   (Annotation)? (export?='export')? (private?='private')? (static?='static')? 
   'def' (extension=[ObjectDef:Id] '.')? name=Id
-  '(' (params+=Parameter (',' params+=Parameter)*)? ')' ('->' returnType=Types)? ('=>' body=Block)?;
+  '(' Parameters? ')' (FunctionReturn)? (FunctionBody)?;
 
-// argument는 초기값을 가질 수 없지만 parameter는 그렇지 않다.
-Parameter:
-  (spread?='...')? name=Id (nullable?='?')? (':' type=Types)? ('=' value=Expression)?;
+Block:
+  (isBracket?='{' codes+=Code+ '}') | codes+=Expression;
 
 /*
   Object Definition
@@ -197,7 +203,7 @@ Parameter:
 ObjectDef:
   (Annotation)? (export?='export')?
   'def' name=Id ('extends' superClass=[ObjectDef:Id])?
-  '=>' body=ObjectType;
+  '=' body=ObjectType;
 
 // ex) var obj = { name = "samuel" age = 20 ...ary }
 ObjectValue:

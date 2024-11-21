@@ -1,4 +1,4 @@
-@NotTrans def setTimeout()
+@NotTrans val setTimeout: ()-> void
 
 /**
   자료형 및 선언과 정의, 다중 대입
@@ -48,7 +48,7 @@ s = array1[a + b] .. array1[1]
 */
 if not s console log 'a is not true'
 
-def matchTest(x: number)-> string => x match {
+val matchTest = (x: number)-> string => x match {
   case 1 => return "one"
   case 2 => return "two"
   case _ => return "other"
@@ -130,7 +130,7 @@ var returnValue = add(1, 2)
  * @param N 
  * @returns 
  */
-def factorial(N: number)-> number => {
+val factorial = (N: number)-> number => {
   var sum: number = 0
   for (d <- 1 to N) {
     sum += d
@@ -138,11 +138,11 @@ def factorial(N: number)-> number => {
   return sum
 }
 
-val timeFlies1 = (msg: string)-> void => {
+val timeFlies1 = (msg: string) => {
   console.log("time flies like an arrow... ", msg)
 }
 
-def timeFlies2(msg: string)-> void => {
+val timeFlies2 = (msg: string)-> void => {
   console.log("time flies like an arrow... ", msg)
 }
 
@@ -151,7 +151,7 @@ val oncePerSecond = (callback: (p:string)-> void)-> void => {
   setTimeout(() => { callback('1초 지남!') }, 1000)
 }
 
-def main() => {
+val main = () => {
   hanoi(3, "a", "b", "c")
   var ary: string[] = ['a', 'b', 'c']
   concatenate(ary)
@@ -164,8 +164,8 @@ def main() => {
  * @param to
  * @param mid 
  */
-def hanoi(n: number, from: string, to: string, mid: string)-> void => {
-  def move(from: string, to: string) => {
+val hanoi = (n: number, from: string, to: string, mid: string)-> void => {
+  val move = (from: string, to: string) => {
     console.log(`${from} ${to}`)
   }
 
@@ -183,14 +183,14 @@ def hanoi(n: number, from: string, to: string, mid: string)-> void => {
  * @param ary 
  * @returns 
  */
-def concatenate(ary: string[])-> string => {
+val concatenate = (ary: string[])-> string => {
   var result = ""
   for (e <- ary)
     result = result .. e
   return result
 }
 
-def generateBypassElement(bypass: string[])-> string => {
+val generateBypassElement = (bypass: string[])-> string => {
   var result: string = ""
   var t = result.trim()
   bypass.forEach(s:string => {
@@ -203,21 +203,21 @@ def generateBypassElement(bypass: string[])-> string => {
   return result
 }
 
-def Work => {
+def Work = {
   var name: string
   var kind: string
   var wage: number
 }
 
-def Person => {
+def Person = {
   var name: string
   var work: Work
-  def calc(hour: number, bonus: Bonus)-> number => {
+  val calc = (hour: number, bonus: Bonus)-> number => {
     return this.work.wage * hour + bonus.amount
   }
 }
 
-def Bonus => {
+def Bonus = {
   var amount: number
 }
 
