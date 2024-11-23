@@ -186,7 +186,7 @@ fragment Spread:
 // 그냥 람다 함수로 변환하면 override 함수에서 super를 사용할 수 없게 된다.
 FunctionDef:
   (Annotation)? (export?='export')? (private?='private')? (static?='static')? 
-  'def' (extension=[ObjectDef:Id] '.')? name=Id
+  'fun' (extension=[ObjectDef:Id] '.')? name=Id '='
   '(' Parameters? ')' (FunctionReturn)? (FunctionBody)?;
 
 Block:

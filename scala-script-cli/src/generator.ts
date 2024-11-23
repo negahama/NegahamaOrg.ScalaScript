@@ -168,68 +168,183 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
  * @param isClassMember - Indicates if the variable is a class member.
  * @returns The transpiled string representation of the variable definition.
  */
+/*
+  타입스크립트로 변환할 때 다음과 같은 점을 고려해야 한다.
+
+  1) val, var, fun
+  타입스크립트에서는 부모 클래스의 프로퍼티를 자식 클래스에서 재정의하는 것이 가능하다.
+  (대신 override가 필요하고 함수가 아니기 때문에 super 호출은 되지 않는다)
+  하지만 스칼라스크립트에서는 부모 클래스에서 val로 정의된 함수형 변수는 자식 클래스에서 재정의할 수 없다.
+  var로 정의된 함수형 변수는 타입스크립트의 함수형 변수(프로퍼티)로 변환되는데 일부는 함수로 변환해야 한다.
+  fun으로 시작하는 것은 함수 정의이므로 여기서 처리되지 않는다.
+  
+  2) Override
+  override는 타입스크립트의 컴파일 옵션인 noImplicitOverride 옵션의 영향을 받는데
+  여기서는 이 옵션이 true인 경우 즉 명시적으로 override를 선언해야 하는 경우를 살펴본다.
+  먼저 noImplicitOverride가 true이면 부모 클래스와 동일한 이름은 무조건 override가 있어야 한다.
+  
+  3) Super
+  타입스크립트에서 함수형 변수는 자식 클래스에서 재정의할 수 있지만 super를 사용할 수는 없다.
+  이 경우 자식 클래스에서 함수로 변환할 수도 있지만 부모 클래스에서 함수형 변수로 선언되어진 경우에는
+  자식 클래스에서 동일한 이름의 함수를 선언하는 것도 에러이기 때문에 의미가 없다. (아래의 코드에서 f3은 에러임)
+  하지만 개념적으로도 super를 사용하려면 super의 대상이 함수이어야 하므로 부모 클래스에서는 함수인 것으로 가정한다.
+  그리고 자식 클래스에서는 super가 있으면 해당 메서드가 부모 클래스에서 함수로 이미 정의되어져 있다고 가정하고
+  자식 클래스에서는 함수로 변환하고 override를 추가한다. 이렇게 하면 스칼라스크립트에서는
+  자식 클래스에서 메서드가 함수이든 함수형 변수이던 super를 사용할 수 있다.
+
+  4) 함수로의 변환
+  함수형 변수는 함수로 변환되어야 하는 경우가 있다. 위의 super를 포함하는 경우도 이에 해당한다.
+  이 외에도 constructor, argument가 디폴트 값을 가지는 경우도 타입스크립트에서 함수형 변수로는 처리할 수 없으므로
+  함수로 변환되어야 한다. 스칼라스크립트에서는 이것들은 함수이던지, 함수형 변수이든지, 함수형 상수이든지 상관없다.
+  
+  5) 타입스크립트에서의 함수형 변수와 함수의 차이
+  class Parent {
+    f1(): number { return 1 }
+    f2(): number { return 1 }
+    f3 = (): number => { return 1 }
+    f4 = (): number => { return 1 }
+  }
+
+  class Children extends Parent {
+    override f1(): number { return 1 }
+    override f2 = (): number => { return 1 }
+    override f3(): number { return 1 }
+    override f4 = (): number => { return 1 }
+  }
+
+  같은 형태로의 변환은 당연히 되고 다른 형태로 변환하는 경우는 f3만 에러가 된다.
+  즉 함수는 함수형 변수로 재정의가 될 수 있지만 함수형 변수는 파생 클래스에서 함수로 재정의 할 수 없다.
+*/
 function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMember: boolean = false): string {
   let result = ''
   if (stmt.annotate == 'NotTrans') return result
+
+  // 이 함수는 일반적인 변수 정의로 변환하는데 함수형 변수인 경우에만 함수로 변환하거나 override를 추가한다.
+  // 코드의 가독성을 높이기 위해서 코드가 좀 중복되더라도 함수형 변수인 경우만 따로 처리한다.
+  // 먼저 함수형이 아닌 경우를 먼저 처리하고 리턴한다.
+  if (!(stmt.value && ast.isFunctionValue(stmt.value))) {
+    if (stmt.export) result += 'export '
+    if (stmt.private) result += 'private '
+    if (stmt.static) result += 'static '
+
+    if (!isClassMember) {
+      if (stmt.kind == 'var') result += 'let '
+      if (stmt.kind == 'val') result += 'const '
+    }
+    result += stmt.name + (stmt.nullable ? '?' : '')
+    result += stmt.type ? `: ${generateTypes(stmt.type, indent)}` : ''
+    result += stmt.value ? ' = ' + generateExpression(stmt.value, indent) : ''
+    return result
+  }
+
+  // 여기서부터는 함수형 변수인 경우이다.
+  // 함수형 변수 처리가 복잡하지만 이 모든 처리는 결국은 이 함수형 변수가 에러인지, 함수로 변환되어야 하는지,
+  // override를 붙여야 하는지를 판단하기 위해서이다.
+  let isError: string[] = []
+  let isFunction = false
+  let isOverride = false
+
+  // 1) 먼저 함수형 변수가 있는 클래스가 부모 클래스를 가지고 있으면 부모 클래스를 찾는다.
+  //   부모 클래스가 없으면 일반적인 처리를 하면 되는데 있지만 못찾는 경우는 에러 처리를 해야 한다.
+  // 2) 부모 클래스에서 동일한 이름이 쓰이고 있는지를 확인한다.
+  //   동일한 이름이 없으면 일반적인 처리를 한다. 이름이 쓰이면 무조건 override가 추가되어야 한다.
+  // 3-1) 부모 클래스에서 해당 이름이 val 변수이면 이것을 재정의하고 있는 현재 상태는 에러인 것이다.
+  //   따라서 적절한 에러 처리를 해야 한다.
+  // 3-2) 해당 이름이 var 변수이면 재정의되어질 수 있으므로 대부분 일반적인 변환 과정을 거치면 된다.
+  //   하지만 일부 함수형 변수는 변환시 함수로 변환되어야 하는 것들이 있는데 아래와 같은 경우들이다.
+  //   3-2-1) constructor인 경우
+  //   3-2-2) argument가 디폴트 값을 가지는 경우
+  //   3-2-3) super 호출이 있는 경우
+  // 위의 주석 [[al=42c6f56d6b52aeb10a6d766534a7d38a]]도 참조.
+
+  const currClass = AstUtils.getContainerOfType(stmt, ast.isObjectDef)
+  if (currClass && currClass.superClass) {
+    // 부모 클래스가 있는 경우 부모 클래스를 찾는다.
+    const superClass = currClass.superClass.ref
+    if (superClass && ast.isObjectDef(superClass) && superClass.name == currClass.superClass.$refText) {
+      // 부모 클래스에서 동일한 이름이 쓰이고 있는지를 확인한다.
+      let foundName: ast.FunctionDef | ast.VariableDef | ast.ObjectDef | undefined
+      // bypass는 name이 없으므로 제외하고 나머지 중에서 동일한 이름을 찾는다.
+      // 하지만 아래에서 결국 ast.VariableDef인 경우만 처리하고 나머지는 에러로 처리한다.
+      superClass.body.elements.forEach(e => {
+        if (!ast.isBypass(e) && e.name == stmt.name) {
+          foundName = e
+        }
+      })
+
+      // 이름을 찾았으면
+      if (foundName) {
+        if (ast.isVariableDef(foundName)) {
+          if (foundName.kind == 'val') {
+            isError.push(`'${stmt.name}' is a function constant in ${superClass.name}`)
+          } else if (foundName.kind == 'var') {
+            isOverride = true
+            // 함수형 변수로 변환하는데 몇가지 경우에는 함수로 변환한다.
+            if (stmt.name == 'constructor') {
+              isFunction = true
+            }
+
+            stmt.value.params.forEach(param => {
+              if (param.value) {
+                isFunction = true
+              }
+            })
+
+            // 함수의 바디에 super 호출이 있는 경우
+            // fun 으로 정의되는 경우에는 super 호출이 관련이 없지만 변수인 상황에서는 이것은 에러에 해당한다.
+            const callchain = AstUtils.streamAllContents(stmt.value.body).filter(ast.isThisOrSuper)
+            callchain.forEach(cc => {
+              if (cc.this == 'super') {
+                isError.push(`'${stmt.name}' is not allowed to call super`)
+              }
+            })
+          }
+        } else {
+          // 동일한 이름이 동일한 종류(함수형 변수)로 쓰이지 않는 경우
+          isError.push(`internal error: '${stmt.name}' is not a variable`)
+        }
+      } else {
+        // 동일한 이름이 쓰이고 있지 않은 경우
+      }
+    } else {
+      // 부모 클래스가 있지만 찾을 수 없는 경우
+      isError.push(`internal error: '${currClass.superClass.$refText}' is not found`)
+    }
+  } else {
+    // 해당 클래스는 부모 클래스가 없는 경우
+  }
+
+  if (isError.length != 0) {
+    isError.forEach(e => console.error(chalk.red(e)))
+    return result
+  }
+
   if (stmt.export) result += 'export '
   if (stmt.private) result += 'private '
   if (stmt.static) result += 'static '
 
-  // 함수형 변수 중에는 함수로 변환되어야 하는 것들이 있다.
-  // 그중 가장 중요한 것은 var 로 선언된 변수는 함수로 변환되어야 한다는 것이다.
-  // constructor, argument가 값을 가지는 경우, super 호출이 있는 경우등도 함수로 변환되어야 한다.
-  let isFunctionDef = false
-  let isOverrideDef = false
-  let isOverridable = false
-  if (stmt.value && ast.isFunctionValue(stmt.value)) {
-    if (stmt.kind == 'var') {
-      isFunctionDef = true
-      isOverridable = true
-    }
-
-    if (stmt.name == 'constructor') {
-      isFunctionDef = true
-    }
-
-    stmt.value.params.forEach(param => {
-      if (param.value) {
-        isFunctionDef = true
-      }
+  if (isFunction) {
+    result += generateFunction({
+      includeFunction: !isClassMember,
+      override: isOverride,
+      name: stmt.name,
+      params: stmt.value.params,
+      paramsForceBracket: true,
+      returnType: stmt.value.returnType,
+      body: stmt.value.body,
+      bodyForceBracket: true,
+      indent,
     })
-
-    // 함수의 바디에 super 호출이 있는 경우
-    const callchain = AstUtils.streamAllContents(stmt.value.body).filter(ast.isThisOrSuper)
-    callchain.forEach(cc => {
-      if (cc.this == 'super') {
-        isFunctionDef = true
-        if (isOverridable) isOverrideDef = true
-      }
-    })
-  }
-
-  if (isFunctionDef) {
-    if (isOverrideDef) result += 'override '
-    if (stmt.value && ast.isFunctionValue(stmt.value)) {
-      result += generateFunction({
-        includeFunction: !isClassMember,
-        name: stmt.name,
-        params: stmt.value.params,
-        paramsForceBracket: true,
-        returnType: stmt.value.returnType,
-        body: stmt.value.body,
-        bodyForceBracket: true,
-        indent,
-      })
-      return result
-    } else {
-      console.error(chalk.red('internal error'))
-    }
+    return result
   }
 
   if (!isClassMember) {
     if (stmt.kind == 'var') result += 'let '
     if (stmt.kind == 'val') result += 'const '
   }
+
+  if (isOverride) result += 'override '
+
   result += stmt.name + (stmt.nullable ? '?' : '')
   result += stmt.type ? `: ${generateTypes(stmt.type, indent)}` : ''
   result += stmt.value ? ' = ' + generateExpression(stmt.value, indent) : ''
@@ -247,12 +362,58 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
 function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMethod: boolean = false): string {
   let result = ''
   if (stmt.annotate == 'NotTrans') return result
+
+  // 함수의 정의도 함수형 변수에서의 처리와 거의 유사하지만 조금 다르다.
+  let isError: string[] = []
+  let isOverride = false
+
+  // 내가 파생 클래스이면 부모 클래스를 찾아서 동일한 이름이 쓰이고 있는지를 확인한다.
+  const currClass = AstUtils.getContainerOfType(stmt, ast.isObjectDef)
+  if (currClass && currClass.superClass) {
+    // 부모 클래스가 있는 경우 부모 클래스를 찾는다.
+    const superClass = currClass.superClass.ref
+    if (superClass && ast.isObjectDef(superClass) && superClass.name == currClass.superClass.$refText) {
+      // 부모 클래스에서 동일한 이름이 쓰이고 있는지를 확인한다.
+      let foundName: ast.FunctionDef | ast.VariableDef | ast.ObjectDef | undefined
+      // bypass는 name이 없으므로 제외하고 나머지 중에서 동일한 이름을 찾는다.
+      // 하지만 아래에서 결국 ast.FunctionDef인 경우만 처리하고 나머지는 에러로 처리한다.
+      superClass.body.elements.forEach(e => {
+        if (!ast.isBypass(e) && e.name == stmt.name) {
+          foundName = e
+        }
+      })
+
+      // 이름을 찾았으면
+      if (foundName) {
+        if (ast.isFunctionDef(foundName)) {
+          isOverride = true
+        } else {
+          // 동일한 이름이 동일한 종류(함수형 변수)로 쓰이지 않는 경우
+          isError.push(`internal error: '${stmt.name}' is not a variable`)
+        }
+      } else {
+        // 동일한 이름이 쓰이고 있지 않은 경우
+      }
+    } else {
+      // 부모 클래스가 있지만 찾을 수 없는 경우
+      isError.push(`internal error: '${currClass.superClass.$refText}' is not found`)
+    }
+  } else {
+    // 해당 클래스는 부모 클래스가 없는 경우
+  }
+
+  if (isError.length != 0) {
+    isError.forEach(e => console.error(chalk.red(e)))
+    return result
+  }
+
   if (stmt.export) result += 'export '
   if (stmt.private) result += 'private '
   if (stmt.static) result += 'static '
 
   result += generateFunction({
     includeFunction: !isClassMethod,
+    override: isOverride,
     name: stmt.name,
     params: stmt.params,
     returnType: stmt.returnType,
@@ -963,6 +1124,12 @@ interface GenerateFunctionParams {
   includeFunction?: boolean
 
   /**
+   * Whether to override the existing function definition.
+   * @default false
+   */
+  override?: boolean
+
+  /**
    * The name of the function.
    * if this is undefined, the name of the function is not included in the generated code.
    */
@@ -1021,6 +1188,7 @@ interface GenerateFunctionParams {
  */
 function generateFunction(param: GenerateFunctionParams): string {
   let result = param.includeFunction ? 'function ' : ''
+  result += param.override ? 'override ' : ''
   result += param.name ? param.name : ''
 
   const paramsText = param.params

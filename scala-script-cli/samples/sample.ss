@@ -26,7 +26,7 @@ var s: string = "this " .. 'is ' .. `sample`
 if (s.length > 0) s = "1"
 
 %%// 문자열 함수들
-var list1 = s.concat("2" .. 'def').trim().split(",")
+var list1 = s.concat(",2" .. ', 3, 4 ').trim().split(",")
 
 %%// 문자열 인덱스는 1 부터
 val included = s.includes("is", 1)
@@ -111,18 +111,18 @@ var t2: (arg: number) -> number[]
 %%// 인수의 타입을 명시해야 하거나 인수가 여러 개이면 괄호로 묶어야 하고
 %%// 익명 함수의 리턴 타입은 명시할 수 없는 것 같다.
 %%// 타입스크립트는 스칼라와 동일한데 익명 함수의 리턴 타입을 지정할 수 있다.
-%%// 스칼라스크립트는 여기에 더해 인수가 하나이고 타입을 명시할 경우에도 괄호가 필요하지 않다.
+%%// 스칼라스크립트는 여기에 더해 인수가 하나이면 인수 타입과 리턴 타입을 명시할 경우에도 괄호가 필요하지 않다.
 val lambda1 = () => return 1
 val lambda2 = arg => return arg
 val lambda3 = arg: number => return arg
-val lambda4 = (arg: number) => return arg
-val lambda5 = (arg: number) -> number => return arg
+val lambda4 = arg: number -> number => return arg
+val lambda5 = (arg1: number, arg2: number) => return arg1 + arg2
 
 /**
   함수 정의 및 호출
 */
-// def add(a: number, b: number) -> number => return a + b
-val add = (a: number, b: number) -> number => return a + b
+fun add = (a: number, b: number) -> number => return a + b
+// val add = (a: number, b: number) -> number => return a + b
 var returnValue = add(1, 2)
 
 /**
@@ -147,7 +147,7 @@ val timeFlies2 = (msg: string) -> void => {
 }
 
 val oncePerSecond = (callback: (p:string) -> void) -> void => {
-%%//def oncePerSecond(callback: (p: string) -> void) -> void => {
+%%//fun oncePerSecond = (callback: (p: string) -> void) -> void => {
   setTimeout(() => { callback('1초 지남!') }, 1000)
 }
 
@@ -231,3 +231,37 @@ var somebody = new Person()
 somebody.name = "Jessica"
 somebody.work = alba
 somebody.calc(3, { amount: 10 })
+
+/**
+ *
+ */
+def OverrideTest = {
+  fun get11 = () -> number => { return 1 }
+  fun get12 = () -> number => { return 1 }
+  val get21 = () -> number => { return 2 }
+  val get22 = () -> number => { return 2 }
+  var get31 = () -> number => { return 3 }
+  var get32 = () -> number => { return 3 }
+}
+
+def OverrideTest2 extends OverrideTest = {
+  fun get11 = () -> number => { return super.get11() + 10 }
+  fun get12 = () -> number => { return 10 }
+  // 스칼라스크립트는 부모 클래스에서 val로 선언된 메소드는 자식 클래스에서 재정의 할 수 없다.
+  val get21 = () -> number => { return super.get21() + 20 }
+  val get22 = () -> number => { return 20 }
+  // 부모 클래스에서 프로퍼티(함수형 변수)인 것은 자식 클래스에서 재정의할 수 있다.
+  // 하지만 이것은 함수가 아니므로 super 사용이 안된다. super가 사용가능하려면 함수이어야 하는데 자식 클래스에서
+  // get31을 함수로 바꿔도 안된다. 이때는 get31이란 이름이 프로퍼티에서 함수로 바뀌는건데 타입스크립트에서 허락되지 않음
+  // 즉 super를 사용하려면 부모 클래스에서 fun으로 정의해야 한다.
+  // 사실 부모 클래스의 get31을 내부적으로 함수로 바꿔주면 궂이 fun을 사용하지 않고 구현할 수 있다.
+  // 하지만 이 경우 변수인 get31을 super.get31이라고 쓸 수 있는 것 자체가 모순이 된다.
+  var get31 = () -> number => { return super.get31() + 30 }
+  var get32 = () -> number => { return 30 }
+}
+
+val overrideTest = new OverrideTest2()
+console.log(overrideTest.get11())
+console.log(overrideTest.get12())
+console.log(overrideTest.get32())
+
