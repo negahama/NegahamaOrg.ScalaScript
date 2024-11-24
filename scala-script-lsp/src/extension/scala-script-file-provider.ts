@@ -2,7 +2,13 @@ import * as vscode from 'vscode'
 import { ScalaScriptBuiltinLibrary } from '../../../language/scala-script-library.js'
 
 /**
+ * A custom implementation of the `vscode.FileSystemProvider` interface for providing
+ * a read-only, case-insensitive file system that serves a built-in Scala script library.
  *
+ * This class is registered as a file system provider under the scheme 'builtin'.
+ *
+ * @class DslLibraryFileSystemProvider
+ * @implements {vscode.FileSystemProvider}
  */
 export class DslLibraryFileSystemProvider implements vscode.FileSystemProvider {
   static register(context: vscode.ExtensionContext) {

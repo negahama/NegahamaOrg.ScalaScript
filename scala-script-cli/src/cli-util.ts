@@ -5,10 +5,14 @@ import { URI } from 'langium'
 import chalk from 'chalk'
 
 /**
+ * Extracts a Langium document from the given file name and performs validation.
  *
- * @param fileName
- * @param services
- * @returns
+ * @param fileName - The name of the file to extract the document from.
+ * @param services - The Langium core services used for document extraction and validation.
+ * @returns A promise that resolves to the extracted Langium document.
+ *
+ * @throws Will exit the process with code 1 if the file extension is not supported,
+ *         if the file does not exist, or if there are validation errors.
  */
 export async function extractDocument(fileName: string, services: LangiumCoreServices): Promise<LangiumDocument> {
   const extensions = services.LanguageMetaData.fileExtensions
@@ -46,17 +50,19 @@ export async function extractDocument(fileName: string, services: LangiumCoreSer
 }
 
 /**
+ * Extracts an AST (Abstract Syntax Tree) node from a given file.
  *
- * @param fileName
- * @param services
- * @returns
+ * @template T - The type of the AST node to be extracted, extending from `AstNode`.
+ * @param fileName - The name of the file from which to extract the AST node.
+ * @param services - The core services of Langium required for extraction.
+ * @returns A promise that resolves to the extracted AST node of type `T`.
  */
 export async function extractAstNode<T extends AstNode>(fileName: string, services: LangiumCoreServices): Promise<T> {
   return (await extractDocument(fileName, services)).parseResult?.value as T
 }
 
 /**
- *
+ * Represents data related to a file path.
  */
 interface FilePathData {
   destination: string
@@ -64,10 +70,14 @@ interface FilePathData {
 }
 
 /**
+ * Extracts the destination directory and the base name from a given file path.
+ * If the destination is not provided, it defaults to a 'generated' directory
+ * within the same directory as the file.
  *
- * @param filePath
- * @param destination
- * @returns
+ * @param filePath - The path of the file to process.
+ * @param destination - An optional destination directory. If not provided,
+ *                      defaults to a 'generated' directory within the same directory as the file.
+ * @returns An object containing the destination directory and the base name of the file.
  */
 export function extractDestinationAndName(filePath: string, destination: string | undefined): FilePathData {
   filePath = path.basename(filePath, path.extname(filePath)).replace(/[.-]/g, '')

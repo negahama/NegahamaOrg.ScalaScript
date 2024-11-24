@@ -6,7 +6,15 @@ import { DslLibraryFileSystemProvider } from './scala-script-file-provider.js'
 
 let client: LanguageClient
 
-// This function is called when the extension is activated.
+/**
+ * Activates the extension.
+ * This function is called when the extension is activated.
+ *
+ * This function is called when the extension is activated. It registers the
+ * `DslLibraryFileSystemProvider` and starts the language client.
+ *
+ * @param context - The extension context provided by VS Code.
+ */
 export function activate(context: vscode.ExtensionContext): void {
   DslLibraryFileSystemProvider.register(context)
   console.log('DslLibraryFileSystemProvider.register')
@@ -15,7 +23,12 @@ export function activate(context: vscode.ExtensionContext): void {
   console.log('startLanguageClient')
 }
 
-// This function is called when the extension is deactivated.
+/**
+ * Deactivates the extension by stopping the client if it is running.
+ * This function is called when the extension is deactivated.
+ *
+ * @returns {Thenable<void> | undefined} A promise that resolves when the client is stopped, or undefined if the client is not running.
+ */
 export function deactivate(): Thenable<void> | undefined {
   if (client) {
     return client.stop()
@@ -23,6 +36,16 @@ export function deactivate(): Thenable<void> | undefined {
   return undefined
 }
 
+/**
+ * Starts the language client for the ScalaScript language server.
+ *
+ * @param context - The extension context provided by VS Code.
+ * @returns The initialized and started LanguageClient instance.
+ *
+ * This function sets up the language server module path, configures debug options,
+ * and defines server and client options. It then creates and starts the language client,
+ * which in turn launches the language server.
+ */
 function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
   const serverModule = context.asAbsolutePath(path.join('out', 'language', 'main.cjs'))
   // The debug options for the server

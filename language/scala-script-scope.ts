@@ -190,10 +190,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   }
 
   /**
+   * Retrieves the scope for a given object within a specific context.
    *
-   * @param context
-   * @param objectDef
-   * @returns
+   * @param context - The reference information that provides context for the scope retrieval.
+   * @param object - The object for which the scope is being retrieved. This can be an ObjectDef, ObjectType, or ObjectValue.
+   * @returns The scope associated with the given object. If no scope is found, returns an empty scope.
    */
   scopeCacheForObjectType = new Map<ast.ObjectType, Scope>()
   private getScopeForObject(context: ReferenceInfo, object: ast.ObjectDef | ast.ObjectType | ast.ObjectValue): Scope {
@@ -221,10 +222,18 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   }
 
   /**
+   * Retrieves the scope for a specific class within the given context.
    *
-   * @param context
-   * @param className
-   * @returns
+   * @param context - The reference information context.
+   * @param className - The name of the class for which the scope is being retrieved.
+   * @param object - An optional object definition to use for creating the scope.
+   * @returns The scope associated with the specified class.
+   *
+   * This method first checks if the scope is cached locally. If not, it attempts to create the scope
+   * by examining the class chain and filtering out bypass elements. If the class is found in the global
+   * scope and is exported, it caches and returns the scope. If an object definition is provided, it creates
+   * and caches the scope locally. If none of these conditions are met, it logs an error and returns the
+   * default scope from the superclass.
    */
   localScopeCacheForObjectDef = new Map<string, Scope>()
   globalScopeCacheForObjectDef = new Map<string, Scope>()
@@ -272,11 +281,12 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   }
 
   /**
+   * Retrieves the scope for a given type within a specific context.
    * any type의 경우 member 검사를 하지 않는다. 엄밀하게는 무조건 멤버를 생성하고 리턴한다.
    *
-   * @param context
-   * @param previous
-   * @returns
+   * @param context - The reference information containing the context for the type.
+   * @param previous - The previous AST expression node.
+   * @returns A `Scope` object that represents the scope for the given type.
    */
   private getScopeForAnytype(context: ReferenceInfo, previous: ast.Expression): Scope {
     // console.log('getScopeForAnytype, ref text:', context.reference.$refText)

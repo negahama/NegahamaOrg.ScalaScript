@@ -8,9 +8,9 @@
       "title": "`// Create a connection to the client` at scala-script-lsp\\src\\language\\main.ts#6",
       "source": {
         "file": "/scala-script-lsp/src/language/main.ts",
-        "startLine": 7,
+        "startLine": 11,
         "startColumn": 0,
-        "endLine": 15,
+        "endLine": 19,
         "endColumn": 0
       },
       "notes": [
@@ -28,9 +28,9 @@
       "title": "`const debugOptions = {` at scala-script-lsp\\src\\extension\\main.ts#31",
       "source": {
         "file": "/scala-script-lsp/src/extension/main.ts",
-        "startLine": 31,
+        "startLine": 54,
         "startColumn": 0,
-        "endLine": 31,
+        "endLine": 54,
         "endColumn": 0
       },
       "notes": [

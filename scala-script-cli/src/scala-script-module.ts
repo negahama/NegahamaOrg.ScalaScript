@@ -95,9 +95,13 @@ export function createScalaScriptServices(context: DefaultSharedModuleContext): 
 }
 
 /**
- * Register custom validation checks.
+ * Registers validation checks for ScalaScript services.
  *
- * @param services
+ * @param services - The ScalaScript services that provide validation functionality.
+ *
+ * The function sets up a series of validation checks for different AST (Abstract Syntax Tree) types
+ * such as VariableDef, FunctionDef, ObjectDef, Assignment, FunctionValue, UnaryExpression, and BinaryExpression.
+ * These checks are then registered with the validation registry using the provided validator.
  */
 export function registerValidationChecks(services: ScalaScriptServices) {
   const registry = services.validation.ValidationRegistry
@@ -115,11 +119,22 @@ export function registerValidationChecks(services: ScalaScriptServices) {
 }
 
 /**
+ * A factory class for creating Langium documents specifically for ScalaScript.
+ * Extends the DefaultLangiumDocumentFactory to provide custom document creation logic.
+ *
  * JSDoc style comment는 특별히 그대로 bypass한다.
  * 원래 주석을 bypass하기 위해서는 %% ... %% 으로 처리해야 하지만 이렇게 하면 JSDoc의 편이 기능을 사용할 수 없고
  * 그렇다고 주석을 bypass 안 할수도 없기 때문에 편집시에는 주석 형태로 사용하고 변환을 하기 전에만 %%을 붙여서 빌드한다.
  */
 export class ScalaScriptDocumentFactory extends DefaultLangiumDocumentFactory {
+  /**
+   * Asynchronously creates a Langium document from a given URI.
+   *
+   * @template T - The type of the AST node, defaults to AstNode.
+   * @param uri - The URI of the file to read.
+   * @param cancellationToken - An optional cancellation token to cancel the operation, defaults to CancellationToken.None.
+   * @returns A promise that resolves to a LangiumDocument of type T.
+   */
   override async fromUri<T extends AstNode = AstNode>(
     uri: URI,
     cancellationToken = CancellationToken.None

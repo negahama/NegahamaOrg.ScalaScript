@@ -9,9 +9,16 @@ import chalk from 'chalk'
  */
 export class ScalaScriptValidator {
   /**
+   * Validates a variable definition in the ScalaScript language.
    *
-   * @param expr
-   * @param accept
+   * @param expr - The variable definition AST node to be checked.
+   * @param accept - The validation acceptor to report validation issues.
+   *
+   * This function performs the following checks:
+   * - Logs the entry and traces the type and value of the variable definition.
+   * - If both type and value are present, it infers their types and checks if the value is assignable to the type.
+   *   - If the value is not assignable to the type, it reports an error.
+   * - If neither type nor value is present, it reports an error indicating that variables require a type hint or an assignment at creation.
    */
   checkVariableDef(expr: ast.VariableDef, accept: ValidationAcceptor): void {
     // const text = AstUtils.getDocument(expr).parseResult.value.$cstNode?.text
@@ -57,10 +64,17 @@ export class ScalaScriptValidator {
   }
 
   /**
+   * Validates a function definition by checking its return type and return statements.
    *
-   * @param method
-   * @param accept
-   * @returns
+   * @param method - The function definition to be checked.
+   * @param accept - The validation acceptor to report validation issues.
+   *
+   * This function performs the following checks:
+   * 1. If the function has a body and a return type, it infers the expected return type.
+   * 2. It extracts all return expressions from the function body.
+   * 3. If there are no return statements and the expected return type is not 'void', it reports an error.
+   * 4. For each return statement, it infers the return value type and checks if it is assignable to the expected return type.
+   *    If not, it reports an error.
    */
   checkFunctionDef(method: ast.FunctionDef, accept: ValidationAcceptor): void {
     const log = enterLog('checkFunctionDef', method.name)
@@ -97,10 +111,10 @@ export class ScalaScriptValidator {
   }
 
   /**
+   * Validates a function value by checking its return type and return statements.
    *
-   * @param method
-   * @param accept
-   * @returns
+   * @param method - The function value to be checked.
+   * @param accept - The validation acceptor to report validation issues.
    */
   checkFunctionValue(method: ast.FunctionValue, accept: ValidationAcceptor): void {
     const log = enterLog('checkFunctionValue', method.$cstNode?.text)
@@ -137,11 +151,12 @@ export class ScalaScriptValidator {
   }
 
   /**
+   * Extracts all return expressions from the given AST node and adds them to the result array.
    * Block에서 모든 return문을 추출한다.
    * 이때 함수 선언 및 람다 함수 호출과 같이 return이 사용되었지만 return의 scope가 해당 블럭과 관련이 없는 것은 제외한다.
    *
-   * @param node
-   * @param result
+   * @param node - The AST node to extract return expressions from.
+   * @param result - An array to store the extracted return expressions.
    */
   extractReturnExpression(node: AstNode, result: ast.ReturnExpression[]) {
     // return AstUtils.streamAllContents(node).filter(ast.isReturnExpression).toArray()
@@ -153,9 +168,10 @@ export class ScalaScriptValidator {
   }
 
   /**
+   * Checks the validity of a class declaration.
    *
-   * @param declaration
-   * @param accept
+   * @param decl - The class declaration object to be checked.
+   * @param accept - The validation acceptor to report validation issues.
    */
   checkClassDeclaration(decl: ast.ObjectDef, accept: ValidationAcceptor): void {
     const log = enterLog('checkClassDeclaration', decl.name)
@@ -168,9 +184,10 @@ export class ScalaScriptValidator {
   }
 
   /**
+   * Validates an assignment expression to ensure the right-hand side value is assignable to the left-hand side variable.
    *
-   * @param expr
-   * @param accept
+   * @param expr - The assignment expression to validate.
+   * @param accept - The validation acceptor to report validation issues.
    */
   checkAssignment(expr: ast.Assignment, accept: ValidationAcceptor): void {
     const log = enterLog('checkAssignment', expr.assign.$type)
@@ -181,7 +198,7 @@ export class ScalaScriptValidator {
     const left = TypeSystem.inferType(expr.assign, map)
     const right = TypeSystem.inferType(expr.value, map)
 
-    traceLog(`${right.$type} = ${left.$type}`)
+    traceLog(`${left.$type} = ${right.$type}`)
 
     if (!isAssignable(right, left)) {
       accept(
@@ -197,9 +214,10 @@ export class ScalaScriptValidator {
   }
 
   /**
+   * Checks if a unary operation is allowed on a given expression.
    *
-   * @param unary
-   * @param accept
+   * @param unary - The unary expression to be checked.
+   * @param accept - The validation acceptor to report errors.
    */
   checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
     if (unary.operator) {
@@ -219,9 +237,19 @@ export class ScalaScriptValidator {
   }
 
   /**
+   * Checks if a binary operation is allowed between two expressions.
    *
-   * @param binary
-   * @param accept
+   * @param binary - The binary expression to be validated.
+   * @param accept - The validation acceptor to report errors or warnings.
+   *
+   * This function performs the following steps:
+   * 1. Logs the entry and details of the binary operation.
+   * 2. Infers the types of the left and right expressions.
+   * 3. Logs the inferred types.
+   * 4. Checks if the binary operation is legal for the inferred types.
+   * 5. If the operation is illegal, reports an error.
+   * 6. If the operation is a comparison ('==' or '!='), checks if the comparison is always true or false and reports a warning if so.
+   * 7. Logs the exit of the function.
    */
   checkBinaryOperationAllowed(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
     const log = enterLog('checkBinaryOperationAllowed', binary.operator)
@@ -258,22 +286,28 @@ export class ScalaScriptValidator {
 }
 
 /**
+ * Retrieves a new type cache.
  *
- * @returns
+ * @returns {Map<AstNode, TypeDescription>} A new map instance to be used as a type cache.
  */
 export function getTypeCache(): Map<AstNode, TypeDescription> {
   return new Map()
 }
 
 /**
+ * Determines if an operation between two types is legal.
+ *
+ * This function checks if the given operator can be legally applied to the provided types.
+ * If either of the types is a union type, it will check all combinations of the union's element types.
+ *
  * 연산자가 적법한 타입을 취하는지 확인한다.
  * any type은 모든 타입과 연산이 가능하다.
  * nil type은 일반적으로는 모든 타입과 연산이 안되지만 연산자마다 조금씩 다르다
  *
- * @param operator
- * @param left
- * @param right
- * @returns
+ * @param operator - The operator to be applied.
+ * @param left - The left-hand side type description.
+ * @param right - The right-hand side type description (optional).
+ * @returns `true` if the operation is legal, otherwise `false`.
  */
 export function isLegalOperation(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
   // Union type이면 모든 내부 타입들을 하나씩 적용해서 적법한 연산이 있는지 확인한다.
@@ -296,11 +330,30 @@ export function isLegalOperation(operator: string, left: TypeDescription, right?
 }
 
 /**
+ * Determines if a given operation between two types is legal based on the operator and the types involved.
  *
- * @param operator
- * @param left
- * @param right
- * @returns
+ * @param operator - The operator to be used in the operation.
+ * @param left - The type description of the left operand.
+ * @param right - The type description of the right operand (optional).
+ * @returns `true` if the operation is legal, `false` otherwise.
+ *
+ * The function checks the legality of various operators including:
+ * - String concatenation (`..`)
+ * - Equality and inequality (`==`, `!=`)
+ * - Arithmetic operations (`+`, `-`, `*`, `/`, `%`, `**`)
+ * - Comparison operations (`<`, `<=`, `>`, `>=`)
+ * - Logical operations (`and`, `or`, `&&`, `||`)
+ * - Unary logical negation (`not`, `!`)
+ * - Type checking (`typeof`, `instanceof`)
+ *
+ * The function also handles implicit type conversions and special cases such as:
+ * - Any type (`any`)
+ * - Nil type (`nil`)
+ * - Boolean type (`boolean`)
+ * - String type (`string`)
+ * - Number type (`number`)
+ *
+ * Internal errors are logged to the console if the right operand is missing for binary operations.
  */
 function isLegalOperation_(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
   if (TypeSystem.isAnyType(left) || (right != undefined && TypeSystem.isAnyType(right))) {
@@ -384,19 +437,50 @@ function isLegalOperation_(operator: string, left: TypeDescription, right?: Type
 }
 
 /**
+ * Determines if a type can be assigned to another type.
  * any type은 모든 타입과 연산이 가능하며 nil type은 모든 타입과 가능한 연산이 없다.
  *
- * @param from
- * @param to
- * @returns
+ * @param from - The source type description.
+ * @param to - The target type description.
+ * @param indent - The indentation level for logging (default is 0).
+ * @returns `true` if the `from` type can be assigned to the `to` type, otherwise `false`.
+ *
+ * The function checks for the following conditions:
+ * - If the types are identical or if either type is `any`, it returns `true`.
+ * - If the target type is a union type, it checks if the source type can be assigned to any of the union's element types.
+ * - If the source type is a union type, it checks if any of the union's element types can be assigned to the target type.
+ * - If either type is `nil`, it returns `true` only if both types are `nil`.
+ * - If the source type is a class type, it checks if the target type is also a class type and if the source class is in the inheritance chain of the target class.
+ * - If the source type is a function type, it checks if the target type is also a function type, if their return types are assignable, and if their parameters are assignable.
  */
 export function isAssignable(from: TypeDescription, to: TypeDescription, indent: number = 0): boolean {
   // const space = "  ".repeat(indent)
   // console.log(space + `isAssignable: ${to.$type} = ${from.$type}`)
 
-  // 성능 향상을 위해 둘의 타입이 동일하거나 어느 하나의 타입이 any이면 바로 return true
-  if (from.$type == to.$type || TypeSystem.isAnyType(from) || TypeSystem.isAnyType(to)) {
+  // 성능 향상을 위해 어느 하나의 타입이 any이면 바로 return true
+  if (TypeSystem.isAnyType(from) || TypeSystem.isAnyType(to)) {
     return true
+  }
+
+  // 성능 향상을 위해 둘의 타입이 동일하면 바로 return true
+  // 하지만 이 경우는 function type의 return type과 parameter type을 비교해야 한다.
+  if (from.$type == to.$type) {
+    if (TypeSystem.isFunctionType(from) && TypeSystem.isFunctionType(to)) {
+      if (!isAssignable(from.returnType, to.returnType)) {
+        return false
+      }
+      if (from.parameters.length !== to.parameters.length) {
+        return false
+      }
+      for (let i = 0; i < from.parameters.length; i++) {
+        const fromParam = from.parameters[i]
+        const toParam = to.parameters[i]
+        if (!isAssignable(fromParam.type, toParam.type)) {
+          return false
+        }
+      }
+      return true
+    } else return true
   }
 
   // union type이면 각 세부 타입들의 조합을 검사한다.
@@ -456,26 +540,6 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
     }
     // 둘 다 클래스 타입이면 일단 통과시킨다.
     // return false
-  }
-
-  if (TypeSystem.isFunctionType(from)) {
-    if (!TypeSystem.isFunctionType(to)) {
-      return false
-    }
-    if (!isAssignable(from.returnType, to.returnType)) {
-      return false
-    }
-    if (from.parameters.length !== to.parameters.length) {
-      return false
-    }
-    for (let i = 0; i < from.parameters.length; i++) {
-      const fromParam = from.parameters[i]
-      const toParam = to.parameters[i]
-      if (!isAssignable(fromParam.type, toParam.type)) {
-        return false
-      }
-    }
-    return true
   }
 
   return from.$type === to.$type

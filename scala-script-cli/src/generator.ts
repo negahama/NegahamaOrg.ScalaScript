@@ -7,11 +7,12 @@ import * as ast from '../../language/generated/ast.js'
 import chalk from 'chalk'
 
 /**
+ * Generates a TypeScript file from the given AST program and writes it to the specified destination.
  *
- * @param program
- * @param filePath
- * @param destination
- * @returns
+ * @param program - The AST program to be transpiled into TypeScript.
+ * @param filePath - The file path of the source file being transpiled.
+ * @param destination - The directory where the generated TypeScript file should be saved. If undefined, the file will be saved in the same directory as the source file.
+ * @returns The file path of the generated TypeScript file.
  */
 export function generateTypeScript(program: ast.Program, filePath: string, destination: string | undefined): string {
   const data = extractDestinationAndName(filePath, destination)

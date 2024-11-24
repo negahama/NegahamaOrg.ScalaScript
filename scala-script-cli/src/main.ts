@@ -22,7 +22,22 @@ const packageContent = await fs.readFile(packagePath, 'utf-8')
 const packageVersion = JSON.parse(packageContent).version
 
 /**
+ * Initializes and configures the command-line interface (CLI) for the ScalaScript project.
  *
+ * This function sets up the CLI using the `commander` library, defining the version,
+ * available commands, arguments, and options. Specifically, it defines a `generate` command
+ * that takes a source file and an optional destination directory, and generates TypeScript
+ * code from ScalaScript code.
+ *
+ * @remarks
+ * - The `generate` command requires a source file with one of the supported file extensions.
+ * - The supported file extensions are retrieved from `ScalaScriptLanguageMetaData.fileExtensions`.
+ *
+ * @example
+ * ```sh
+ * # To generate TypeScript code from a ScalaScript file
+ * scala-script-cli generate example.scala --destination ./output
+ * ```
  */
 export default function (): void {
   const program = new Command()
@@ -41,16 +56,30 @@ export default function (): void {
 }
 
 /**
+ * Options for generating output.
  *
+ * @property {string} [destination] - The destination path where the output should be generated.
  */
 export type GenerateOptions = {
   destination?: string
 }
 
 /**
+ * Generates TypeScript code from ScalaScript files.
  *
- * @param fileName
- * @param opts
+ * @param fileName - The name of the file to be processed. If the file name is '*', all files with the '.ss' extension in the directory will be processed.
+ * @param opts - Options for the generation process.
+ * @returns A promise that resolves when the generation process is complete.
+ *
+ * The function performs the following steps:
+ * 1. Initializes ScalaScript services and the workspace.
+ * 2. Resolves the root directory of the file.
+ * 3. Logs the start of the transpilation process.
+ * 4. Creates and builds a library document from the built-in ScalaScript library.
+ * 5. If a single file is specified, it extracts the AST node, generates TypeScript code, and logs the success message.
+ * 6. If multiple files are to be processed, it initializes the workspace, builds documents, and validates them.
+ * 7. For each document, it logs the processing status, checks for validation errors, and generates TypeScript code.
+ * 8. Logs any validation errors and exits the process if errors are found.
  */
 export const generateAction = async (fileName: string, opts: GenerateOptions): Promise<void> => {
   const services = createScalaScriptServices(NodeFileSystem).scalaScriptServices

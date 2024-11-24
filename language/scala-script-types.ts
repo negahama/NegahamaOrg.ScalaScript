@@ -22,21 +22,28 @@ export type TypeDescription =
 type CacheType = Map<AstNode, TypeDescription>
 
 /**
+ * Represents a description of a type that can be any value.
  *
+ * @property $type - A string literal that identifies this type description as 'any'.
  */
 export interface AnyTypeDescription {
   readonly $type: 'any'
 }
 
 /**
+ * Represents a description of a Nil type.
  *
+ * @property $type - A string literal type that is always 'nil'.
  */
 export interface NilTypeDescription {
   readonly $type: 'nil'
 }
 
 /**
+ * Represents a description of a string type.
  *
+ * @property $type - A constant string value indicating the type, which is always 'string'.
+ * @property literal - An optional literal value of type `ast.Literal`.
  */
 export interface StringTypeDescription {
   readonly $type: 'string'
@@ -44,7 +51,10 @@ export interface StringTypeDescription {
 }
 
 /**
+ * Represents a description of a number type.
  *
+ * @property $type - A string literal indicating the type, which is always 'number'.
+ * @property literal - An optional property representing a literal value of the number type.
  */
 export interface NumberTypeDescription {
   readonly $type: 'number'
@@ -52,7 +62,10 @@ export interface NumberTypeDescription {
 }
 
 /**
+ * Represents a description of a boolean type in the ScalaScript language.
  *
+ * @property $type - A string literal that identifies the type as 'boolean'.
+ * @property literal - An optional AST literal associated with the boolean type.
  */
 export interface BooleanTypeDescription {
   readonly $type: 'boolean'
@@ -62,12 +75,21 @@ export interface BooleanTypeDescription {
 /**
  *
  */
+/**
+ * Represents a description of a void type.
+ *
+ * @property $type - A string literal type that is always 'void'.
+ */
 export interface VoidTypeDescription {
   readonly $type: 'void'
 }
 
 /**
+ * Describes an array type in the ScalaScript language.
  *
+ * @interface ArrayTypeDescription
+ * @property {string} $type - The type identifier, which is always 'array'.
+ * @property {TypeDescription} elementType - The description of the type of elements contained in the array.
  */
 export interface ArrayTypeDescription {
   readonly $type: 'array'
@@ -75,7 +97,11 @@ export interface ArrayTypeDescription {
 }
 
 /**
+ * Represents a union type description.
  *
+ * @interface UnionTypeDescription
+ * @property {string} $type - The type identifier, which is always 'union'.
+ * @property {TypeDescription[]} elementTypes - An array of type descriptions that are part of the union.
  */
 export interface UnionTypeDescription {
   readonly $type: 'union'
@@ -83,7 +109,12 @@ export interface UnionTypeDescription {
 }
 
 /**
+ * Describes the type information for a function.
  *
+ * @interface FunctionTypeDescription
+ * @property {string} $type - The type identifier, which is always 'function'.
+ * @property {TypeDescription} returnType - The description of the function's return type.
+ * @property {FunctionParameter[]} parameters - The list of parameters that the function accepts.
  */
 export interface FunctionTypeDescription {
   readonly $type: 'function'
@@ -92,7 +123,7 @@ export interface FunctionTypeDescription {
 }
 
 /**
- *
+ * Represents a parameter of a function.
  */
 export interface FunctionParameter {
   name: string
@@ -100,7 +131,11 @@ export interface FunctionParameter {
 }
 
 /**
+ * Represents a description of a class type.
  *
+ * @interface ClassTypeDescription
+ * @property {string} $type - The type identifier, which is always 'class'.
+ * @property {ast.ObjectDef | ast.ObjectType | ast.ObjectValue} literal - The literal representation of the class type.
  */
 export interface ClassTypeDescription {
   readonly $type: 'class'
@@ -108,7 +143,11 @@ export interface ClassTypeDescription {
 }
 
 /**
+ * Represents an error type description.
  *
+ * @property $type - A constant string with the value 'error'.
+ * @property source - An optional property representing the source of the error, which is an AstNode.
+ * @property message - A string containing the error message.
  */
 export interface ErrorTypeDescription {
   readonly $type: 'error'
@@ -117,12 +156,17 @@ export interface ErrorTypeDescription {
 }
 
 /**
- *
+ * The `TypeSystem` class provides methods to create and check various type descriptions,
+ * as well as infer types from AST nodes. It supports basic types like `any`, `nil`, `string`,
+ * `number`, `boolean`, `void`, and more complex types like `array`, `union`, `function`, `class`,
+ * and `error`. The class also includes methods to convert types to strings and to infer types
+ * from AST nodes using a cache to store and retrieve type information.
  */
 export class TypeSystem {
   /**
+   * Creates a description object for the 'any' type.
    *
-   * @returns
+   * @returns An object representing the 'any' type.
    */
   static createAnyType(): AnyTypeDescription {
     return {
@@ -131,17 +175,19 @@ export class TypeSystem {
   }
 
   /**
+   * Checks if the given item is of type `AnyTypeDescription`.
    *
-   * @param item
-   * @returns
+   * @param item - The type description to check.
+   * @returns `true` if the item is of type `AnyTypeDescription`, otherwise `false`.
    */
   static isAnyType(item: TypeDescription): item is AnyTypeDescription {
     return item.$type === 'any'
   }
 
   /**
+   * Creates a description for the Nil type.
    *
-   * @returns
+   * @returns {NilTypeDescription} An object representing the Nil type with a `$type` property set to 'nil'.
    */
   static createNilType(): NilTypeDescription {
     return {
@@ -150,18 +196,20 @@ export class TypeSystem {
   }
 
   /**
+   * Checks if the given item is of type `NilTypeDescription`.
    *
-   * @param item
-   * @returns
+   * @param item - The type description to check.
+   * @returns True if the item is of type `NilTypeDescription`, otherwise false.
    */
   static isNilType(item: TypeDescription): item is NilTypeDescription {
     return item.$type === 'nil'
   }
 
   /**
+   * Creates a description for a string type.
    *
-   * @param literal
-   * @returns
+   * @param literal - An optional AST literal that represents the string value.
+   * @returns An object describing the string type, including its literal value if provided.
    */
   static createStringType(literal?: ast.Literal): StringTypeDescription {
     return {
@@ -171,18 +219,20 @@ export class TypeSystem {
   }
 
   /**
+   * Checks if the given TypeDescription is of type StringTypeDescription.
    *
-   * @param item
-   * @returns
+   * @param item - The TypeDescription to check.
+   * @returns True if the item is of type StringTypeDescription, otherwise false.
    */
   static isStringType(item: TypeDescription): item is StringTypeDescription {
     return item.$type === 'string'
   }
 
   /**
+   * Creates a description for a number type.
    *
-   * @param literal
-   * @returns
+   * @param literal - An optional AST literal that represents the number type.
+   * @returns An object representing the number type description.
    */
   static createNumberType(literal?: ast.Literal): NumberTypeDescription {
     return {
@@ -192,18 +242,20 @@ export class TypeSystem {
   }
 
   /**
+   * Determines if the given type description is a number type.
    *
-   * @param item
-   * @returns
+   * @param item - The type description to check.
+   * @returns True if the type description is a number type, otherwise false.
    */
   static isNumberType(item: TypeDescription): item is NumberTypeDescription {
     return item.$type === 'number'
   }
 
   /**
+   * Creates a description for a boolean type.
    *
-   * @param literal
-   * @returns
+   * @param literal - An optional AST literal that represents the boolean value.
+   * @returns An object representing the boolean type description.
    */
   static createBooleanType(literal?: ast.Literal): BooleanTypeDescription {
     return {
@@ -213,17 +265,19 @@ export class TypeSystem {
   }
 
   /**
+   * Determines if the given type description is a boolean type.
    *
-   * @param item
-   * @returns
+   * @param item - The type description to check.
+   * @returns True if the type description is a boolean type, otherwise false.
    */
   static isBooleanType(item: TypeDescription): item is BooleanTypeDescription {
     return item.$type === 'boolean'
   }
 
   /**
+   * Creates a description object for the void type.
    *
-   * @returns
+   * @returns {VoidTypeDescription} An object representing the void type.
    */
   static createVoidType(): VoidTypeDescription {
     return {
@@ -232,18 +286,20 @@ export class TypeSystem {
   }
 
   /**
+   * Determines if the given type description is a void type.
    *
-   * @param item
-   * @returns
+   * @param item - The type description to check.
+   * @returns True if the type description is a void type, otherwise false.
    */
   static isVoidType(item: TypeDescription): item is VoidTypeDescription {
     return item.$type === 'void'
   }
 
   /**
+   * Creates an ArrayTypeDescription object with the specified element type.
    *
-   * @param elementType
-   * @returns
+   * @param elementType - The type description of the elements in the array.
+   * @returns An ArrayTypeDescription object with the specified element type.
    */
   static createArrayType(elementType: TypeDescription): ArrayTypeDescription {
     return {
@@ -253,18 +309,20 @@ export class TypeSystem {
   }
 
   /**
+   * Checks if the given type description is an array type.
    *
-   * @param item
-   * @returns
+   * @param item - The type description to check.
+   * @returns True if the type description is an array type, otherwise false.
    */
   static isArrayType(item: TypeDescription): item is ArrayTypeDescription {
     return item.$type === 'array'
   }
 
   /**
+   * Creates a union type description from the provided element types.
    *
-   * @param elementType
-   * @returns
+   * @param elementTypes - An array of `TypeDescription` objects that represent the types to be included in the union.
+   * @returns A `UnionTypeDescription` object representing the union of the provided types.
    */
   static createUnionType(elementTypes: TypeDescription[]): UnionTypeDescription {
     return {
@@ -274,19 +332,21 @@ export class TypeSystem {
   }
 
   /**
+   * Determines if the given type description is a union type.
    *
-   * @param item
-   * @returns
+   * @param item - The type description to check.
+   * @returns True if the type description is a union type, otherwise false.
    */
   static isUnionType(item: TypeDescription): item is UnionTypeDescription {
     return item.$type === 'union'
   }
 
   /**
+   * Creates a description of a function type.
    *
-   * @param returnType
-   * @param parameters
-   * @returns
+   * @param returnType - The type description of the function's return type.
+   * @param parameters - An array of function parameters, each described by a `FunctionParameter`.
+   * @returns An object representing the function type description.
    */
   static createFunctionType(returnType: TypeDescription, parameters: FunctionParameter[]): FunctionTypeDescription {
     return {
@@ -297,18 +357,20 @@ export class TypeSystem {
   }
 
   /**
+   * Determines if the given type description is a function type.
    *
-   * @param item
-   * @returns
+   * @param item - The type description to check.
+   * @returns True if the type description is a function type, otherwise false.
    */
   static isFunctionType(item: TypeDescription): item is FunctionTypeDescription {
     return item.$type === 'function'
   }
 
   /**
+   * Creates a ClassTypeDescription object from the given literal.
    *
-   * @param literal
-   * @returns
+   * @param literal - The AST node representing the object definition, type, or value.
+   * @returns An object describing the class type.
    */
   static createClassType(literal: ast.ObjectDef | ast.ObjectType | ast.ObjectValue): ClassTypeDescription {
     return {
@@ -318,19 +380,21 @@ export class TypeSystem {
   }
 
   /**
+   * Determines if the given `TypeDescription` item is of type `ClassTypeDescription`.
    *
-   * @param item
-   * @returns
+   * @param item - The `TypeDescription` item to check.
+   * @returns A boolean indicating whether the item is a `ClassTypeDescription`.
    */
   static isClassType(item: TypeDescription): item is ClassTypeDescription {
     return item.$type === 'class'
   }
 
   /**
+   * Creates an error type description object.
    *
-   * @param message
-   * @param source
-   * @returns
+   * @param message - The error message.
+   * @param source - Optional. The source AST node where the error occurred.
+   * @returns An object describing the error type.
    */
   static createErrorType(message: string, source?: AstNode): ErrorTypeDescription {
     return {
@@ -341,18 +405,23 @@ export class TypeSystem {
   }
 
   /**
+   * Determines if the given type description is an error type.
    *
-   * @param item
-   * @returns
+   * @param item - The type description to check.
+   * @returns True if the type description is an error type, otherwise false.
    */
   static isErrorType(item: TypeDescription): item is ErrorTypeDescription {
     return item.$type === 'error'
   }
 
   /**
+   * Converts a `TypeDescription` object to its string representation.
    *
-   * @param item
-   * @returns
+   * @param item - The `TypeDescription` object to convert.
+   * @returns A string representation of the `TypeDescription`.
+   *          - If the type is a class type, returns the text of the class node or 'unknown' if not available.
+   *          - If the type is a function type, returns a string in the format of `(param1: type1, param2: type2, ...) -> returnType`.
+   *          - Otherwise, returns the type as a string.
    */
   static typeToString(item: TypeDescription): string {
     if (TypeSystem.isClassType(item)) {
@@ -366,11 +435,20 @@ export class TypeSystem {
   }
 
   /**
+   * Infers the type of a given AST node.
    *
-   * @param node
-   * @param cache
-   * @param indent
-   * @returns
+   * @param node - The AST node for which the type is to be inferred. Can be undefined.
+   * @param cache - A cache to store and retrieve previously inferred types to avoid redundant computations.
+   * @returns The inferred type description of the given node.
+   *
+   * This function performs type inference based on the type of the AST node. It handles various node types such as
+   * types, element types, primitive types, variable definitions, function definitions, object definitions, call chains,
+   * parameters, assignment bindings, loops, expressions, and literals.
+   *
+   * If the node is undefined, an error type is returned. If the type inference encounters a recursive definition,
+   * an error type is cached and returned to prevent infinite recursion.
+   *
+   * The function logs the entry and exit points for debugging purposes.
    */
   static inferType(node: AstNode | undefined, cache: CacheType): TypeDescription {
     const rootLog = enterLog('inferType', `'${node?.$cstNode?.text}', node is ${node?.$type}`)
@@ -496,7 +574,12 @@ export class TypeSystem {
       type = TypeSystem.createClassType(node)
     } else if (ast.isElementType(node)) {
       if (ast.isFunctionType(node)) {
-        type = TypeSystem.inferFunctionType(node, cache)
+        const returnType = TypeSystem.inferType(node.returnType, cache)
+        const parameters = node.params.map(e => ({
+          name: e.name,
+          type: TypeSystem.inferType(e.type, cache),
+        }))
+        type = TypeSystem.createFunctionType(returnType, parameters)
       } else if (ast.isPrimitiveType(node)) {
         type = TypeSystem.inferTypePrimitiveType(node, cache)
       } else if (node.reference) {
@@ -547,7 +630,7 @@ export class TypeSystem {
    */
   static inferTypeFunctionDef(node: ast.FunctionDef, cache: CacheType): TypeDescription {
     const log = enterLog('isFunction', node.name)
-    const returnType = TypeSystem.inferFunctionReturnType(node, cache)
+    const returnType = TypeSystem.getFunctionReturnType(node.returnType, node.body, cache)
     const parameters = node.params.map(e => ({
       name: e.name,
       type: TypeSystem.inferType(e.type, cache),
@@ -592,6 +675,17 @@ export class TypeSystem {
 
     if (element) {
       type = TypeSystem.inferType(element, cache)
+
+      // CallChain이 변수, 함수, 배열등을 모두 포함할 수 있다.
+      // 이것의 타입이 무엇인가를 결정할 때는 context가 중요하다.
+      // 예를들어 `var n: number = someFunction()`는 `someFunction`의 타입이 `() -> number` 라는 것이
+      // 중요한 것이 아니라 number를 리턴한다는 것이 중요하다. 하지만 좌변에 있을 경우에는 예를들어
+      // 아래와 같은 경우 f의 타입은 `number`가 아니라 `() -> number[]` 이어야 한다.
+      // var f: () -> number[]
+      // f = () => { return 1 }
+      // 이와 같은 차이는 해당 CallChain이 함수 호출인가 아닌가에 달려있다.
+      // 즉 ()을 사용해서 함수가 호출되는 경우는 함수의 리턴 타입이 중요하고
+      // 그렇지 않으면 함수 자체의 타입이 중요하다.
 
       // 배열 호출이면 배열 요소가 리턴되어야 한다.
       if (TypeSystem.isArrayType(type) && node.isArray) {
@@ -640,8 +734,6 @@ export class TypeSystem {
     else {
       type = TypeSystem.createErrorType('Could not infer type for element ' + node.element?.$refText, node)
     }
-
-    if (TypeSystem.isFunctionType(type)) type = type.returnType
 
     exitLog(log, type)
     return type
@@ -953,9 +1045,13 @@ export class TypeSystem {
    * @returns The inferred type description of the function value.
    */
   static inferTypeFunctionValue(node: ast.FunctionValue, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
-    const log = enterLog('isFunctionValue', node.$type)
-    type = TypeSystem.inferFunctionValue(node, cache)
+    const log = enterLog('isFunctionValue', node.$type, node.$cstNode?.text)
+    const returnType = TypeSystem.getFunctionReturnType(node.returnType, node.body, cache)
+    const parameters = node.params.map(e => ({
+      name: e.name,
+      type: TypeSystem.inferType(e.type, cache),
+    }))
+    const type = TypeSystem.createFunctionType(returnType, parameters)
     exitLog(log, type)
     return type
   }
@@ -995,10 +1091,6 @@ export class TypeSystem {
     return type
   }
 
-  //-----------------------------------------------------------------------------
-  // helper functions
-  //-----------------------------------------------------------------------------
-
   /**
    * Infers the type of a primitive type node.
    *
@@ -1026,24 +1118,9 @@ export class TypeSystem {
     return type
   }
 
-  /**
-   * Infers the type of a function node.
-   *
-   * @param node - The function type node to infer the type from.
-   * @param cache - The cache to use for type inference.
-   * @returns The inferred type description of the function.
-   */
-  static inferFunctionType(node: ast.FunctionType, cache: CacheType): TypeDescription {
-    const log = enterLog('isFunctionType', node.$cstNode?.text)
-    const returnType = TypeSystem.inferType(node.returnType, cache)
-    const parameters = node.params.map(e => ({
-      name: e.name,
-      type: TypeSystem.inferType(e.type, cache),
-    }))
-    const type = TypeSystem.createFunctionType(returnType, parameters)
-    exitLog(log, type)
-    return type
-  }
+  //-----------------------------------------------------------------------------
+  // helper functions
+  //-----------------------------------------------------------------------------
 
   /**
    * Infers the return type of a given function definition node.
@@ -1059,57 +1136,23 @@ export class TypeSystem {
    * 4. If there are multiple return statements, it currently assumes all return the same type and uses that type.
    * 5. If an error occurs during type inference, it returns an error type.
    */
-  static inferFunctionReturnType(node: ast.FunctionDef, cache: CacheType): TypeDescription {
+  static getFunctionReturnType(
+    returnType: ast.Types | undefined,
+    body: ast.Block | undefined,
+    cache: CacheType
+  ): TypeDescription {
     // 명시된 리턴 타입이 있으면 이를 근거로 한다.
-    if (node.returnType) return TypeSystem.inferType(node.returnType, cache)
+    if (returnType) return TypeSystem.inferType(returnType, cache)
 
     // 함수의 바디가 없으면 void type으로 간주한다
-    if (!node.body) return TypeSystem.createVoidType()
+    if (!body) return TypeSystem.createVoidType()
 
     // 함수의 바디에 명시된 return 문이 없어도 void type으로 간주한다.
-    const returnStatements = AstUtils.streamAllContents(node.body).filter(ast.isReturnExpression).toArray()
+    const returnStatements = AstUtils.streamAllContents(body).filter(ast.isReturnExpression).toArray()
     if (returnStatements.length == 0) return TypeSystem.createVoidType()
 
-    // 여러 타입을 return할 수 있지만 일단은 모두 단일 타입을 리턴하는 것으로 가정하고 이 타입을 return
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
-    for (const returnStatement of returnStatements) {
-      type = TypeSystem.inferType(returnStatement, cache)
-    }
-    return type
-  }
-
-  /**
-   * Infers the type of a function value node.
-   *
-   * @param node - The AST node representing the function value.
-   * @param cache - The cache used for type inference.
-   * @returns The inferred type description of the function value.
-   */
-  static inferFunctionValue(node: ast.FunctionValue, cache: CacheType): TypeDescription {
-    const log = enterLog('isFunctionValue', node.$cstNode?.text)
-    const returnType = TypeSystem._inferFunctionType(node, cache)
-    const parameters = node.params.map(e => ({
-      name: e.name,
-      type: TypeSystem.inferType(e.type, cache),
-    }))
-    const type = TypeSystem.createFunctionType(returnType, parameters)
-    exitLog(log, type)
-    return type
-  }
-
-  static _inferFunctionType(node: ast.FunctionValue, cache: CacheType): TypeDescription {
-    // 명시된 리턴 타입이 있으면 이를 근거로 한다.
-    if (node.returnType) return TypeSystem.inferType(node.returnType, cache)
-
-    // 함수의 바디가 없으면 void type으로 간주한다
-    if (!node.body) return TypeSystem.createVoidType()
-
-    // 함수의 바디에 명시된 return 문이 없어도 void type으로 간주한다.
-    const returnStatements = AstUtils.streamAllContents(node.body).filter(ast.isReturnExpression).toArray()
-    if (returnStatements.length == 0) return TypeSystem.createVoidType()
-
-    // 여러 타입을 return할 수 있지만 일단은 모두 단일 타입을 리턴하는 것으로 가정하고 이 타입을 return
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    //todo 여러 타입을 return할 수 있지만 일단은 모두 단일 타입을 리턴하는 것으로 가정하고 이 타입을 return
+    let type: TypeDescription = TypeSystem.createErrorType('internal error', body)
     for (const returnStatement of returnStatements) {
       type = TypeSystem.inferType(returnStatement, cache)
     }

@@ -1,24 +1,47 @@
 import { TypeDescription, TypeSystem } from './scala-script-types.js'
 
 /**
+ * A flag to enable or disable logging.
  *
+ * When set to `true`, logging is enabled and log messages will be output.
+ * When set to `false`, logging is disabled and no log messages will be output.
+ *
+ * @default false
  */
 var _enable_log_ = false
+
+/**
+ * A global variable to keep track of a signal number.
+ *
+ * @remarks
+ * This variable is used to maintain a count or identifier for signals within the application.
+ *
+ * @privateRemarks
+ * Ensure that this variable is incremented or modified in a thread-safe manner if accessed concurrently.
+ *
+ * @example
+ * ```typescript
+ * _sig_number_++;
+ * console.log(_sig_number_);
+ * ```
+ */
 var _sig_number_ = 0
 
 /**
+ * Enables or disables logging.
  *
- * @param enable
+ * @param enable - A boolean value to enable (true) or disable (false) logging.
  */
 export function enableLog(enable: boolean) {
   _enable_log_ = enable
 }
 
 /**
+ * Logs the entry of a process with a unique signature and optional parameters.
  *
- * @param procKind
- * @param procId
- * @returns
+ * @param procKind - A string representing the kind of process being logged.
+ * @param optionalParams - Additional optional parameters to log.
+ * @returns A string representing the unique signature of the log entry.
  */
 export function enterLog(procKind: string, ...optionalParams: any[]): string {
   if (!_enable_log_) return ''
@@ -31,9 +54,10 @@ export function enterLog(procKind: string, ...optionalParams: any[]): string {
 }
 
 /**
+ * Logs a message to the console if logging is enabled.
  *
- * @param msg
- * @param optionalParams
+ * @param msg - The message to log.
+ * @param optionalParams - Additional parameters to log.
  */
 export function traceLog(msg: string, ...optionalParams: any[]) {
   if (!_enable_log_) return
@@ -41,9 +65,11 @@ export function traceLog(msg: string, ...optionalParams: any[]) {
 }
 
 /**
+ * Logs a message to the console and ends the current console group if logging is enabled.
  *
- * @param log
- * @param type
+ * @param log - The message to log.
+ * @param type - Optional. An object describing the type of the log message.
+ * @param optionalParams - Optional. Additional parameters to log.
  */
 export function exitLog(log: string, type?: TypeDescription, ...optionalParams: any[]) {
   if (!_enable_log_) return
