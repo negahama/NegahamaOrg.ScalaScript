@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### 0.5.4 - November 24, 2024
 
-- bug fix about function type variables
+- fixed some bugs about function type variables
 
 ### 0.5.3 - November 22, 2024
 
