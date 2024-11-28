@@ -111,7 +111,7 @@ export function registerValidationChecks(services: ScalaScriptServices) {
     FunctionDef: validator.checkFunctionDef,
     ObjectDef: validator.checkClassDeclaration,
     Assignment: validator.checkAssignment,
-    FunctionValue: validator.checkFunctionValue,
+    FunctionValue: validator.checkFunctionDef,
     UnaryExpression: validator.checkUnaryOperationAllowed,
     BinaryExpression: validator.checkBinaryOperationAllowed,
   }

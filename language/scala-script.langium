@@ -7,48 +7,17 @@ Code: Statement | Expression;
 //-----------------------------------------------------------------------------
 // 스칼라스크립트의 자료형 관련
 //-----------------------------------------------------------------------------
-/*
-  선언 또는 정의에서 중요한 것은 대상이다. 선언의 대상은 변수일 수도 있고 타입 자체일 수도 있다.
-  우리가 보통 val array: number[] 와 같이 선언하는 것은 숫자형 배열을 타입으로 가지는 array라는
-  변수를 선언하는 것이며 class Person { ... } 은 Person이라는 이름을 가지는 타입을 선언하는 것이다.
-  그럼 function display(msg: string) { ... } 와 같은 함수의 선언은 무엇을 선언한 것일까?
-  함수의 선언은 타입에 대한 선언이 아니라 변수 선언처럼 값에 대한 선언에 가깝다.
-  다른 타입들은 특정 값을 명시하는 방법으로 상수를 사용하는데 반해 함수는 별도의 문법이 있는 것이다.
-  함수 선언은 함수형 언어에서는 전역 상수(함수형 변수)의 선언과 동일한 개념이다. 기존 언어 사용자들을 위해
-  새로운 언어들도 이런 관행적인 문법들을 포함하지만 이는 언어에 대한 이해도를 떨어뜨린다고 생각한다.
-  그래서 스칼라스크립트에서는 다른 언어에 존재하는 함수의 정의가 존재하지 않는다.
-  함수의 정의는 예를들면 return a + b 라는 값에 sum 이라는 이름을 부여하는 것인데
-  스칼라스크립트에서는 값에 이름을 부여할 수 없다. 이유는 거의 필요하지 않기 때문이다.
-  3.14159 라는 값에 PI 라는 이름을 부여하기 위해서 별도의 언어적인 장치가 필요하진 않다.
-  일반적인 상수 선언으로도 충분하다. 즉 값은 변수에 할당되므로써 고유한 이름을 가질 수 있다.
-  반면 타입에는 이름을 부여할 수 있다. 이를 타입 별칭이라고도 할 수 있다.
-  스칼라스크립트에서 def 로 시작하는 것은 모두 타입에 대해 이름을 부여하는 것이다.
-  스칼라스크립트에서는 클래스, 오브젝트등의 사용자 정의 자료구조의 구분이 없기 때문에(모두 오브젝트라고 칭함)
-  def는 일반적으로 오브젝트의 선언인데 이것은 오브젝트 개체를 선언하는 것이 아니라 타입 자체를 선언하는 것이다.
-  예를들어 name과 age를 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
-  이 타입을 매번 이렇게 쓰기가 불편하기 때문에 이를 Person 이라는 이름으로 사용하는 것이다.
-  이는 함수도 마찬가지이다. 예를 들어 def display = (msg: string) -> void 는 (msg: string)을 파라메터로 가지고
-  void를 리턴하는 함수들의 이름으로 display를 사용하는 것이며 display는 함수 타입의 이름이지 함수가 아니라는 점이
-  중요하다. 하지만 (msg: string) -> void 의 형식을 가지는 함수가 하나가 아니고 이들을 모두 display라는 이름으로
-  사용하는 것은 맞지 않기 때문에 스칼라스크립트에서는 함수 타입을 정의할 일은 거의 없다.
-
-  또한 스칼라스크립트는 오브젝트와 클래스가 하나로 합쳐져 있다.
-  메서드를 가지지 않는 클래스는 오브젝트(인터페이스)로 변환되며 타입으로 사용할 수 있고 값을 할당할 수도 있다.
-*/
-
 // Union type
 // Union type은 모든 타입의 가장 최상위 타입이며 간단히 Types라고 표현한다.
 Types: 
   types+=SimpleType ('|' types+=SimpleType)*;
 
-/*
-  타입으로 사용될 수 있는 모든 타입들
-  ElementType은 하나의 항목만을 가지는 타입들이며 
-  CompoundType과 ArrayType은 두개 이상의 항목을 가지는 타입들이다.
-  ArrayType은 동일한 타입이 연속된 구조를 취하는 특수한 Compound 타입이다.
-  ArrayType을 CompoundType과 구분해서 처리하는 것은 표기 방법과 처리가 매우 다르기 때문이다.
-  현재 CompoundType은 ObjectType 밖에 없기 때문에 이를 별도로 구분하지 않고 ObjectType으로 사용한다.
-*/
+// 타입으로 사용될 수 있는 모든 타입들
+// ElementType은 하나의 항목만을 가지는 타입들이며 
+// CompoundType과 ArrayType은 두개 이상의 항목을 가지는 타입들이다.
+// ArrayType은 동일한 타입이 연속된 구조를 취하는 특수한 Compound 타입이다.
+// ArrayType을 CompoundType과 구분해서 처리하는 것은 표기 방법과 처리가 매우 다르기 때문이다.
+// 현재 CompoundType은 ObjectType 밖에 없기 때문에 이를 별도로 구분하지 않고 ObjectType으로 사용한다.
 SimpleType:
   ArrayType | ObjectType | ElementType;
 
@@ -144,15 +113,35 @@ fragment Annotation:
 /*
   Function Defintion
   -----------------------------------------------------------------------------
-  스칼라스크립트에서는 함수의 정의가 없다. 함수는 다른 자료형과 동일하게 그냥 변수에 할당되어져 사용되어진다.
-  함수는 파라메터와 리턴타입, 함수의 바디로 구성되고 함수를 표시할때 `(msg: string) -> void => { ... }` 와 같이
-  리턴 타입은 -> 으로 표시하고 함수의 바디는 => 으로 표시한다. 함수의 리턴 타입을 -> 으로 표기하는 것은
-  ScalaScript가 다른 언어와 구분되는 대표적인 차이점 중에 하나이다.
+  선언 또는 정의에서 중요한 것은 대상이다. 선언의 대상은 변수일 수도 있고 타입 자체일 수도 있다.
+  우리가 보통 val array: number[] 와 같이 선언하는 것은 숫자형 배열을 타입으로 가지는 array라는
+  변수를 선언하는 것이며 class Person { ... } 은 Person이라는 이름을 가지는 타입을 선언하는 것이다.
+  그럼 function display(msg: string) { ... } 와 같은 함수의 선언은 무엇을 선언한 것일까?
+  함수의 선언은 타입에 대한 선언이 아니라 변수 선언처럼 값에 대한 선언에 가깝다.
+  다른 타입들은 특정 값을 명시하는 방법으로 상수를 사용(예를들어 3.14159라는 값에 PI라는
+  이름을 부여하기 위해서 상수를 사용)하는데 반해 함수는 별도의 문법이 있는 것이다.
+  함수의 정의는 함수형 언어에서는 전역 함수형 상수의 정의와 동일한 개념이다.
+
+  하지만 기존의 함수 정의가 필요한 경우가 딱 하나 있다.
+  파생 클래스에서 부모 클래스의 함수를 오버라이드하면서 super로 부모 함수를 사용하는 경우이다.
+  이 경우의 부모 함수는 개념적으로 변수(또는 상수)일 수가 없다. 자식 클래스에서 PI를 변경하면서
+  super.PI로 PI가 부모 클래스에서 가졌던 값을 사용한다는 것이 억지스럽기 때문이다.
+  물론 이것을 우회해서 동일한 기능을 구현할 순 있지만 불편하기 때문에 스칼라스크립트에서도
+  함수의 정의를 지원하기로 했다. 하지만 여전히 함수의 정의를 일반적인 것으로 보지는 않는다.
+
+  스칼라스크립트는 함수형 변수 형태로 함수를 사용하는 것을 원칙으로 하고 많은 경우 타입스크립트에서도
+  함수형 변수로 변환되지만 모두는 아니다. 특히 생성자와 디폴트 파라메터를 가지는 함수는 타입스크립트에서
+  람다 함수로 변환이 안되기 때문에 일반 함수로 변환된다. 하지만 이것은 스칼라스크립트가 그렇게 변환한다는
+  것이므로 스칼라스크립트 코드 자체에서는 다음과 같이 호출하면 된다.
+  val constructor = (msg: string)           -> void => { ... } // 생성자 함수
+  val paramMethod = (msg: string = "hello") -> void => { ... } // 디폴트 파라메터가 있는 함수
 
   FunctionValue란 함수 자체를 말하는 것으로 변수에 함수를 할당할 때 우변에 있어야 하는 것이 FunctionValue이다.
-  함수를 가지는 변수의 완전한 표현은 var f:(msg: string) -> void = (msg: string) -> void => { ... } 이다.
-  f 변수의 타입을 별도로 기술할 필요가 없기 때문에 var f = FunctionValue 형태로 표시할 수 있다. 
-  즉 FunctionValue는 함수 타입과 함수 바디를 포함하는 것으로 람다 함수라고도 하며 expression이다.
+  함수는 파라메터와 리턴타입, 함수의 바디로 구성되고 함수를 표시할때 `(msg: string) -> void => { ... }` 와 같이
+  리턴 타입은 -> 으로 표시하고 함수의 바디는 => 으로 표시한다. 함수의 리턴 타입을 -> 으로 표기하는 것은
+  ScalaScript가 다른 언어와 구분되는 차이점 중에 하나이다.
+  함수형 변수의 완전한 표현은 var f:(msg: string) -> void = (msg: string) -> void => { ... } 이지만
+  f 변수의 타입을 중복으로 기술할 필요가 없기 때문에 var f = FunctionValue 형태로 표시할 수 있다. 
   함수의 값에 함수 타입이 포함되는 점은 혼란의 여지가 있지만 이것이 없는 함수 바디는 그냥 block일 뿐이다.
   인수는 괄호를 사용해서 묶어야 하지만 인수가 하나인 경우에는 괄호없이 사용할 수도 있다.
 */
@@ -177,13 +166,8 @@ fragment FunctionBody:
 fragment Spread:
   '...' spread=[NamedElement:Id];
 
-// 함수의 정의 자체는 값에 대한 이름 부여이고 ScalaScript의 Type system에 부합되지 않지만
-// 편이를 위해 제공하고 있다. 실제로도 타입스크립트의 function으로 transpile되어지기는 하지만
-// 이것 대신 val function_name = FuncionValue를 사용해야 한다.
-// 모든 것을 함수형 변수로 처리하고 싶었는데 많은 장애물이 있었다.
-// 생성자와 디폴트 파라메터를 가지는 함수는 람다 함수로 변환이 안되기 때문에 일반 함수로 변환해야 한다.
-// 하지만 치명적인 문제는 함수의 override이다. override되어질 베이스 클래스의 함수를 알 수 있는 방법이 없어서
-// 그냥 람다 함수로 변환하면 override 함수에서 super를 사용할 수 없게 된다.
+// 함수의 정의 자체는 값에 대한 이름 부여이고 위에서 설명하였듯이 ScalaScript에서는 이를 예외적인 경우로 본다.
+// var, val, def 와 동일하게 이름 다음에 = 이 오고 그 다음에 함수값(FunctionValue)이 위치한다.
 FunctionDef:
   (Annotation)? (export?='export')? (private?='private')? (static?='static')? 
   'fun' (extension=[ObjectDef:Id] '.')? name=Id '='
@@ -196,9 +180,24 @@ Block:
   Object Definition
   -----------------------------------------------------------------------------
   Object는 유저가 정의하는 타입을 모두 포괄하는 단어이며 여기에는 일반적인 Class, Interface를 모두 포함한다.
-  Object의 정의란 Object의 타입에 이름을 부여하는 것이다.
   Object는 복합타입 컨테이너로 자신을 제외한 모든 타입을 가질 수 있다.
   예를들면 단일타입, 다른 복합타입, 배열타입등을 모두 element로 가질 수 있다. 
+
+  Object의 정의란 특정 타입에 이름을 부여하는 것이다.
+  스칼라스크립트에서 def 로 시작하는 것은 모두 타입에 대해 이름을 부여하는 것이다.
+  스칼라스크립트에서는 클래스, 오브젝트등의 사용자 정의 자료구조의 구분이 없기 때문에(모두 오브젝트라고 칭함)
+  def는 일반적으로 오브젝트의 선언인데 이것은 오브젝트 개체를 선언하는 것이 아니라 타입 자체를 선언하는 것이다.
+  예를들어 name과 age를 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
+  이 타입을 매번 이렇게 쓰기가 불편하기 때문에 이를 Person 이라는 이름으로 사용하는 것이다.
+
+  이는 함수도 마찬가지이다. 예를 들어 def EventHandler = (event: Event, param: EventParam) => EventResult 는
+  (event: Event, param: EventParam)을 파라메터로 가지고 EventResult를 리턴하는 함수 타입을 EventHandler라는 이름으로
+  지정한 것이며 var f: EventHandler 와 같이 선언하거나 f = EventHandler => { ... } 와 같이 쓰일 수 있다.
+  EventHandler는 함수 타입의 이름이지 함수가 아니라는 점이 중요하다.
+
+  스칼라스크립트에서는 오브젝트와 클래스를 구분하지 않지만 실제로 타입스크립트로 변환할때는 구분해야 하는데
+  함수나 대입문이 있거나 변수의 값을 초기화하는 경우 클래스로 변환된다.
+  자세한 내용은 transpileObjectDef()를 참고
 */
 ObjectDef:
   (Annotation)? (export?='export')?
@@ -309,7 +308,7 @@ Exponentiation infers Expression:
   은 문법적으로는 에러가 없지만 parser가 구문분석을 할때 lookahead 처리에 너무나 많은 시간이 소요되는 단점이 있었다.
   이것을 아래와 같이 switch 문으로 변경하면 구문이 분명해져서 lookahead 처리에 드는 시간을 모두 없앨 수 있지만
   'switch' '(' expr=Expression ')' '{' cases+=CaseClause+ '}';
-  스칼라스크립트의 특징 중에 하나인 match문을 포기할 수 없어서 여기로 정하였다.
+  스칼라스크립트의 특징 중에 하나인 match문을 포기할 수 없어서 이렇게 변경하였다.
 */
 MatchOperator infers Expression:
   UnaryOperator ({infer MatchExpression.expr=current} 'match' '{' cases+=CaseClause+ '}')*;
@@ -333,9 +332,11 @@ UnaryOperator infers Expression:
   RefCall과 함께 CallChain은 체이닝된 모든 variables, functions, arrays, fields, methods를 모두 포함한다.
 
   CallChain(또는 RefCall)은 Array expression을 포함한다.
-  즉 Array를 실제로 사용하는 ary[ 1 ]와 같은 구문을 function의 function call과 동일하게 취급하고 있다.
+  즉 Array를 실제로 사용하는 ary[1]와 같은 구문을 function의 function call과 동일하게 취급하고 있다.
   ArrayExpression:
     element=[NamedElement:Id] isArray?='[' index=Expression ']';
+  ArrayExpression은 RefCall과 CallChain에 포함되어져 있으며 ary[1]과 같은 구문이
+  ary이라는 element와 [1]이라는 ArrayValue로 인식되지 않도록 위와 같이 정의되어야 한다.
 
   CallChain을 아래와 같이 정의한 이유...
   CallChain을 정의하는 다양한 방법들이 있을 수 있는데 아래와 같이 정의하게 된 과정을 살펴보면...
@@ -352,14 +353,29 @@ UnaryOperator infers Expression:
   여기서 isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')'는
   FunctionCallSignature와 동일하지만 FunctionCallSignature를 사용할 수 없다.
   심지어 FunctionCallSignature의 내용인 isFunction?='(' Arguments? ')'을 사용하는 것도 안된다.
-  정확한 이유는 모르지만 fragment는 외부적으로 들어나는 타입은 존재하진 않아도 내부적으로는 규칙을 호출하는데
-  이것은 fragment를 사용하지 않는 경우와는 다르게 처리된다는 의미이다. 이로 인해 fragment로 사용하는 경우에는
-  AST node has no document 에러가 발생된다. 개발 노트를 참고
+  
+  정확한 이유는 모르지만 fragment를 적용하면 배열이나 함수로 되어진 것들은 ref가 제대로 설정되지 않는다.
+  fragment를 적용하면 (), []까지 포함해서 element가 구성되는 것 같다. 그냥 element가 아니라 element[1]을
+  참조할 수 없는 것처럼 보인다. 그래서 ref가 설정이 안되는 것이다.
+
+  어째든 이 경우에 fragment로 사용하면 랭기움에서 제대로 참조를 생성하지 못하고 `AST node has no document` 에러를 발생시킨다.
+  개발 노트를 참고
 */
 CallChain infers Expression:
   SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
   (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')?
   (assertion=('!'|'?'))? )*;
+
+// CallChain infers Expression:
+//   SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
+//   (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | ArrayCallSignature )?
+//   // ( FunctionCallSignature | ArrayCallSignature )?
+//   (assertion=('!'|'?'))? )*;
+
+// fragment FunctionCallSignature:
+//   isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')';
+// fragment ArrayCallSignature:
+//   isArray?='[' index=Expression ']';
 
 /*
   CallChain의 시작점으로 사용되는 atomic expressions

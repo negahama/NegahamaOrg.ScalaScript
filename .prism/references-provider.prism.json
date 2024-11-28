@@ -8,10 +8,10 @@
       "title": "`protected getReferences(selectedNode: LeafCstNode, params: ReferenceParams, _document: LangiumDocument): Location[] {` at node_modules\\langium\\src\\lsp\\references-provider.ts#57",
       "source": {
         "file": "/node_modules/langium/src/lsp/references-provider.ts",
-        "startLine": 57,
+        "startLine": 62,
         "startColumn": 0,
-        "endLine": 68,
-        "endColumn": 0
+        "endLine": 62,
+        "endColumn": 121
       },
       "notes": [
         {
@@ -28,10 +28,10 @@
       "title": "`const options = { includeDeclaration: params.context.includeDeclaration };` at node_modules\\langium\\src\\lsp\\references-provider.ts#61",
       "source": {
         "file": "/node_modules/langium/src/lsp/references-provider.ts",
-        "startLine": 61,
+        "startLine": 66,
         "startColumn": 0,
-        "endLine": 61,
-        "endColumn": 0
+        "endLine": 66,
+        "endColumn": 86
       },
       "notes": [
         {

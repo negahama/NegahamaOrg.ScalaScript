@@ -1,4 +1,23 @@
-import { DeepPartial, type Module, inject, ValidationChecks } from 'langium'
+import {
+  DeepPartial,
+  type Module,
+  inject,
+  ValidationChecks,
+  DefaultReferences,
+  CstNode,
+  AstNode,
+  GenericAstNode,
+  // GrammarUtils,
+  CstUtils,
+  AstUtils,
+  UriUtils,
+  isReference,
+  FindReferencesOptions,
+  ReferenceDescription,
+  Stream,
+  stream,
+  GrammarAST,
+} from 'langium'
 import {
   createDefaultModule,
   createDefaultSharedModule,
@@ -50,6 +69,7 @@ export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServic
   },
   references: {
     ScopeProvider: services => new ScalaScriptScopeProvider(services),
+    // References: services => new ScalaScriptReferences(services),
   },
   lsp: {
     SemanticTokenProvider: services => new ScalaScriptSemanticTokenProvider(services),
@@ -88,7 +108,13 @@ export function createScalaScriptServices(context: DefaultSharedModuleContext): 
 }
 
 /**
- * Register custom validation checks.
+ * Registers validation checks for ScalaScript services.
+ *
+ * @param services - The ScalaScript services that provide validation functionality.
+ *
+ * The function sets up a series of validation checks for different AST (Abstract Syntax Tree) types
+ * such as VariableDef, FunctionDef, ObjectDef, Assignment, FunctionValue, UnaryExpression, and BinaryExpression.
+ * These checks are then registered with the validation registry using the provided validator.
  */
 export function registerValidationChecks(services: ScalaScriptServices) {
   const registry = services.validation.ValidationRegistry
@@ -98,9 +124,115 @@ export function registerValidationChecks(services: ScalaScriptServices) {
     FunctionDef: validator.checkFunctionDef,
     ObjectDef: validator.checkClassDeclaration,
     Assignment: validator.checkAssignment,
-    FunctionValue: validator.checkFunctionValue,
+    FunctionValue: validator.checkFunctionDef,
     UnaryExpression: validator.checkUnaryOperationAllowed,
     BinaryExpression: validator.checkBinaryOperationAllowed,
   }
   registry.register(checks, validator)
+}
+
+export class ScalaScriptReferences extends DefaultReferences {
+  override findDeclaration(sourceCstNode: CstNode): AstNode | undefined {
+    console.log('ScalaScriptReferences findDeclaration:', sourceCstNode.text)
+
+    const findAssignment = (cstNode: CstNode): GrammarAST.Assignment | undefined => {
+      const astNode = cstNode.astNode
+      console.log('🚀 ~ ScalaScriptReferences ~ findAssignment ~ astNode:', astNode.$cstNode?.text)
+
+      // Only search until the ast node of the parent cst node is no longer the original ast node
+      // This would make us jump to a preceding rule call, which contains only unrelated assignments
+      while (astNode === cstNode.container?.astNode) {
+        const assignment = AstUtils.getContainerOfType(cstNode.grammarSource, GrammarAST.isAssignment)
+        if (assignment) {
+          console.log('🚀 ~ ScalaScriptReferences ~ findAssignment ~ assignment:', assignment)
+          console.log('🚀 ~ ScalaScriptReferences ~ findAssignment ~ assignment:', assignment.terminal)
+          return assignment
+        }
+        cstNode = cstNode.container
+        console.log('🚀 ~ ScalaScriptReferences ~ findAssignment ~ cstNode:', cstNode)
+      }
+      return undefined
+    }
+
+    if (sourceCstNode) {
+      const assignment = findAssignment(sourceCstNode)
+      console.log('🚀 ~ assignment.feature:', assignment?.feature)
+
+      const nodeElem = sourceCstNode.astNode
+      if (assignment && nodeElem) {
+        const reference = (nodeElem as GenericAstNode)[assignment.feature]
+
+        if (isReference(reference)) {
+          console.log('🚀 ~ reference 1:', reference)
+          return reference.ref
+        } else if (Array.isArray(reference)) {
+          console.log('🚀 ~ reference 2:', reference)
+          for (const ref of reference) {
+            if (
+              isReference(ref) &&
+              ref.$refNode &&
+              ref.$refNode.offset <= sourceCstNode.offset &&
+              ref.$refNode.end >= sourceCstNode.end
+            ) {
+              return ref.ref
+            }
+          }
+        } else {
+          console.log('🚀 ~ reference 3:', reference)
+        }
+      }
+      if (nodeElem) {
+        const nameNode = this.nameProvider.getNameNode(nodeElem)
+        console.log('🚀 ~ nameNode:', nameNode?.text)
+        // Only return the targeted node in case the targeted cst node is the name node or part of it
+        if (nameNode && (nameNode === sourceCstNode || CstUtils.isChildNode(sourceCstNode, nameNode))) {
+          return nodeElem
+        }
+      }
+    }
+    return undefined
+    // return super.findDeclaration(sourceCstNode)
+  }
+
+  override findDeclarationNode(sourceCstNode: CstNode): CstNode | undefined {
+    const astNode = this.findDeclaration(sourceCstNode)
+    if (astNode?.$cstNode) {
+      const targetNode = this.nameProvider.getNameNode(astNode)
+      return targetNode ?? astNode.$cstNode
+    }
+    return undefined
+  }
+
+  override findReferences(targetNode: AstNode, options: FindReferencesOptions): Stream<ReferenceDescription> {
+    const refs: ReferenceDescription[] = []
+    if (options.includeDeclaration) {
+      const ref = this.getReferenceToSelf(targetNode)
+      if (ref) {
+        refs.push(ref)
+      }
+    }
+    let indexReferences = this.index.findAllReferences(targetNode, this.nodeLocator.getAstNodePath(targetNode))
+    if (options.documentUri) {
+      indexReferences = indexReferences.filter(ref => UriUtils.equals(ref.sourceUri, options.documentUri))
+    }
+    refs.push(...indexReferences)
+    return stream(refs)
+  }
+
+  protected override getReferenceToSelf(targetNode: AstNode): ReferenceDescription | undefined {
+    const nameNode = this.nameProvider.getNameNode(targetNode)
+    if (nameNode) {
+      const doc = AstUtils.getDocument(targetNode)
+      const path = this.nodeLocator.getAstNodePath(targetNode)
+      return {
+        sourceUri: doc.uri,
+        sourcePath: path,
+        targetUri: doc.uri,
+        targetPath: path,
+        segment: CstUtils.toDocumentSegment(nameNode),
+        local: true,
+      }
+    }
+    return undefined
+  }
 }

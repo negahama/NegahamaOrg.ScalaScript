@@ -45,8 +45,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns
    */
   override getScope(context: ReferenceInfo): Scope {
-    const scopeId = `${context.container.$type}.${context.property} = '${context.reference.$refText}'`
+    const refText = context.reference.$refText
+    const scopeId = `${context.container.$type}.${context.property} = '${refText}'`
     const scopeLog = enterLog('getScope', scopeId)
+    const superScope = super.getScope(context)
 
     // 타입의 참조는 따로 처리한다.
     if (ast.isTypeChain(context.container)) {
@@ -54,9 +56,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       const previous = typeChain.previous
       traceLog(`TypeChain.previous is ${previous?.$type}`)
       if (!previous) {
-        const scope = super.getScope(context)
         exitLog(scopeLog, undefined, 'Exit5')
-        return scope
+        return superScope
       }
 
       // previous 의 타입을 추론한 결과가...
@@ -64,30 +65,30 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
 
       // 클래스이면
       // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
-      if (TypeSystem.isClassType(prevTypeDesc)) {
+      if (TypeSystem.isObjectType(prevTypeDesc)) {
         traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`)
         exitLog(scopeLog, prevTypeDesc, 'Exit6')
         return this.getScopeForObject(context, prevTypeDesc.literal)
       } else console.error(chalk.red('internal error in typechain:', prevTypeDesc))
-      return super.getScope(context)
+      return superScope
     }
 
     // target element of member calls
     if (context.property !== 'element') {
       exitLog(scopeLog, undefined, 'Exit4')
-      return super.getScope(context)
+      return superScope
     }
 
     // for now, `this` and `super` simply target the container class type
     // this, super가 [NamedElement:'this'] 인 경우에 호출된다. 지금처럼 keyword 인 경우에는
     // ref 처리가 되지 않아서 여기가 호출되지 않는다.
-    if (context.reference.$refText === 'this' || context.reference.$refText === 'super') {
+    if (refText === 'this' || refText === 'super') {
       const classItem = AstUtils.getContainerOfType(context.container, ast.isObjectDef)
       if (classItem) {
         traceLog('this or super')
         return this.getScopeForSpecificClass(context, classItem.name, classItem)
       } else {
-        console.error('this or super is empty in scopes.ts')
+        console.error(chalk.red('this or super is empty in scopes.ts'))
         return EMPTY_SCOPE
       }
     }
@@ -105,10 +106,16 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const previous = callChain.previous
     traceLog(`CallChain.previous is ${previous?.$type}`)
     if (!previous) {
-      const scope = super.getScope(context)
       exitLog(scopeLog, undefined, 'Exit1')
-      return scope
+      return superScope
     }
+
+    // precomputedScopes가 있는지를 확인해 본다
+    // let previousNode: AstNode | undefined = previous
+    // const found = superScope.getAllElements().find(e => e.name == previous.$cstNode?.text)
+    // if (found) {
+    //   previousNode = found.node
+    // }
 
     // previous 의 타입을 추론한 결과가...
     const prevTypeDesc = TypeSystem.inferType(previous, new Map())
@@ -121,7 +128,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     let anyDesc = prevTypeDesc
     if (TypeSystem.isUnionType(prevTypeDesc)) {
       for (const t of prevTypeDesc.elementTypes) {
-        if (TypeSystem.isClassType(t)) {
+        if (TypeSystem.isObjectType(t)) {
           classDesc = t
           break
         }
@@ -146,8 +153,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
 
     // 클래스이면
     // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
-    if (TypeSystem.isClassType(classDesc)) {
-      traceLog(`FIND Class: ${previous.$type}, ${classDesc.literal?.$type}`)
+    if (TypeSystem.isObjectType(classDesc)) {
+      traceLog(`FIND class type: ${previous.$type}, ${classDesc.literal?.$type}, ${refText}`)
       exitLog(scopeLog, prevTypeDesc, 'Exit2')
       return this.getScopeForObject(context, classDesc.literal)
     }
@@ -156,28 +163,28 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 문자열이나 배열 관련 빌트인 함수들은 전역으로 class $string$ { ... } 형태로 저장되어져 있기 때문에
     // 전역 클래스 중 이름이 $string$인 것의 멤버들을 scope로 구성해서 리턴한다.
     else if (TypeSystem.isStringType(stringDesc)) {
-      traceLog(`FIND string type: ${previous.$type}, ${stringDesc.literal?.$type}`)
+      traceLog(`FIND string type: ${previous.$type}, ${stringDesc.literal?.$type}, ${refText}`)
       exitLog(scopeLog, prevTypeDesc, 'Exit2')
       return this.getScopeForSpecificClass(context, '$string$')
     }
 
     // number이면
     else if (TypeSystem.isNumberType(numberDesc)) {
-      traceLog(`FIND number type: ${previous.$type}, ${numberDesc.literal?.$type}`)
+      traceLog(`FIND number type: ${previous.$type}, ${numberDesc.literal?.$type}, ${refText}`)
       exitLog(scopeLog, prevTypeDesc, 'Exit2')
       return this.getScopeForSpecificClass(context, '$number$')
     }
 
     // 배열이면
     else if (TypeSystem.isArrayType(arrayDesc)) {
-      traceLog(`FIND array type: ${previous.$type}, element-type:${arrayDesc.elementType.$type}`)
+      traceLog(`FIND array type: ${previous.$type}, ${arrayDesc.elementType.$type}, ${refText}`)
       exitLog(scopeLog, prevTypeDesc, 'Exit2')
       return this.getScopeForSpecificClass(context, '$array$')
     }
 
     // any 타입이면
     else if (TypeSystem.isAnyType(anyDesc)) {
-      traceLog(`FIND any-type: ${previous.$type}`)
+      traceLog(`FIND any-type: ${previous.$type}, ${refText}`)
       exitLog(scopeLog, prevTypeDesc, 'Exit2')
       return this.getScopeForAnytype(context, previous)
     }
@@ -186,7 +193,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // This means it is either a primitive type or a type resolution error
     // Simply return an empty scope
     exitLog(scopeLog, prevTypeDesc, 'Exit3')
-    return super.getScope(context)
+    return superScope
   }
 
   /**
@@ -215,7 +222,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
         this.scopeCacheForObjectType.set(object, scope)
       }
     } else {
-      console.error(chalk.red('find class, but error:', object?.$type))
+      console.error(chalk.red('find class, but error:', object?.$type, object.$cstNode?.text))
     }
     if (!scope) return EMPTY_SCOPE
     else return scope
@@ -275,7 +282,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       this.localScopeCacheForObjectDef.set(className, scope)
       return scope
     } else {
-      console.error('internal error in getScopeForSpecificClass', className)
+      console.error(chalk.red('internal error in getScopeForSpecificClass', className))
     }
     return super.getScope(context)
   }

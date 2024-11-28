@@ -8,10 +8,10 @@
       "title": "`ArrayType:` at language\\scala-script.langium#62",
       "source": {
         "file": "/language/scala-script.langium",
-        "startLine": 57,
+        "startLine": 28,
         "startColumn": 0,
-        "endLine": 57,
-        "endColumn": 0
+        "endLine": 28,
+        "endColumn": 63
       },
       "notes": [
         {

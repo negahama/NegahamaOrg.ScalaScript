@@ -1229,7 +1229,7 @@ function generateFunction(param: GenerateFunctionParams): string {
       // 단일 expression을 괄호로 표시하면 numbers.find(n => n == 0) 과 같은 구문에 항상 return을 사용해야 하는 불편이 있다.
       // 따라서 expression이 하나이면 괄호를 사용하지 않지만 이것도 return 문과 같이 사용되면 괄호를 사용해야 한다
       // return처럼 단일 expression으로 처리할 수 없는 것들은 assignment, if, match등이 있다.
-      if (param.body.codes.length == 0) console.error('block is empty')
+      if (param.body.codes.length == 0) console.error(chalk.red('block is empty'))
       if (param.body.codes.length == 1) {
         const lastCode = param.body.codes[0]
         if (ast.isExpression(lastCode)) {

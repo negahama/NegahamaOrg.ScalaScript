@@ -38,11 +38,11 @@ export class ScalaScriptValidator {
     traceLog('expr.value:', `${expr.value?.$type}, '${expr.value?.$cstNode?.text}'`)
 
     if (expr.type && expr.value) {
-      const map = getTypeCache()
-      const left = TypeSystem.inferType(expr.type, map)
-      const right = TypeSystem.inferType(expr.value, map)
+      const cache = getTypeCache()
+      const left = TypeSystem.inferType(expr.type, cache)
+      const right = TypeSystem.inferType(expr.value, cache)
 
-      traceLog(`${right.$type} = ${left.$type}`)
+      traceLog(`${left.$type} = ${right.$type}`)
 
       if (!isAssignable(right, left)) {
         accept(
@@ -76,12 +76,12 @@ export class ScalaScriptValidator {
    * 4. For each return statement, it infers the return value type and checks if it is assignable to the expected return type.
    *    If not, it reports an error.
    */
-  checkFunctionDef(method: ast.FunctionDef, accept: ValidationAcceptor): void {
-    const log = enterLog('checkFunctionDef', method.name)
+  checkFunctionDef(method: ast.FunctionDef | ast.FunctionValue, accept: ValidationAcceptor): void {
+    const log = enterLog('checkFunctionDef', method.$cstNode?.text)
 
     if (method.body && method.returnType) {
-      const map = getTypeCache()
-      const expectedType = TypeSystem.inferType(method.returnType, map)
+      const cache = getTypeCache()
+      const expectedType = TypeSystem.inferType(method.returnType, cache)
 
       const returnStatements: ast.ReturnExpression[] = []
       this.extractReturnExpression(method.body, returnStatements)
@@ -94,47 +94,7 @@ export class ScalaScriptValidator {
       }
 
       for (const returnStatement of returnStatements) {
-        const returnValueType = TypeSystem.inferType(returnStatement, map)
-        if (!isAssignable(returnValueType, expectedType)) {
-          accept(
-            'error',
-            `Type '${TypeSystem.typeToString(returnValueType)}' is not assignable to type ` +
-              `'${TypeSystem.typeToString(expectedType)}'.`,
-            {
-              node: returnStatement,
-            }
-          )
-        }
-      }
-    }
-    exitLog(log)
-  }
-
-  /**
-   * Validates a function value by checking its return type and return statements.
-   *
-   * @param method - The function value to be checked.
-   * @param accept - The validation acceptor to report validation issues.
-   */
-  checkFunctionValue(method: ast.FunctionValue, accept: ValidationAcceptor): void {
-    const log = enterLog('checkFunctionValue', method.$cstNode?.text)
-
-    if (method.body && method.returnType) {
-      const map = getTypeCache()
-      const expectedType = TypeSystem.inferType(method.returnType, map)
-
-      const returnStatements: ast.ReturnExpression[] = []
-      this.extractReturnExpression(method.body, returnStatements)
-
-      if (returnStatements.length === 0 && !TypeSystem.isVoidType(expectedType)) {
-        accept('error', "A function whose declared type is not 'void' must return a value.", {
-          node: method.returnType,
-        })
-        return
-      }
-
-      for (const returnStatement of returnStatements) {
-        const returnValueType = TypeSystem.inferType(returnStatement, map)
+        const returnValueType = TypeSystem.inferType(returnStatement, cache)
         if (!isAssignable(returnValueType, expectedType)) {
           accept(
             'error',
@@ -194,9 +154,9 @@ export class ScalaScriptValidator {
     traceLog(`left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`)
     traceLog(`right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`)
 
-    const map = getTypeCache()
-    const left = TypeSystem.inferType(expr.assign, map)
-    const right = TypeSystem.inferType(expr.value, map)
+    const cache = getTypeCache()
+    const left = TypeSystem.inferType(expr.assign, cache)
+    const right = TypeSystem.inferType(expr.value, cache)
 
     traceLog(`${left.$type} = ${right.$type}`)
 
@@ -222,7 +182,8 @@ export class ScalaScriptValidator {
   checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
     if (unary.operator) {
       const log = enterLog('checkUnaryOperationAllowed', unary.value.$type)
-      const item = TypeSystem.inferType(unary.value, getTypeCache())
+      const cache = getTypeCache()
+      const item = TypeSystem.inferType(unary.value, cache)
       if (!isLegalOperation(unary.operator, item)) {
         accept(
           'error',
@@ -255,9 +216,9 @@ export class ScalaScriptValidator {
     const log = enterLog('checkBinaryOperationAllowed', binary.operator)
     traceLog(`expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`)
 
-    const map = getTypeCache()
-    const left = TypeSystem.inferType(binary.left, map)
-    const right = TypeSystem.inferType(binary.right, map)
+    const cache = getTypeCache()
+    const left = TypeSystem.inferType(binary.left, cache)
+    const right = TypeSystem.inferType(binary.right, cache)
 
     traceLog(`${right.$type} = ${left.$type}`)
 
@@ -290,7 +251,7 @@ export class ScalaScriptValidator {
  *
  * @returns {Map<AstNode, TypeDescription>} A new map instance to be used as a type cache.
  */
-export function getTypeCache(): Map<AstNode, TypeDescription> {
+function getTypeCache(): Map<AstNode, TypeDescription> {
   return new Map()
 }
 
@@ -309,131 +270,130 @@ export function getTypeCache(): Map<AstNode, TypeDescription> {
  * @param right - The right-hand side type description (optional).
  * @returns `true` if the operation is legal, otherwise `false`.
  */
-export function isLegalOperation(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
+function isLegalOperation(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
+  /**
+   * Determines if the given operator is legal for the provided type descriptions.
+   *
+   * @param operator - The operator to check.
+   * @param left - The left-hand side type description.
+   * @param right - The right-hand side type description (optional).
+   * @returns `true` if the operator is legal for the provided types, otherwise `false`.
+   *
+   * The function checks the legality of various operators including:
+   * - String concatenation (`..`)
+   * - Equality and inequality (`==`, `!=`)
+   * - Arithmetic operators (`+`, `-`, `*`, `/`, `%`, `**`)
+   * - Comparison operators (`<`, `<=`, `>`, `>=`)
+   * - Logical operators (`and`, `or`, `&&`, `||`)
+   * - Unary logical NOT (`not`, `!`)
+   * - Type-related operators (`typeof`, `instanceof`)
+   *
+   * Special cases:
+   * - If either type is `any`, the operation is considered legal.
+   * - If either type is `nil`, the operation is considered legal for equality checks.
+   * - String concatenation allows implicit type conversion for numbers and booleans.
+   * - Unary plus and minus operators are only legal for numbers.
+   * - Logical operators are only legal for booleans.
+   * - Unary NOT operators are legal for booleans, strings, and numbers.
+   */
+  const isLegal = (operator: string, left: TypeDescription, right?: TypeDescription): boolean => {
+    if (TypeSystem.isAnyType(left) || (right != undefined && TypeSystem.isAnyType(right))) {
+      return true
+    }
+
+    // 문자열 접합 연산자
+    if (operator === '..') {
+      if (!right) {
+        console.error(chalk.red('internal error'))
+        return false
+      }
+      // 문자열 접합 연산자이지만 문자열이 아닌 다른 자료형은 암묵적 형변환을 한다고 가정한다.
+      // 그렇다고 해도 숫자형과 boolean형만 가능하다.
+      return (
+        (TypeSystem.isStringType(left) || TypeSystem.isNumberType(left) || TypeSystem.isBooleanType(left)) &&
+        (TypeSystem.isStringType(right) || TypeSystem.isNumberType(right) || TypeSystem.isBooleanType(right))
+      )
+    }
+
+    // 동등 연산자
+    else if (['==', '!='].includes(operator)) {
+      if (!right) {
+        console.error(chalk.red('internal error'))
+        return false
+      }
+      /**
+       * 비교 가능한지를 리턴한다. 비교 가능한 경우는 다음과 같다.
+       *
+       * 두 대상의 타입이 동일한 경우
+       * 한 대상의 타입이 any 타입인 경우
+       * 한 대상의 타입이 nil 타입인 경우 - 모든 타입은 nil 인지를 검사할 수 있다.
+       */
+      if (
+        TypeSystem.isAnyType(left) ||
+        TypeSystem.isAnyType(right) ||
+        TypeSystem.isNilType(left) ||
+        TypeSystem.isNilType(right)
+      ) {
+        return true
+      }
+
+      return left.$type === right.$type
+    }
+
+    // plus, minus 연산자. Unary, Binary operator를 모두 포함한다.
+    else if (['-', '+'].includes(operator)) {
+      if (!right) return TypeSystem.isNumberType(left)
+      return TypeSystem.isNumberType(left) && TypeSystem.isNumberType(right)
+    }
+
+    // 각종 산술 연산자, 비교 연산자
+    else if (['**', '*', '/', '%', '<', '<=', '>', '>='].includes(operator)) {
+      if (!right) {
+        console.error(chalk.red('internal error'))
+        return false
+      }
+      // 모두 숫자 타입과 관련된 연산자이다
+      return TypeSystem.isNumberType(left) && TypeSystem.isNumberType(right)
+    }
+
+    // 논리 연산자
+    else if (['and', 'or', '&&', '||'].includes(operator)) {
+      if (!right) {
+        console.error(chalk.red('internal error'))
+        return false
+      }
+      return TypeSystem.isBooleanType(left) && TypeSystem.isBooleanType(right)
+    }
+
+    // 부정(논리적 NOT) 단항 연산자는 문자열과 숫자에도 적용되는데 빈 문자열과 0 을 거짓으로 취급한다.
+    else if (['not', '!'].includes(operator)) {
+      return TypeSystem.isBooleanType(left) || TypeSystem.isStringType(left) || TypeSystem.isNumberType(left)
+    }
+
+    // typeof, instanceof 연산자
+    else if (['typeof', 'instanceof'].includes(operator)) {
+      return true
+    }
+    return true
+  }
+
   // Union type이면 모든 내부 타입들을 하나씩 적용해서 적법한 연산이 있는지 확인한다.
   if (TypeSystem.isUnionType(left)) {
     for (const l of left.elementTypes) {
       if (right && TypeSystem.isUnionType(right)) {
         for (const r of right.elementTypes) {
-          if (isLegalOperation_(operator, l, r)) return true
+          if (isLegal(operator, l, r)) return true
         }
-      } else return isLegalOperation_(operator, l, right)
+      } else return isLegal(operator, l, right)
     }
   } else {
     if (right && TypeSystem.isUnionType(right)) {
       for (const r of right.elementTypes) {
-        if (isLegalOperation_(operator, left, r)) return true
+        if (isLegal(operator, left, r)) return true
       }
-    } else return isLegalOperation_(operator, left, right)
+    } else return isLegal(operator, left, right)
   }
   return false
-}
-
-/**
- * Determines if a given operation between two types is legal based on the operator and the types involved.
- *
- * @param operator - The operator to be used in the operation.
- * @param left - The type description of the left operand.
- * @param right - The type description of the right operand (optional).
- * @returns `true` if the operation is legal, `false` otherwise.
- *
- * The function checks the legality of various operators including:
- * - String concatenation (`..`)
- * - Equality and inequality (`==`, `!=`)
- * - Arithmetic operations (`+`, `-`, `*`, `/`, `%`, `**`)
- * - Comparison operations (`<`, `<=`, `>`, `>=`)
- * - Logical operations (`and`, `or`, `&&`, `||`)
- * - Unary logical negation (`not`, `!`)
- * - Type checking (`typeof`, `instanceof`)
- *
- * The function also handles implicit type conversions and special cases such as:
- * - Any type (`any`)
- * - Nil type (`nil`)
- * - Boolean type (`boolean`)
- * - String type (`string`)
- * - Number type (`number`)
- *
- * Internal errors are logged to the console if the right operand is missing for binary operations.
- */
-function isLegalOperation_(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
-  if (TypeSystem.isAnyType(left) || (right != undefined && TypeSystem.isAnyType(right))) {
-    return true
-  }
-
-  // 문자열 접합 연산자
-  if (operator === '..') {
-    if (!right) {
-      console.error(chalk.red('internal error'))
-      return false
-    }
-    // 문자열 접합 연산자이지만 문자열이 아닌 다른 자료형은 암묵적 형변환을 한다고 가정한다.
-    // 그렇다고 해도 숫자형과 boolean형만 가능하다.
-    return (
-      (TypeSystem.isStringType(left) || TypeSystem.isNumberType(left) || TypeSystem.isBooleanType(left)) &&
-      (TypeSystem.isStringType(right) || TypeSystem.isNumberType(right) || TypeSystem.isBooleanType(right))
-    )
-  }
-
-  // 동등 연산자
-  else if (['==', '!='].includes(operator)) {
-    if (!right) {
-      console.error(chalk.red('internal error'))
-      return false
-    }
-    /**
-     * 비교 가능한지를 리턴한다. 비교 가능한 경우는 다음과 같다.
-     *
-     * 두 대상의 타입이 동일한 경우
-     * 한 대상의 타입이 any 타입인 경우
-     * 한 대상의 타입이 nil 타입인 경우 - 모든 타입은 nil 인지를 검사할 수 있다.
-     */
-    if (
-      TypeSystem.isAnyType(left) ||
-      TypeSystem.isAnyType(right) ||
-      TypeSystem.isNilType(left) ||
-      TypeSystem.isNilType(right)
-    ) {
-      return true
-    }
-
-    return left.$type === right.$type
-  }
-
-  // plus, minus 연산자. Unary, Binary operator를 모두 포함한다.
-  else if (['-', '+'].includes(operator)) {
-    if (!right) return TypeSystem.isNumberType(left)
-    return TypeSystem.isNumberType(left) && TypeSystem.isNumberType(right)
-  }
-
-  // 각종 산술 연산자, 비교 연산자
-  else if (['**', '*', '/', '%', '<', '<=', '>', '>='].includes(operator)) {
-    if (!right) {
-      console.error(chalk.red('internal error'))
-      return false
-    }
-    // 모두 숫자 타입과 관련된 연산자이다
-    return TypeSystem.isNumberType(left) && TypeSystem.isNumberType(right)
-  }
-
-  // 논리 연산자
-  else if (['and', 'or', '&&', '||'].includes(operator)) {
-    if (!right) {
-      console.error(chalk.red('internal error'))
-      return false
-    }
-    return TypeSystem.isBooleanType(left) && TypeSystem.isBooleanType(right)
-  }
-
-  // 부정(논리적 NOT) 단항 연산자는 문자열과 숫자에도 적용되는데 빈 문자열과 0 을 거짓으로 취급한다.
-  else if (['not', '!'].includes(operator)) {
-    return TypeSystem.isBooleanType(left) || TypeSystem.isStringType(left) || TypeSystem.isNumberType(left)
-  }
-
-  // typeof, instanceof 연산자
-  else if (['typeof', 'instanceof'].includes(operator)) {
-    return true
-  }
-  return true
 }
 
 /**
@@ -453,7 +413,7 @@ function isLegalOperation_(operator: string, left: TypeDescription, right?: Type
  * - If the source type is a class type, it checks if the target type is also a class type and if the source class is in the inheritance chain of the target class.
  * - If the source type is a function type, it checks if the target type is also a function type, if their return types are assignable, and if their parameters are assignable.
  */
-export function isAssignable(from: TypeDescription, to: TypeDescription, indent: number = 0): boolean {
+function isAssignable(from: TypeDescription, to: TypeDescription, indent: number = 0): boolean {
   // const space = "  ".repeat(indent)
   // console.log(space + `isAssignable: ${to.$type} = ${from.$type}`)
 
@@ -519,8 +479,8 @@ export function isAssignable(from: TypeDescription, to: TypeDescription, indent:
     else return false
   }
 
-  if (TypeSystem.isClassType(from)) {
-    if (!TypeSystem.isClassType(to)) {
+  if (TypeSystem.isObjectType(from)) {
+    if (!TypeSystem.isObjectType(to)) {
       return false
     }
     const fromLit = from.literal
