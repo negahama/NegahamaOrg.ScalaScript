@@ -17,6 +17,8 @@ import {
   Stream,
   stream,
   GrammarAST,
+  IndentationAwareTokenBuilder,
+  IndentationAwareLexer,
 } from 'langium'
 import {
   createDefaultModule,
@@ -64,6 +66,20 @@ export const ScalaScriptSharedModule: Module<ScalaScriptSharedServices, DeepPart
  * selected services, while the custom services must be fully specified.
  */
 export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServices & ScalaScriptAddedServices> = {
+  parser: {
+    TokenBuilder: () =>
+      new IndentationAwareTokenBuilder({
+        indentTokenName: 'INDENT',
+        dedentTokenName: 'DEDENT',
+        whitespaceTokenName: 'WS',
+        ignoreIndentationDelimiters: [
+          ['[', ']'],
+          ['{', '}'],
+          ['(', ')'],
+        ],
+      }),
+    Lexer: services => new IndentationAwareLexer(services),
+  },
   validation: {
     ScalaScriptValidator: () => new ScalaScriptValidator(),
   },

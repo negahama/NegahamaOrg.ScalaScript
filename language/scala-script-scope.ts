@@ -56,7 +56,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       const previous = typeChain.previous
       traceLog(`TypeChain.previous is ${previous?.$type}`)
       if (!previous) {
-        exitLog(scopeLog, undefined, 'Exit5')
+        exitLog(scopeLog, undefined, 'Exit(NO previous)')
         return superScope
       }
 
@@ -73,9 +73,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       return superScope
     }
 
-    // target element of member calls
+    // check if the reference is CallChain or RefCall
     if (context.property !== 'element') {
-      exitLog(scopeLog, undefined, 'Exit4')
+      exitLog(scopeLog, undefined, 'Exit(NOT callchain)')
       return superScope
     }
 
@@ -100,13 +100,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 이 코드는 이를 확인하기 위한 것이다.
     const callChain = context.container as ast.CallChain
     if (callChain.args == undefined) {
-      traceLog('CallChain.args is undefined')
+      traceLog(`'${refText}'.args is undefined`)
     }
 
     const previous = callChain.previous
-    traceLog(`CallChain.previous is ${previous?.$type}`)
+    traceLog(`'${refText}'.previous is '${previous?.$cstNode?.text}'(${previous?.$type})`)
     if (!previous) {
-      exitLog(scopeLog, undefined, 'Exit1')
+      exitLog(scopeLog, undefined, 'Exit(NOT previous)')
       return superScope
     }
 
@@ -192,7 +192,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // When the target of our member call isn't a class
     // This means it is either a primitive type or a type resolution error
     // Simply return an empty scope
-    exitLog(scopeLog, prevTypeDesc, 'Exit3')
+    exitLog(scopeLog, prevTypeDesc, 'Exit(reach end)')
     return superScope
   }
 

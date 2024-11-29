@@ -174,7 +174,7 @@ FunctionDef:
   '(' Parameters? ')' (FunctionReturn)? (FunctionBody)?;
 
 Block:
-  (isBracket?='{' codes+=Code+ '}') | codes+=Expression;
+  (isBracket?=('{' | INDENT) codes+=Code+ ('}' | DEDENT)) | codes+=Expression;
 
 /*
   Object Definition
@@ -243,7 +243,7 @@ ThrowStatement:
 // Try Statement
 TryCatchStatement:
   'try' body=Block
-  ('catch' '{' cases+=CaseClause+ '}')?
+  ('catch' ('{' | INDENT) cases+=CaseClause+ ('}' | DEDENT))?
   ('finally' finally=Expression)?;
 
 Continue: dummy='continue';
@@ -353,13 +353,8 @@ UnaryOperator infers Expression:
   여기서 isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')'는
   FunctionCallSignature와 동일하지만 FunctionCallSignature를 사용할 수 없다.
   심지어 FunctionCallSignature의 내용인 isFunction?='(' Arguments? ')'을 사용하는 것도 안된다.
-  
-  정확한 이유는 모르지만 fragment를 적용하면 배열이나 함수로 되어진 것들은 ref가 제대로 설정되지 않는다.
-  fragment를 적용하면 (), []까지 포함해서 element가 구성되는 것 같다. 그냥 element가 아니라 element[1]을
-  참조할 수 없는 것처럼 보인다. 그래서 ref가 설정이 안되는 것이다.
 
-  어째든 이 경우에 fragment로 사용하면 랭기움에서 제대로 참조를 생성하지 못하고 `AST node has no document` 에러를 발생시킨다.
-  개발 노트를 참고
+  [Fragment와 Ref 동시 사용시 문제점](/.prism/docs/1d29c20692a691a8fb6ba4b666d9ccef.md) 참고
 */
 CallChain infers Expression:
   SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
@@ -498,6 +493,12 @@ ArrayItem:
 // terminal & literal
 //-----------------------------------------------------------------------------
 
+// INDENT, DEDENT는 적어도 Id 이전에 위치해야 하는 것으로 보인다.
+terminal INDENT: 'synthetic:indent';
+terminal DEDENT: 'synthetic:dedent';
+hidden terminal WS: /[\t ]+/;
+hidden terminal NL: /[\r\n]+/;
+
 // Parentheses
 // terminal Paren: '(' | ')' | '[' | ']' | '{' | '}';
 
@@ -572,6 +573,6 @@ terminal Id returns string: ID;
 // TypedId: name=Id ':' type=Types;
 
 // Whitespace and Comments
-hidden terminal WS: /\s+/;
+// hidden terminal WS: /\s+/;
 hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
 hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;

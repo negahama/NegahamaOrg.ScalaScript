@@ -74,11 +74,15 @@ export function traceLog(msg: string, ...optionalParams: any[]) {
 export function exitLog(log: string, type?: TypeDescription, ...optionalParams: any[]) {
   if (!_enable_log_) return
   console.groupEnd()
-  let typeInfo = ''
-  if (type) {
-    if (TypeSystem.isErrorType(type)) typeInfo = type.message
-    else typeInfo = `-type: ${type?.$type}`
+  if (!type) {
+    console.log(log, ...optionalParams)
+    return
   }
+
+  let typeInfo = ''
+  if (TypeSystem.isErrorType(type)) typeInfo = type.message
+  else typeInfo = `-type: ${type?.$type}`
+
   // console.timeLog(log, typeInfo, ...optionalParams)
   console.log(log, typeInfo, ...optionalParams)
 }

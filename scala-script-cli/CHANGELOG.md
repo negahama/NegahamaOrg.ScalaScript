@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.5.5 - November 29, 2024
+
+- refactoring TypeSystem
+- The Langium version upgrade to 3.3.0
+- support block with indent such as Python
+
 ### 0.5.4 - November 24, 2024
 
 - fixed some bugs about function type variables
