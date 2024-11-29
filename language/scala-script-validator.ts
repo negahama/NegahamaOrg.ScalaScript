@@ -45,14 +45,12 @@ export class ScalaScriptValidator {
       traceLog(`${left.$type} = ${right.$type}`)
 
       if (!isAssignable(right, left)) {
-        accept(
-          'error',
-          `Type '${TypeSystem.typeToString(right)}' is not assignable to type '${TypeSystem.typeToString(left)}'.`,
-          {
-            node: expr,
-            property: 'value',
-          }
-        )
+        const tr = TypeSystem.typeToString(right)
+        const tl = TypeSystem.typeToString(left)
+        accept('error', `checkVariableDef: Type '${tr}' is not assignable to type '${tl}'.`, {
+          node: expr,
+          property: 'value',
+        })
       }
     } else if (!expr.type && !expr.value) {
       accept('error', 'Variables require a type hint or an assignment at creation', {
@@ -96,14 +94,11 @@ export class ScalaScriptValidator {
       for (const returnStatement of returnStatements) {
         const returnValueType = TypeSystem.inferType(returnStatement, cache)
         if (!isAssignable(returnValueType, expectedType)) {
-          accept(
-            'error',
-            `Type '${TypeSystem.typeToString(returnValueType)}' is not assignable to type ` +
-              `'${TypeSystem.typeToString(expectedType)}'.`,
-            {
-              node: returnStatement,
-            }
-          )
+          const tr = TypeSystem.typeToString(returnValueType)
+          const tl = TypeSystem.typeToString(expectedType)
+          accept('error', `checkFunctionDef: Type '${tr}' is not assignable to type ` + `'${tl}'.`, {
+            node: returnStatement,
+          })
         }
       }
     }
@@ -161,14 +156,12 @@ export class ScalaScriptValidator {
     traceLog(`${left.$type} = ${right.$type}`)
 
     if (!isAssignable(right, left)) {
-      accept(
-        'error',
-        `Type '${TypeSystem.typeToString(right)}' is not assignable to type '${TypeSystem.typeToString(left)}'.`,
-        {
-          node: expr,
-          property: 'value',
-        }
-      )
+      const tr = TypeSystem.typeToString(right)
+      const tl = TypeSystem.typeToString(left)
+      accept('error', `checkAssignment: Type '${tr}' is not assignable to type '${tl}'.`, {
+        node: expr,
+        property: 'value',
+      })
     }
     exitLog(log)
   }
@@ -302,13 +295,14 @@ function isLegalOperation(operator: string, left: TypeDescription, right?: TypeD
     }
 
     // 문자열 접합 연산자
+    // 문자열이 아닌 다른 자료형은 암묵적 형변환을 한다고 가정한다.
+    // 그렇다고 해도 숫자형과 boolean형만 가능하다.
     if (operator === '..') {
       if (!right) {
         console.error(chalk.red('internal error'))
         return false
       }
-      // 문자열 접합 연산자이지만 문자열이 아닌 다른 자료형은 암묵적 형변환을 한다고 가정한다.
-      // 그렇다고 해도 숫자형과 boolean형만 가능하다.
+
       return (
         (TypeSystem.isStringType(left) || TypeSystem.isNumberType(left) || TypeSystem.isBooleanType(left)) &&
         (TypeSystem.isStringType(right) || TypeSystem.isNumberType(right) || TypeSystem.isBooleanType(right))
@@ -316,18 +310,16 @@ function isLegalOperation(operator: string, left: TypeDescription, right?: TypeD
     }
 
     // 동등 연산자
+    // 값이 동등한지 아닌지를 판단하는 것이 아니라 동등 여부를 비교할 수 있는지 타입을 확인하는 것이다.
+    // - 두 대상의 타입이 동일한 경우
+    // - 한 대상의 타입이 any 타입인 경우
+    // - 한 대상의 타입이 nil 타입인 경우 - 모든 타입은 nil 인지를 검사할 수 있다.
     else if (['==', '!='].includes(operator)) {
       if (!right) {
         console.error(chalk.red('internal error'))
         return false
       }
-      /**
-       * 비교 가능한지를 리턴한다. 비교 가능한 경우는 다음과 같다.
-       *
-       * 두 대상의 타입이 동일한 경우
-       * 한 대상의 타입이 any 타입인 경우
-       * 한 대상의 타입이 nil 타입인 경우 - 모든 타입은 nil 인지를 검사할 수 있다.
-       */
+
       if (
         TypeSystem.isAnyType(left) ||
         TypeSystem.isAnyType(right) ||
@@ -341,39 +333,46 @@ function isLegalOperation(operator: string, left: TypeDescription, right?: TypeD
     }
 
     // plus, minus 연산자. Unary, Binary operator를 모두 포함한다.
+    // 모두 number 타입과 관련된 연산자이다
     else if (['-', '+'].includes(operator)) {
       if (!right) return TypeSystem.isNumberType(left)
       return TypeSystem.isNumberType(left) && TypeSystem.isNumberType(right)
     }
 
     // 각종 산술 연산자, 비교 연산자
+    // 모두 이항 연산자이며 number 타입과 관련된 연산자이다
     else if (['**', '*', '/', '%', '<', '<=', '>', '>='].includes(operator)) {
       if (!right) {
         console.error(chalk.red('internal error'))
         return false
       }
-      // 모두 숫자 타입과 관련된 연산자이다
+
       return TypeSystem.isNumberType(left) && TypeSystem.isNumberType(right)
     }
 
     // 논리 연산자
+    // 모두 이항 연산자이며 boolean 타입과 관련된 연산자이다
     else if (['and', 'or', '&&', '||'].includes(operator)) {
       if (!right) {
         console.error(chalk.red('internal error'))
         return false
       }
+
       return TypeSystem.isBooleanType(left) && TypeSystem.isBooleanType(right)
     }
 
-    // 부정(논리적 NOT) 단항 연산자는 문자열과 숫자에도 적용되는데 빈 문자열과 0 을 거짓으로 취급한다.
+    // 부정(논리적 NOT) 단항 연산자
+    // 부정 단항 연산자는 문자열과 숫자에도 적용되는데 빈 문자열과 0 을 거짓으로 취급한다.
     else if (['not', '!'].includes(operator)) {
       return TypeSystem.isBooleanType(left) || TypeSystem.isStringType(left) || TypeSystem.isNumberType(left)
     }
 
     // typeof, instanceof 연산자
+    //todo 일단은 모든 타입에 대해 적용 가능하다.
     else if (['typeof', 'instanceof'].includes(operator)) {
       return true
     }
+
     return true
   }
 
@@ -413,63 +412,27 @@ function isLegalOperation(operator: string, left: TypeDescription, right?: TypeD
  * - If the source type is a class type, it checks if the target type is also a class type and if the source class is in the inheritance chain of the target class.
  * - If the source type is a function type, it checks if the target type is also a function type, if their return types are assignable, and if their parameters are assignable.
  */
-function isAssignable(from: TypeDescription, to: TypeDescription, indent: number = 0): boolean {
-  // const space = "  ".repeat(indent)
-  // console.log(space + `isAssignable: ${to.$type} = ${from.$type}`)
-
+function isAssignable(from: TypeDescription, to: TypeDescription): boolean {
   // 성능 향상을 위해 어느 하나의 타입이 any이면 바로 return true
   if (TypeSystem.isAnyType(from) || TypeSystem.isAnyType(to)) {
     return true
   }
 
   // 성능 향상을 위해 둘의 타입이 동일하면 바로 return true
-  // 하지만 이 경우는 function type의 return type과 parameter type을 비교해야 한다.
+  // 하지만 이 경우에도 function type이면 return type과 parameter type을 비교해야 한다.
   if (from.$type == to.$type) {
     if (TypeSystem.isFunctionType(from) && TypeSystem.isFunctionType(to)) {
-      if (!isAssignable(from.returnType, to.returnType)) {
-        return false
-      }
-      if (from.parameters.length !== to.parameters.length) {
-        return false
-      }
-      for (let i = 0; i < from.parameters.length; i++) {
-        const fromParam = from.parameters[i]
-        const toParam = to.parameters[i]
-        if (!isAssignable(fromParam.type, toParam.type)) {
-          return false
-        }
-      }
-      return true
+      return TypeSystem.compareType(from, to)
     } else return true
   }
 
   // union type이면 각 세부 타입들의 조합을 검사한다.
   if (TypeSystem.isUnionType(to)) {
-    return to.elementTypes.some(t => isAssignable(from, t, indent))
-    // console.log(
-    //   space + "to's union type:",
-    //   to.elementTypes.map((t) => t.$type)
-    // )
-    // let result: boolean = false
-    // to.elementTypes.forEach((t) => {
-    //   console.log(space + "type compare:", t.$type, "=", from.$type)
-    //   if (isAssignable(from, t, indent + 1)) result = true
-    // })
-    // return result
+    return to.elementTypes.some(t => isAssignable(from, t))
   }
 
   if (TypeSystem.isUnionType(from)) {
-    return from.elementTypes.some(t => isAssignable(t, to, indent))
-    // console.log(
-    //   space + "from's union type:",
-    //   from.elementTypes.map((t) => t.$type)
-    // )
-    // let result: boolean = false
-    // from.elementTypes.forEach((t) => {
-    //   console.log(space + "type compare:", to.$type, "=", t.$type)
-    //   if (isAssignable(t, to, indent + 1)) result = true
-    // })
-    // return result
+    return from.elementTypes.some(t => isAssignable(t, to))
   }
 
   // nil type은 다른 타입과 연산이 되지 않지만 같은 nil인 경우에는 assignable될 수 있다.
@@ -485,7 +448,6 @@ function isAssignable(from: TypeDescription, to: TypeDescription, indent: number
     }
     const fromLit = from.literal
     if (ast.isObjectDef(fromLit)) {
-      // console.log(space + `from is object: '${fromLit.name}'`)
       const fromChain = TypeSystem.getClassChain(fromLit)
       const toClass = to.literal
       for (const fromClass of fromChain) {
@@ -494,12 +456,10 @@ function isAssignable(from: TypeDescription, to: TypeDescription, indent: number
         }
       }
     } else if (ast.isObjectType(fromLit)) {
-      // console.log(space + "from is object type", fromLit.$cstNode?.text)
+      console.log('from is object type', fromLit.$cstNode?.text)
     } else if (ast.isObjectValue(fromLit)) {
-      // console.log(space + "from is object value", fromLit.$cstNode?.text)
+      console.log('from is object value', fromLit.$cstNode?.text)
     }
-    // 둘 다 클래스 타입이면 일단 통과시킨다.
-    // return false
   }
 
   return from.$type === to.$type

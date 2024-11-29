@@ -934,7 +934,7 @@ function transpileNewExpression(expr: ast.NewExpression, indent: number): string
  * @returns The string representation of the array value.
  */
 function transpileArrayValue(expr: ast.ArrayValue, indent: number): string {
-  return '[' + expr.items.map(item => generateExpression(item.item, indent)).join(', ') + ']'
+  return '[' + expr.items.map(item => generateExpression(item, indent)).join(', ') + ']'
 }
 
 /**
@@ -947,14 +947,13 @@ function transpileArrayValue(expr: ast.ArrayValue, indent: number): string {
 function transpileObjectValue(expr: ast.ObjectValue, indent: number): string {
   let result = '{\n'
   expr.elements.forEach(item => {
+    let value = ''
     if (item.spread) {
-      result += applyIndent(indent + 1, `${item.$cstNode?.text},\n`)
+      value = `${item.$cstNode?.text},\n`
     } else {
-      result += applyIndent(
-        indent + 1,
-        item.name + ': ' + (item.value ? generateExpression(item.value, indent + 1) : '') + ',\n'
-      )
+      value = item.name + ': ' + (item.value ? generateExpression(item.value, indent + 1) : '') + ',\n'
     }
+    result += applyIndent(indent + 1, value)
   })
   result += applyIndent(indent, '}')
   return result

@@ -170,8 +170,8 @@ fragment Spread:
 // var, val, def 와 동일하게 이름 다음에 = 이 오고 그 다음에 함수값(FunctionValue)이 위치한다.
 FunctionDef:
   (Annotation)? (export?='export')? (private?='private')? (static?='static')? 
-  'fun' (extension=[ObjectDef:Id] '.')? name=Id '='
-  '(' Parameters? ')' (FunctionReturn)? (FunctionBody)?;
+  'fun' (extension=[ObjectDef:Id] '.')? name=Id
+  '=' '(' Parameters? ')' (FunctionReturn)? (FunctionBody)?;
 
 Block:
   (isBracket?=('{' | INDENT) codes+=Code+ ('}' | DEDENT)) | codes+=Expression;
@@ -411,7 +411,7 @@ RefCall: {infer CallChain}
   this, super를 element=[NamedElement:'this']으로 설정하면 ScopeProvider에서 적절한 멤버들을 리턴하게 할 순 있지만
   this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
   설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
-  따라서 현재 this, super는 그냥 keyword로 처리되고하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
+  따라서 현재 this, super는 그냥 keyword로 처리하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
   이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 */
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
@@ -482,10 +482,7 @@ SpreadExpression:
 
 // ex) ary = [ 1, 2, 3 ], [], [ 1, ...ary ]
 ArrayValue:
-  '[' items+=ArrayItem? (',' items+=ArrayItem )* ']';
-
-ArrayItem:
-  item=Expression;
+  '[' items+=Expression? (',' items+=Expression )* ']';
 
 // ArrayExpression - CallChain 참고
 

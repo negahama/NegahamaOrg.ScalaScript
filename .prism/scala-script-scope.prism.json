@@ -8,9 +8,9 @@
       "title": "`// (isFunction?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 Arguments를 그대로 대입한` at language\\scala-script-scope.ts#96",
       "source": {
         "file": "/language/scala-script-scope.ts",
-        "startLine": 96,
+        "startLine": 88,
         "startColumn": 0,
-        "endLine": 101,
+        "endLine": 93,
         "endColumn": 0
       },
       "notes": [
@@ -21,6 +21,106 @@
           "createdAt": "2024-11-28T04:18:18.866Z",
           "content": "Fragment와 Ref 동시 사용시 문제점",
           "link": "file:///./docs/1d29c20692a691a8fb6ba4b666d9ccef.md"
+        }
+      ]
+    },
+    {
+      "id": "91058f69734ded818ee6f907bb0f978c",
+      "title": "`if (TypeSystem.isUnionType(prevTypeDesc)) {` at language\\scala-script-scope.ts#120",
+      "source": {
+        "file": "/language/scala-script-scope.ts",
+        "startLine": 120,
+        "startColumn": 0,
+        "endLine": 144,
+        "endColumn": 0
+      },
+      "notes": [
+        {
+          "id": "b3cc7b4bf6afdb45432a900efe5ae3cc",
+          "category": "Todo",
+          "importance": "Medium",
+          "createdAt": "2024-11-29T17:00:25.401Z",
+          "content": "Union type을 이렇게 처리하는 것은 좋지 못하다..."
+        }
+      ]
+    },
+    {
+      "id": "21678cf61caf988829843014bda674c1",
+      "title": "`console.error(chalk.red('find class, but error:', object?.$type, object.$cstNode?.text))` at language\\scala-script-scope.ts#212",
+      "source": {
+        "file": "/language/scala-script-scope.ts",
+        "startLine": 211,
+        "startColumn": 0,
+        "endLine": 211,
+        "endColumn": 0
+      },
+      "notes": [
+        {
+          "id": "227aeba43cb52147b2ac071909991255",
+          "category": "Todo",
+          "importance": "Medium",
+          "createdAt": "2024-11-29T17:01:05.241Z",
+          "content": "ObjectValue가 여기까지 올 수 있을까?"
+        }
+      ]
+    },
+    {
+      "id": "fb50cf9afb50e8e4897286d59fc76655",
+      "title": "`private getScopeForAnytype(context: ReferenceInfo, previous: ast.Expression): Scope {` at language\\scala-script-scope.ts#301",
+      "source": {
+        "file": "/language/scala-script-scope.ts",
+        "startLine": 301,
+        "startColumn": 0,
+        "endLine": 313,
+        "endColumn": 0
+      },
+      "notes": [
+        {
+          "id": "f16f6f130276216eb842ca01bd598a9f",
+          "category": "Todo",
+          "importance": "Medium",
+          "createdAt": "2024-11-29T17:01:46.567Z",
+          "content": "좀 더 분석해야 한다."
+        }
+      ]
+    },
+    {
+      "id": "8d961b64a7305b84b909bab9a8aed9cd",
+      "title": "`// precomputedScopes가 있는지를 확인해 본다` at language\\scala-script-scope.ts#104",
+      "source": {
+        "file": "/language/scala-script-scope.ts",
+        "startLine": 104,
+        "startColumn": 0,
+        "endLine": 109,
+        "endColumn": 8
+      },
+      "notes": [
+        {
+          "id": "de8e84de34f94d40432fd2d04166f9c8",
+          "category": "Todo",
+          "importance": "Medium",
+          "createdAt": "2024-11-29T17:05:11.099Z",
+          "content": "getGlobalScope는 유용한데... superScope도 분명 도움되는 부분이 있지 않을까?"
+        }
+      ]
+    },
+    {
+      "id": "35ba49ed33e0b5433b1a4a2376faf74d",
+      "title": "`// 타입의 참조는 따로 처리한다.` at language\\scala-script-scope.ts#44",
+      "source": {
+        "file": "/language/scala-script-scope.ts",
+        "startLine": 44,
+        "startColumn": 0,
+        "endLine": 45,
+        "endColumn": 0
+      },
+      "notes": [
+        {
+          "id": "916cbaf91ccd28ee23cdcaf420660be2",
+          "category": "Todo",
+          "importance": "Medium",
+          "createdAt": "2024-11-29T17:05:49.650Z",
+          "content": "타입의 참조?"
         }
       ]
     }
