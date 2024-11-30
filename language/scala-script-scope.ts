@@ -192,6 +192,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   globalScopeCacheForObjectDef = new Map<string, Scope>()
 
   /**
+   * 아래 함수들은 모두 동일한 메커니즘으로 동작한다.
+   * corp.process()에서 현재 값(context.reference)은 process인데 이것의 scope를 제공하기 위해서 corp를 찾는다.
+   * corp의 종류에 따라서 ObjectDef, ObjectType, any type으로 나눠지지만 모두 corp에서 가능한 모든 이름을
+   * Scope로 리턴한다.
    *
    * @param context
    * @param object
@@ -291,20 +295,28 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   }
 
   /**
-   * Retrieves the scope for a given type within a specific context.
-   * any type의 경우 member 검사를 하지 않는다. 엄밀하게는 무조건 멤버를 생성하고 리턴한다.
+   * Create a scope for the given collection of AST nodes, which need to be transformed into respective
+   * descriptions first. This is done using the `NameProvider` and `AstNodeDescriptionProvider` services.
+   *
+   * 이 코드는 DefaultScopeProvider의 createScopeForNodes()와 거의 동일하다.
+   * 차이점은 원래 코드는 이름이 없으면 undefined를 리턴하지만 여기서는 이름이 없으면 이름을 생성해서 리턴한다.   *
+   * 이는 expr이 any type이기 때문에 member 검사를 하지 않고 무조건 멤버가 있다고 보고 처리하는 것이다.
+   * 이것 자체는 문제가 안되는데 이름이 있는 경우에는 문제가 될 수 있다.
    *
    * @param context - The reference information containing the context for the type.
-   * @param previous - The previous AST expression node.
+   * @param expr - The AST expression node.
    * @returns A `Scope` object that represents the scope for the given type.
    */
-  private getScopeForAnytype(context: ReferenceInfo, previous: ast.Expression): Scope {
-    // console.log('getScopeForAnytype, ref text:', context.reference.$refText)
-    const elements: AstNode[] = [previous]
+  private getScopeForAnytype(context: ReferenceInfo, expr: ast.Expression): Scope {
+    // console.log('getScopeForAnytype, ref text:', expr.$cstNode?.text, context.reference.$refText)
+    const elements: AstNode[] = [expr]
     const s = stream(elements)
       .map(e => {
         const name = this.nameProvider.getName(e)
-        if (name) return this.descriptions.createDescription(e, name)
+        if (name) {
+          console.log(chalk.magenta('Name is provided in getScopeForAnytype:', name, e))
+          return this.descriptions.createDescription(e, name)
+        }
         return this.descriptions.createDescription(e, context.reference.$refText)
       })
       .nonNullable()

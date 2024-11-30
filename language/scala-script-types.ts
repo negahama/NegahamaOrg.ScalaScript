@@ -510,6 +510,12 @@ export class TypeSystem {
 
     if (ast.isTypes(node)) {
       type = TypeSystem.inferTypeTypes(node, cache)
+    } else if (ast.isSimpleType(node)) {
+      // Types와 SimpleType은 분리되어져 있다.
+      // SimpleType은 ArrayType | ObjectType | ElementType와 같이 UnionType이며 타입들의 단순한 집합이지만
+      // Types는 types+=SimpleType ('|' types+=SimpleType)*와 같이 SimpleType의 배열로 단순히 타입이 아니다.
+      // 일례로 TypeChain은 ElementType이고 SimpleType이긴 하지만 Types는 아니다.
+      type = TypeSystem.inferTypeSimpleType(node, cache)
     } else if (ast.isVariableDef(node)) {
       type = TypeSystem.inferTypeVariableDef(node, cache)
     } else if (ast.isFunctionDef(node)) {
