@@ -2,23 +2,30 @@ import { AstNode, AstUtils } from 'langium'
 import * as ast from './generated/ast.js'
 import { enterLog, exitLog, traceLog } from '../language/scala-script-util.js'
 import chalk from 'chalk'
-import assert from 'assert'
 
 /**
  *
  */
-export type TypeDescription =
-  | AnyTypeDescription
-  | NilTypeDescription
-  | VoidTypeDescription
-  | StringTypeDescription
-  | NumberTypeDescription
-  | BooleanTypeDescription
-  | UnionTypeDescription
-  | ArrayTypeDescription
-  | FunctionTypeDescription
-  | ObjectTypeDescription
-  | ErrorTypeDescription
+export class TypeDescription {
+  constructor(readonly $type = '') {}
+
+  toString(): string {
+    return this.$type
+  }
+
+  isEqual(other: TypeDescription): boolean {
+    return this.$type === other.$type
+  }
+
+  isAssignableTo(other: TypeDescription): boolean {
+    if (other.$type == 'any') return true
+    if (other.$type == 'union') {
+      const union = other as UnionTypeDescription
+      if (union.elementTypes.some(e => e.isEqual(this))) return true
+    }
+    return this.isEqual(other)
+  }
+}
 
 type CacheType = Map<AstNode, TypeDescription>
 
@@ -27,8 +34,18 @@ type CacheType = Map<AstNode, TypeDescription>
  *
  * @property $type - A string literal that identifies this type description as 'any'.
  */
-export interface AnyTypeDescription {
-  readonly $type: 'any'
+export class AnyTypeDescription extends TypeDescription {
+  constructor() {
+    super('any')
+  }
+
+  override isEqual(other: TypeDescription): boolean {
+    return true
+  }
+
+  override isAssignableTo(other: TypeDescription): boolean {
+    return true
+  }
 }
 
 /**
@@ -36,8 +53,10 @@ export interface AnyTypeDescription {
  *
  * @property $type - A string literal type that is always 'nil'.
  */
-export interface NilTypeDescription {
-  readonly $type: 'nil'
+export class NilTypeDescription extends TypeDescription {
+  constructor() {
+    super('nil')
+  }
 }
 
 /**
@@ -45,8 +64,10 @@ export interface NilTypeDescription {
  *
  * @property $type - A string literal type that is always 'void'.
  */
-export interface VoidTypeDescription {
-  readonly $type: 'void'
+export class VoidTypeDescription extends TypeDescription {
+  constructor() {
+    super('void')
+  }
 }
 
 /**
@@ -55,9 +76,10 @@ export interface VoidTypeDescription {
  * @property $type - A constant string value indicating the type, which is always 'string'.
  * @property literal - An optional literal value of type `ast.Literal`.
  */
-export interface StringTypeDescription {
-  readonly $type: 'string'
-  readonly literal?: ast.Literal
+export class StringTypeDescription extends TypeDescription {
+  constructor(public literal?: ast.Literal) {
+    super('string')
+  }
 }
 
 /**
@@ -66,9 +88,10 @@ export interface StringTypeDescription {
  * @property $type - A string literal indicating the type, which is always 'number'.
  * @property literal - An optional property representing a literal value of the number type.
  */
-export interface NumberTypeDescription {
-  readonly $type: 'number'
-  readonly literal?: ast.Literal
+export class NumberTypeDescription extends TypeDescription {
+  constructor(public literal?: ast.Literal) {
+    super('number')
+  }
 }
 
 /**
@@ -77,9 +100,10 @@ export interface NumberTypeDescription {
  * @property $type - A string literal that identifies the type as 'boolean'.
  * @property literal - An optional AST literal associated with the boolean type.
  */
-export interface BooleanTypeDescription {
-  readonly $type: 'boolean'
-  readonly literal?: ast.Literal
+export class BooleanTypeDescription extends TypeDescription {
+  constructor(public literal?: ast.Literal) {
+    super('boolean')
+  }
 }
 
 /**
@@ -89,9 +113,23 @@ export interface BooleanTypeDescription {
  * @property {string} $type - The type identifier, which is always 'union'.
  * @property {TypeDescription[]} elementTypes - An array of type descriptions that are part of the union.
  */
-export interface UnionTypeDescription {
-  readonly $type: 'union'
-  readonly elementTypes: TypeDescription[]
+export class UnionTypeDescription extends TypeDescription {
+  constructor(public elementTypes: TypeDescription[]) {
+    super('union')
+  }
+
+  override toString(): string {
+    return `${this.$type}(${this.elementTypes.map(t => t.toString()).join(' | ')})`
+  }
+
+  override isEqual(other: TypeDescription): boolean {
+    if (other.$type !== 'union') return false
+    const otherUnion = other as UnionTypeDescription
+    // Union 타입은 순서가 중요하지 않다.
+    const set1 = TypeSystem.getNormalizedType(this.elementTypes)
+    const set2 = TypeSystem.getNormalizedType(otherUnion.elementTypes)
+    return set1.length == set2.length && set1.every(value => set2.find(e => value.isEqual(e)))
+  }
 }
 
 /**
@@ -101,9 +139,20 @@ export interface UnionTypeDescription {
  * @property {string} $type - The type identifier, which is always 'array'.
  * @property {TypeDescription} elementType - The description of the type of elements contained in the array.
  */
-export interface ArrayTypeDescription {
-  readonly $type: 'array'
-  readonly elementType: TypeDescription
+export class ArrayTypeDescription extends TypeDescription {
+  constructor(public elementType: TypeDescription) {
+    super('array')
+  }
+
+  override toString(): string {
+    return `${this.$type}<${this.elementType.toString()}>`
+  }
+
+  override isEqual(other: TypeDescription): boolean {
+    if (other.$type !== 'array') return false
+    const otherArray = other as ArrayTypeDescription
+    return this.elementType.isEqual(otherArray.elementType)
+  }
 }
 
 /**
@@ -114,10 +163,23 @@ export interface ArrayTypeDescription {
  * @property {TypeDescription} returnType - The description of the function's return type.
  * @property {FunctionParameter[]} parameters - The list of parameters that the function accepts.
  */
-export interface FunctionTypeDescription {
-  readonly $type: 'function'
-  readonly returnType: TypeDescription
-  readonly parameters: FunctionParameter[]
+export class FunctionTypeDescription extends TypeDescription {
+  constructor(public returnType: TypeDescription, public parameters: FunctionParameter[]) {
+    super('function')
+  }
+
+  override toString(): string {
+    const params = this.parameters.map(e => `${e.name}: ${e.type.toString()}`).join(', ')
+    return `(${params}) -> ${this.returnType.toString()}`
+  }
+
+  override isEqual(other: TypeDescription): boolean {
+    if (other.$type !== 'function') return false
+    const otherFunction = other as FunctionTypeDescription
+    if (!this.returnType.isEqual(otherFunction.returnType)) return false
+    if (this.parameters.length !== otherFunction.parameters.length) return false
+    return this.parameters.every((p, i) => p.type.isEqual(otherFunction.parameters[i].type))
+  }
 }
 
 /**
@@ -135,9 +197,20 @@ export interface FunctionParameter {
  * @property {string} $type - The type identifier, which is always 'object'.
  * @property {ast.ObjectDef | ast.ObjectType | ast.ObjectValue} literal - The literal representation of the class type.
  */
-export interface ObjectTypeDescription {
-  readonly $type: 'object'
-  readonly literal: ast.ObjectDef | ast.ObjectType | ast.ObjectValue
+export class ObjectTypeDescription extends TypeDescription {
+  constructor(public literal: ast.ObjectDef | ast.ObjectType | ast.ObjectValue) {
+    super('object')
+  }
+
+  override toString(): string {
+    if (this.literal && ast.isObjectDef(this.literal)) return this.literal.name
+    else return this.literal.$cstNode?.text ?? 'unknown'
+  }
+
+  override isEqual(other: TypeDescription): boolean {
+    //todo
+    return other.$type === 'object'
+  }
 }
 
 /**
@@ -147,10 +220,10 @@ export interface ObjectTypeDescription {
  * @property source - An optional property representing the source of the error, which is an AstNode.
  * @property message - A string containing the error message.
  */
-export interface ErrorTypeDescription {
-  readonly $type: 'error'
-  readonly source?: AstNode
-  readonly message: string
+export class ErrorTypeDescription extends TypeDescription {
+  constructor(public message: string, public source?: AstNode) {
+    super('error')
+  }
 }
 
 /**
@@ -172,48 +245,35 @@ export class TypeSystem {
   static createPrimitiveType(type: string, literal?: ast.Literal): TypeDescription {
     switch (type) {
       case 'any':
+        return new AnyTypeDescription()
       case 'nil':
+        return new NilTypeDescription()
       case 'void':
-        return {
-          $type: type,
-        }
+        return new VoidTypeDescription()
       case 'string':
+        return new StringTypeDescription(literal)
       case 'number':
+        return new NumberTypeDescription(literal)
       case 'boolean':
-        return {
-          $type: type,
-          literal,
-        }
+        return new BooleanTypeDescription(literal)
       default:
-        return TypeSystem.createErrorType(`Unknown primitive type: ${type}`)
+        return new ErrorTypeDescription(`Unknown primitive type: ${type}`)
     }
   }
 
   /**
    * Creates a union type description from the provided element types.
    *
-   * @param elementTypes - An array of `TypeDescription` objects that represent the types to be included in the union.
+   * @param types - An array of `TypeDescription` objects that represent the types to be included in the union.
    * @returns A `UnionTypeDescription` object representing the union of the provided types.
    */
-  static createUnionType(elementTypes: TypeDescription[]): UnionTypeDescription {
-    const set = new Set(elementTypes)
-    return {
-      $type: 'union',
-      elementTypes: [...set],
-    }
-  }
-
-  /**
-   * Creates an ArrayTypeDescription object with the specified element type.
-   *
-   * @param elementType - The type description of the elements in the array.
-   * @returns An ArrayTypeDescription object with the specified element type.
-   */
-  static createArrayType(elementType: TypeDescription): ArrayTypeDescription {
-    return {
-      $type: 'array',
-      elementType,
-    }
+  static createUnionType(types: TypeDescription[]): TypeDescription {
+    // Union 타입은 중복된 타입을 제거해야 하는데 Set을 사용해서 이를 처리할 수 없다.
+    // 중복된 타입을 제거한 후에도 union 타입인 경우에만 union을 리턴하고 아니면 단일 타입을 리턴한다.
+    const normalized = TypeSystem.getNormalizedType(types)
+    if (normalized.length == 0) return new ErrorTypeDescription('no types in union')
+    else if (normalized.length == 1) return normalized[0]
+    else return new UnionTypeDescription(normalized)
   }
 
   /**
@@ -232,68 +292,19 @@ export class TypeSystem {
    * 5. If an error occurs during type inference, it returns an error type.
    */
   static createFunctionType(params: ast.Parameter[], ret?: ast.Types, body?: ast.Block): FunctionTypeDescription {
-    /**
-     * Determines the return type of a function based on its explicitly defined return type,
-     * its body, or defaults to 'void' if neither is provided.
-     *
-     * @param returnType - The explicitly defined return type of the function, if any.
-     * @param body - The body of the function, which can be used to infer the return type if no explicit return type is provided.
-     * @param cache - A cache used for type inference.
-     * @returns The inferred or explicitly defined return type of the function.
-     */
-    const getFunctionReturnType = (
-      returnType: ast.Types | undefined,
-      body: ast.Block | undefined,
-      cache: CacheType
-    ): TypeDescription => {
-      // 명시된 리턴 타입이 있으면 이를 근거로 한다.
-      if (returnType) return TypeSystem.inferType(returnType, cache)
-
-      // 함수의 바디가 없으면 void type으로 간주한다
-      if (!body) return TypeSystem.createPrimitiveType('void')
-
-      return TypeSystem.inferTypeBlock(body, cache)
-    }
-
     const cache = new Map<AstNode, TypeDescription>()
-    const returnType = getFunctionReturnType(ret, body, cache)
+    // 명시된 리턴 타입이 있으면 이를 근거로 한다.
+    // 명시된 리턴 타입도 없고 함수의 바디도 없으면 void type으로 간주한다
+    let returnType: TypeDescription = new VoidTypeDescription()
+    if (ret) returnType = TypeSystem.inferType(ret, cache)
+    else if (body) returnType = TypeSystem.inferTypeBlock(body, cache)
+
     const parameters = params.map(e => ({
       name: e.name,
       type: TypeSystem.inferType(e.type, cache),
     }))
-    return {
-      $type: 'function',
-      returnType,
-      parameters,
-    }
-  }
 
-  /**
-   * Creates a ClassTypeDescription object from the given literal.
-   *
-   * @param literal - The AST node representing the object definition, type, or value.
-   * @returns An object describing the class type.
-   */
-  static createObjectType(literal: ast.ObjectDef | ast.ObjectType | ast.ObjectValue): ObjectTypeDescription {
-    return {
-      $type: 'object',
-      literal,
-    }
-  }
-
-  /**
-   * Creates an error type description object.
-   *
-   * @param message - The error message.
-   * @param source - Optional. The source AST node where the error occurred.
-   * @returns An object describing the error type.
-   */
-  static createErrorType(message: string, source?: AstNode): ErrorTypeDescription {
-    return {
-      $type: 'error',
-      message,
-      source,
-    }
+    return new FunctionTypeDescription(returnType, parameters)
   }
 
   /**
@@ -302,7 +313,7 @@ export class TypeSystem {
    * @param item - The type description to check.
    * @returns `true` if the item is of type `AnyTypeDescription`, otherwise `false`.
    */
-  static isAnyType(item: TypeDescription): item is AnyTypeDescription {
+  static isAnyType(item: TypeDescription): boolean {
     return item.$type === 'any'
   }
 
@@ -312,7 +323,7 @@ export class TypeSystem {
    * @param item - The type description to check.
    * @returns True if the item is of type `NilTypeDescription`, otherwise false.
    */
-  static isNilType(item: TypeDescription): item is NilTypeDescription {
+  static isNilType(item: TypeDescription): boolean {
     return item.$type === 'nil'
   }
 
@@ -322,7 +333,7 @@ export class TypeSystem {
    * @param item - The type description to check.
    * @returns True if the type description is a void type, otherwise false.
    */
-  static isVoidType(item: TypeDescription): item is VoidTypeDescription {
+  static isVoidType(item: TypeDescription): boolean {
     return item.$type === 'void'
   }
 
@@ -407,73 +418,6 @@ export class TypeSystem {
   }
 
   /**
-   * Converts a `TypeDescription` object to its string representation.
-   *
-   * @param item - The `TypeDescription` object to convert.
-   * @returns A string representation of the `TypeDescription`.
-   *          - If the type is a class type, returns the text of the class node or 'unknown' if not available.
-   *          - If the type is a function type, returns a string in the format of `(param1: type1, param2: type2, ...) -> returnType`.
-   *          - Otherwise, returns the type as a string.
-   */
-  static typeToString(item: TypeDescription): string {
-    if (TypeSystem.isObjectType(item)) {
-      return item.literal.$cstNode?.text ?? 'unknown'
-    } else if (TypeSystem.isFunctionType(item)) {
-      const params = item.parameters.map(e => `${e.name}: ${TypeSystem.typeToString(e.type)}`).join(', ')
-      return `(${params}) -> ${TypeSystem.typeToString(item.returnType)}`
-    } else {
-      return item.$type
-    }
-  }
-
-  /**
-   * Compares two TypeDescription objects to determine if they are equivalent.
-   *
-   * @param t1 - The first TypeDescription object to compare.
-   * @param t2 - The second TypeDescription object to compare.
-   * @returns `true` if the two TypeDescription objects are equivalent, `false` otherwise.
-   *
-   * The comparison takes into account the type of the objects and their specific properties:
-   * - For union types, the order of elements does not matter.
-   * - For array types, the element types must be the same.
-   * - For function types, the return types and parameter types must be the same.
-   * - For other types, only the type itself is compared.
-   */
-  static compareType(t1: TypeDescription, t2: TypeDescription): boolean {
-    if (t1.$type !== t2.$type) return false
-
-    if (TypeSystem.isUnionType(t1)) {
-      assert.ok(TypeSystem.isUnionType(t2))
-      if (t1.elementTypes.length != t2.elementTypes.length) {
-        return false
-      }
-      // Union 타입은 순서가 중요하지 않다.
-      const set1 = new Set(t1.elementTypes)
-      const set2 = new Set(t2.elementTypes)
-      return set1.size == set2.size && [...set1].every(value => set2.has(value))
-    } else if (TypeSystem.isArrayType(t1)) {
-      assert.ok(TypeSystem.isArrayType(t2))
-      return TypeSystem.compareType(t1.elementType, t2.elementType)
-    } else if (TypeSystem.isFunctionType(t1)) {
-      assert.ok(TypeSystem.isFunctionType(t2))
-      if (!TypeSystem.compareType(t1.returnType, t2.returnType)) {
-        return false
-      }
-      if (t1.parameters.length != t2.parameters.length) {
-        return false
-      }
-      for (let i = 0; i < t1.parameters.length; i++) {
-        if (!TypeSystem.compareType(t1.parameters[i].type, t2.parameters[i].type)) {
-          return false
-        }
-      }
-    }
-
-    // 나머지 타입은 모두 타입만 같으면 같은 타입이다.
-    return true
-  }
-
-  /**
    * Infers the type of a given AST node.
    *
    * @param node - The AST node for which the type is to be inferred. Can be undefined.
@@ -494,7 +438,7 @@ export class TypeSystem {
 
     let type: TypeDescription | undefined
     if (!node) {
-      type = TypeSystem.createErrorType('Could not infer type for undefined', node)
+      type = new ErrorTypeDescription('Could not infer type for undefined', node)
       exitLog(log, type, 'Exit(node is undefined)')
       return type
     }
@@ -506,7 +450,7 @@ export class TypeSystem {
     }
 
     // Prevent recursive inference errors
-    cache.set(node, TypeSystem.createErrorType('Recursive definition', node))
+    cache.set(node, new ErrorTypeDescription('Recursive definition', node))
 
     if (ast.isTypes(node)) {
       type = TypeSystem.inferTypeTypes(node, cache)
@@ -548,12 +492,14 @@ export class TypeSystem {
       type = TypeSystem.inferTypeBinaryExpression(node, cache)
     } else if (ast.isReturnExpression(node)) {
       type = TypeSystem.inferTypeReturnExpression(node, cache)
+    } else if (ast.isSpreadExpression(node)) {
+      type = TypeSystem.inferTypeSpreadExpression(node, cache)
     } else if (ast.isNewExpression(node)) {
       type = TypeSystem.inferTypeNewExpression(node, cache)
     } else if (ast.isArrayValue(node)) {
       type = TypeSystem.inferTypeArrayValue(node, cache)
     } else if (ast.isObjectValue(node)) {
-      type = TypeSystem.inferTypeObjectValue(node, cache)
+      type = TypeSystem.inferTypeObjectDef(node, cache)
     } else if (ast.isFunctionValue(node)) {
       type = TypeSystem.inferTypeFunctionDef(node, cache)
     } else if (ast.isLiteral(node)) {
@@ -563,7 +509,11 @@ export class TypeSystem {
     }
 
     if (!type) {
-      type = TypeSystem.createErrorType('Could not infer type for ' + node.$type, node)
+      type = new ErrorTypeDescription('Could not infer type for ' + node.$type, node)
+    }
+
+    if (TypeSystem.isErrorType(type)) {
+      console.error(chalk.red('Error type:'), type.message, node.$cstNode?.text)
     }
 
     cache.set(node, type)
@@ -584,13 +534,10 @@ export class TypeSystem {
    * - If there are multiple types, it returns a union type.
    */
   static inferTypeTypes(node: ast.Types, cache: CacheType): TypeDescription {
-    let type: TypeDescription
     const log = enterLog('inferAllTypes', `'${node.$cstNode?.text}'`)
     const ts = node.types.map(t => TypeSystem.inferTypeSimpleType(t, cache))
     // 실제 Union 타입이 아니면 처리를 단순화하기 위해 개별 타입으로 리턴한다.
-    if (ts.length == 0) type = TypeSystem.createErrorType('internal error', node)
-    else if (ts.length == 1) type = ts[0]
-    else type = TypeSystem.createUnionType(ts)
+    const type = TypeSystem.createUnionType(ts)
     exitLog(log, type)
     return type
   }
@@ -607,12 +554,12 @@ export class TypeSystem {
    * If the type cannot be determined, it returns an error type.
    */
   static inferTypeSimpleType(node: ast.SimpleType, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const log = enterLog('inferSimpleType', `'${node.$cstNode?.text}'`)
     if (ast.isArrayType(node)) {
-      type = TypeSystem.createArrayType(TypeSystem.inferTypeSimpleType(node.elementType, cache))
+      type = new ArrayTypeDescription(TypeSystem.inferTypeSimpleType(node.elementType, cache))
     } else if (ast.isObjectType(node)) {
-      type = TypeSystem.createObjectType(node)
+      type = new ObjectTypeDescription(node)
     } else if (ast.isElementType(node)) {
       if (ast.isFunctionType(node)) {
         type = TypeSystem.createFunctionType(node.params, node.returnType)
@@ -623,12 +570,12 @@ export class TypeSystem {
         if (node.reference.ref) {
           const ref = node.reference.ref
           if (ast.isObjectDef(ref)) {
-            type = TypeSystem.createObjectType(ref)
+            type = new ObjectTypeDescription(ref)
           } else {
-            traceLog('node.reference.ref is not class')
+            console.error(chalk.red('node.reference.ref is not class'))
           }
         } else {
-          traceLog('node.reference.ref is not valid')
+          console.error(chalk.red('node.reference.ref is not valid'))
         }
       }
     }
@@ -644,14 +591,12 @@ export class TypeSystem {
    * @returns The inferred type description of the variable definition.
    */
   static inferTypeVariableDef(node: ast.VariableDef, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('No type hint for this element', node)
     const log = enterLog('inferVariableDef', node.name)
     if (node.type) {
       type = TypeSystem.inferType(node.type, cache)
     } else if (node.value) {
       type = TypeSystem.inferType(node.value, cache)
-    } else {
-      type = TypeSystem.createErrorType('No type hint for this element', node)
     }
     exitLog(log, type)
     return type
@@ -667,7 +612,7 @@ export class TypeSystem {
   static inferTypeFunctionDef(node: ast.FunctionDef | ast.FunctionValue, cache: CacheType): TypeDescription {
     let log = ''
     if (ast.isFunctionDef(node)) log = enterLog('inferFunctionDef', node.name)
-    else log = enterLog('inferFunctionValue', node.$type, node.$cstNode?.text)
+    else log = enterLog('inferFunctionValue', `'${node.$cstNode?.text}', '${node.$type}'`)
     const type = TypeSystem.createFunctionType(node.params, node.returnType, node.body)
     exitLog(log, type)
     return type
@@ -680,9 +625,11 @@ export class TypeSystem {
    * @param cache - The cache to use for type inference.
    * @returns The inferred TypeDescription of the object definition node.
    */
-  static inferTypeObjectDef(node: ast.ObjectDef, cache: CacheType): TypeDescription {
-    const log = enterLog('inferObjectDef', node.name)
-    const type = TypeSystem.createObjectType(node)
+  static inferTypeObjectDef(node: ast.ObjectDef | ast.ObjectValue, cache: CacheType): TypeDescription {
+    let log = ''
+    if (ast.isObjectDef(node)) log = enterLog('inferObjectDef', node.name)
+    else log = enterLog('inferObjectValue', `'${node.$cstNode?.text}'`)
+    const type = new ObjectTypeDescription(node)
     exitLog(log, type)
     return type
   }
@@ -699,7 +646,7 @@ export class TypeSystem {
    * @returns The inferred type description of the call chain node.
    */
   static inferTypeCallChain(node: ast.CallChain, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const id = `element='${node.element?.$refText}', cst='${node?.$cstNode?.text}'`
     const log = enterLog('inferCallChain', id)
     traceLog(chalk.redBright('ref 참조전:'), id)
@@ -730,6 +677,10 @@ export class TypeSystem {
       if (TypeSystem.isFunctionType(type) && node.isFunction) {
         traceLog('함수 호출이면 함수 리턴 타입이 리턴되어야 한다', type.returnType.$type)
         type = type.returnType
+
+        // 일반적인 함수 호출이면 함수의 리턴 타입을 리턴하고
+        //todo 함수형 메서드 호출인 경우에는 return type을 조정해 준다.
+        // type = TypeSystem.getFunctionalMethodType(type, node, cache)
       }
     }
 
@@ -738,7 +689,7 @@ export class TypeSystem {
       const classItem = AstUtils.getContainerOfType(node, ast.isObjectDef)
       if (classItem) {
         traceLog(`'this' refers ${classItem.name}`)
-        type = TypeSystem.createObjectType(classItem)
+        type = new ObjectTypeDescription(classItem)
       } else {
         console.error(chalk.red('this or super is empty in types.ts'))
       }
@@ -755,12 +706,12 @@ export class TypeSystem {
         console.log(chalk.green(`  previous: ${node.previous?.$cstNode?.text}'s type: ${previousType.$type}`))
         if (TypeSystem.isFunctionType(previousType)) type = previousType.returnType
         else if (TypeSystem.isArrayType(previousType)) type = previousType.elementType
-        else type = TypeSystem.createErrorType('Could not infer type for element ' + node.element?.$refText, node)
+        else type = new ErrorTypeDescription('Could not infer type for element ' + node.element?.$refText, node)
         exitLog(log, type)
         return type
       }
 
-      type = TypeSystem.createErrorType('Could not infer type for element ' + node.element?.$refText, node)
+      type = new ErrorTypeDescription('Could not infer type for element ' + node.element?.$refText, node)
     }
 
     exitLog(log, type)
@@ -777,14 +728,12 @@ export class TypeSystem {
    */
   static inferTypeParameter(node: ast.Parameter, cache: CacheType): TypeDescription {
     // Parameter를 type이나 value로 타입을 알 수 없을 경우는 any type으로 취급한다.
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new AnyTypeDescription()
     const log = enterLog('inferParameter', node.name)
     if (node.type) {
       type = TypeSystem.inferType(node.type, cache)
     } else if (node.value) {
       type = TypeSystem.inferType(node.value, cache)
-    } else {
-      type = TypeSystem.createPrimitiveType('any')
     }
     exitLog(log, type)
     return type
@@ -803,14 +752,12 @@ export class TypeSystem {
    * @returns The inferred type description of the assignment binding node.
    */
   static inferTypeAssignBinding(node: ast.AssignBinding, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    // Assign Binding에는 value가 없을수는 없지만 없으면 nil type으로 취급한다.
+    let type: TypeDescription = new NilTypeDescription()
     const log = enterLog('inferAssignBinding', node.name)
     //todo 원래 타입은?
-    // Assign Binding에는 value가 없을수는 없지만 없으면 nil type으로 취급한다.
     if (node.value) {
       type = TypeSystem.inferType(node.value, cache)
-    } else {
-      type = TypeSystem.createPrimitiveType('nil')
     }
     exitLog(log, type)
     return type
@@ -859,14 +806,12 @@ export class TypeSystem {
    * @returns The inferred type description of the assignment node.
    */
   static inferTypeAssignment(node: ast.Assignment, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('No type hint for this element', node)
     const log = enterLog('inferAssignment', node.operator)
     if (node.assign) {
       type = TypeSystem.inferType(node.assign, cache)
     } else if (node.value) {
       type = TypeSystem.inferType(node.value, cache)
-    } else {
-      type = TypeSystem.createErrorType('No type hint for this element', node)
     }
     exitLog(log, type)
     return type
@@ -880,10 +825,10 @@ export class TypeSystem {
    * @returns The inferred type description of the logical NOT operation.
    */
   static inferTypeLogicalNot(node: ast.LogicalNot, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const log = enterLog('inferLogicalNot', node.operator)
     if (node.operator === '!' || node.operator === 'not') {
-      type = TypeSystem.createPrimitiveType('boolean')
+      type = new BooleanTypeDescription()
     }
     exitLog(log, type)
     return type
@@ -897,7 +842,7 @@ export class TypeSystem {
    * @returns The inferred type description of the IfExpression node.
    */
   static inferTypeIfExpression(node: ast.IfExpression, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const log = enterLog('inferIfExpression', node.$type)
     if (!node.then) {
       console.error(chalk.red('IfExpression has no then node'))
@@ -910,7 +855,7 @@ export class TypeSystem {
     // 그렇지 않은 모든 경우는 then의 타입을 그대로 사용한다.
     if (node.else) {
       const elseType = TypeSystem.inferType(node.else, cache)
-      if (type.$type != elseType.$type) {
+      if (!type.isEqual(elseType)) {
         type = TypeSystem.createUnionType([type, elseType])
       }
     }
@@ -927,8 +872,15 @@ export class TypeSystem {
    */
   static inferTypeMatchExpression(node: ast.MatchExpression, cache: CacheType): TypeDescription {
     const log = enterLog('inferMatchExpression', node.$type)
-    const type = TypeSystem.createErrorType('internal error', node)
-    //todo
+    const types: TypeDescription[] = []
+    node.cases.forEach(c => {
+      if (c.body) {
+        types.push(TypeSystem.inferTypeBlock(c.body, cache))
+      }
+    })
+    // type이 없으면 void type으로 처리한다.
+    let type: TypeDescription = TypeSystem.createUnionType(types)
+    if (TypeSystem.isErrorType(type)) type = new VoidTypeDescription()
     exitLog(log, type)
     return type
   }
@@ -955,10 +907,10 @@ export class TypeSystem {
    * @returns The inferred type description of the unary expression.
    */
   static inferTypeUnaryExpression(node: ast.UnaryExpression, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const log = enterLog('inferUnaryExpression', node.operator ? node.operator : '+')
     if (node.operator && node.operator === 'typeof') {
-      type = TypeSystem.createPrimitiveType('string')
+      type = new StringTypeDescription()
     } else {
       type = TypeSystem.inferType(node.value, cache)
     }
@@ -982,22 +934,22 @@ export class TypeSystem {
    * If the type cannot be inferred, an error type is returned.
    */
   static inferTypeBinaryExpression(node: ast.BinaryExpression, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const log = enterLog('inferBinaryExpression', node.operator)
-    type = TypeSystem.createErrorType('Could not infer type from binary expression', node)
+    type = new ErrorTypeDescription('Could not infer type from binary expression', node)
     if (['and', 'or', '&&', '||', '<', '<=', '>', '>=', '==', '!='].includes(node.operator)) {
-      type = TypeSystem.createPrimitiveType('boolean')
+      type = new BooleanTypeDescription()
     } else if (['-', '+', '**', '*', '/', '%'].includes(node.operator)) {
-      type = TypeSystem.createPrimitiveType('number')
+      type = new NumberTypeDescription()
     } else if (['..'].includes(node.operator)) {
       const left = TypeSystem.inferType(node.left, cache)
       const right = TypeSystem.inferType(node.right, cache)
       if (TypeSystem.isStringType(left) || TypeSystem.isStringType(right)) {
-        type = TypeSystem.createPrimitiveType('string')
+        type = new StringTypeDescription()
       }
     } else if (node.operator === 'instanceof') {
       //todo instanceof 의 결과는 일단 any type으로 처리한다.
-      type = TypeSystem.createPrimitiveType('any')
+      type = new AnyTypeDescription()
     }
     exitLog(log, type)
     return type
@@ -1011,12 +963,30 @@ export class TypeSystem {
    * @returns The inferred type description of the return expression.
    */
   static inferTypeReturnExpression(node: ast.ReturnExpression, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new VoidTypeDescription()
     const log = enterLog('inferReturnExpr')
-    if (!node.value) {
-      type = TypeSystem.createPrimitiveType('void')
-    } else {
+    if (node.value) {
       type = TypeSystem.inferType(node.value, cache)
+    }
+    exitLog(log, type)
+    return type
+  }
+
+  /**
+   * Infers the type of a spread expression node.
+   * Spread expression은 ...을 사용해서 배열을 풀어서 사용하는 경우이다.
+   * 예를들어 a = [1, 2, 3]이라고 할 때 b = [...a, 4, 5]와 같이 사용하는 경우이다.
+   *
+   * @param node - The return expression node to infer the type from.
+   * @param cache - A cache to store and retrieve type information.
+   * @returns The inferred type description of the return expression.
+   */
+  static inferTypeSpreadExpression(node: ast.SpreadExpression, cache: CacheType): TypeDescription {
+    let type: TypeDescription = new AnyTypeDescription()
+    const log = enterLog('inferSpreadExpr')
+    if (node.spread && node.spread.ref) {
+      type = TypeSystem.inferType(node.spread.ref, cache)
+      // console.log(chalk.red('spread type:'), node.spread.ref.name, node.spread.ref.$type, type.$type)
     }
     exitLog(log, type)
     return type
@@ -1030,10 +1000,10 @@ export class TypeSystem {
    * @returns The inferred type description of the new expression.
    */
   static inferTypeNewExpression(node: ast.NewExpression, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const log = enterLog('inferNewExpression', node.class.$refText)
     if (node.class.ref) {
-      type = TypeSystem.createObjectType(node.class.ref)
+      type = new ObjectTypeDescription(node.class.ref)
     }
     exitLog(log, type)
     return type
@@ -1050,30 +1020,17 @@ export class TypeSystem {
    * @param cache - A cache used for type inference.
    * @returns The inferred type description of the array value.
    */
-  //todo 모두 동일한 타입을 가지는지 검사해야 한다.
-  //todo 또한 함수의 경우 CallChain에서 처리되는데 이것도 거기서 처리되어야 하지 않을까
   static inferTypeArrayValue(node: ast.ArrayValue, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const log = enterLog('inferArrayValue', `item count= ${node.items.length}`)
-    //todo item이 없는 경우 즉 [] 으로 표현되는 빈 배열의 경우 any type으로 취급한다.
+    // item이 없는 경우 즉 [] 으로 표현되는 빈 배열의 경우 any type으로 취급한다.
     if (node.items.length > 0) {
-      type = TypeSystem.createArrayType(TypeSystem.inferType(node.items[0], cache))
-    } else type = TypeSystem.createPrimitiveType('any')
-    exitLog(log, type)
-    return type
-  }
-
-  /**
-   * Infers the type of an object value node.
-   *
-   * @param node - The AST node representing the object value.
-   * @param cache - The cache used for type inference.
-   * @returns The inferred type description of the object value.
-   */
-  static inferTypeObjectValue(node: ast.ObjectValue, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
-    const log = enterLog('inferObjectValue', `'${node.$cstNode?.text}'`)
-    type = TypeSystem.createObjectType(node)
+      const types: TypeDescription[] = []
+      node.items.forEach(item => {
+        types.push(TypeSystem.inferType(item, cache))
+      })
+      type = new ArrayTypeDescription(TypeSystem.createUnionType(types))
+    } else type = new AnyTypeDescription()
     exitLog(log, type)
     return type
   }
@@ -1086,24 +1043,28 @@ export class TypeSystem {
    * @returns The inferred type description of the literal node.
    */
   static inferTypeLiteral(node: ast.Literal, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const log = enterLog('inferLiteral', `'${node.$cstNode?.text}'`)
     if (typeof node.value == 'string') {
       switch (node.value) {
         case 'any':
+          type = new AnyTypeDescription()
+          break
         case 'nil':
+          type = new NilTypeDescription()
+          break
         case 'void':
-          type = TypeSystem.createPrimitiveType(node.value)
+          type = new VoidTypeDescription()
           break
         case 'true':
         case 'false':
-          type = TypeSystem.createPrimitiveType('boolean')
+          type = new BooleanTypeDescription()
           break
         default:
-          type = TypeSystem.createPrimitiveType('string', node)
+          type = new StringTypeDescription(node)
       }
     } else {
-      type = TypeSystem.createPrimitiveType('number', node)
+      type = new NumberTypeDescription(node)
     }
     exitLog(log, type)
     return type
@@ -1126,19 +1087,34 @@ export class TypeSystem {
    * Logs the process of type inference and any errors encountered.
    */
   static inferTypeBlock(node: ast.Block, cache: CacheType): TypeDescription {
-    let type: TypeDescription = TypeSystem.createErrorType('internal error', node)
+    const extractReturnExpression = (node: AstNode) => {
+      // return AstUtils.streamAllContents(node).filter(ast.isReturnExpression).toArray()
+      const result: ast.ReturnExpression[] = []
+      AstUtils.streamContents(node).forEach(n => {
+        if (ast.isFunctionDef(n) || ast.isFunctionType(n) || ast.isFunctionValue(n)) return
+        else if (ast.isReturnExpression(n)) result.push(n)
+        else {
+          const r = extractReturnExpression(n)
+          if (r) result.push(...r)
+        }
+      })
+      return result
+    }
+
+    let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     const log = enterLog('inferBlock', node.$type, node.$cstNode?.text)
     // Block이 여러 식으로 구성된 경우
     if (node.isBracket) {
       // 함수의 바디에 명시된 return 문이 없어도 void type으로 간주한다.
-      const returnStatements = AstUtils.streamAllContents(node).filter(ast.isReturnExpression).toArray()
-      if (returnStatements.length == 0) type = TypeSystem.createPrimitiveType('void')
-      else {
-        //todo 여러 타입을 return할 수 있지만 일단은 모두 단일 타입을 리턴하는 것으로 가정하고 이 타입을 return
-        for (const returnStatement of returnStatements) {
-          type = TypeSystem.inferType(returnStatement, cache)
-        }
+      // extractReturnExpression은 람다함수에서 리턴하는 경우를 배제한다.
+      // 여러 개의 return문이 있으면 각각의 타입이 union으로 처리한다.
+      const types: TypeDescription[] = []
+      const returnStatements = extractReturnExpression(node)
+      for (const returnStatement of returnStatements) {
+        types.push(TypeSystem.inferType(returnStatement, cache))
       }
+      type = TypeSystem.createUnionType(types)
+      if (TypeSystem.isErrorType(type)) type = new VoidTypeDescription()
     } else {
       // Block이 단일 식인 경우 이 식의 타입을 리턴한다.
       if (node.codes.length == 1) type = TypeSystem.inferType(node.codes[0], cache)
@@ -1170,5 +1146,78 @@ export class TypeSystem {
     }
     // Sets preserve insertion order
     return Array.from(set)
+  }
+
+  /**
+   * Returns an array of unique `TypeDescription` objects by removing duplicates.
+   *
+   * @param types - An array of `TypeDescription` objects to be normalized.
+   * @returns An array of unique `TypeDescription` objects.
+   */
+  static getNormalizedType(types: TypeDescription[]): TypeDescription[] {
+    // 새로운 타입과 기존의 타입들이 호환되는지 확인한다.
+    // 새로운 타입이 기존의 타입들에 포함되면 true를 리턴하는데 이는 새로운 타입을 추가할 필요가 없다는 의미이다.
+    // any type은 모든 타입으로 변환될 수 있으므로 제거한다.
+    const compatibleType = (nt: TypeDescription, set: TypeDescription[]) => {
+      if (set.some(e => nt.$type === e.$type)) return true
+
+      //todo nil도 일단은 any와 같이 취급한다.
+      if (TypeSystem.isAnyType(nt)) return true
+      else if (TypeSystem.isNilType(nt)) return true
+      else if (TypeSystem.isArrayType(nt)) {
+        let found = false
+        set.forEach(e => {
+          if (TypeSystem.isArrayType(e)) {
+            if (TypeSystem.isAnyType(nt.elementType) || TypeSystem.isAnyType(e.elementType)) found = true
+          }
+        })
+        return found
+      }
+      return false
+    }
+
+    // types에 타입이 하나 이하이면 그냥 리턴
+    if (types.length <= 1) return types
+
+    // types에 union type이 포함되어 있으면 union type을 풀어서 각각의 타입으로 변환한다.
+    const spread: TypeDescription[] = []
+    types.forEach(t => {
+      if (TypeSystem.isUnionType(t)) spread.push(...t.elementTypes)
+      else spread.push(t)
+    })
+
+    const set: TypeDescription[] = []
+    spread.forEach(e => {
+      if (!compatibleType(e, set)) set.push(e)
+    })
+    return set
+  }
+
+  /**
+   * Determines the functional method type for a given node in the call chain.
+   *
+   * This method checks if the provided type is of any type and if the method
+   * being called is one of the specified functional methods (`at`, `find`,
+   * `findLast`, `pop`, `reduce`, `reduceRight`, `shift`). If so, it attempts
+   * to infer the type from the previous node in the call chain if it exists
+   * and is an array type.
+   *
+   * @param type - The initial type description.
+   * @param node - The AST node representing the call chain.
+   * @param cache - The cache used for type inference.
+   * @returns The inferred type description.
+   */
+  static getFunctionalMethodType(type: TypeDescription, node: ast.CallChain, cache: CacheType): TypeDescription {
+    const method = node.element?.$refText
+    const methodNames = ['at', 'find', 'findLast', 'pop', 'reduce', 'reduceRight', 'shift']
+    if (TypeSystem.isAnyType(type) && method && methodNames.includes(method)) {
+      if (node.previous) {
+        const prevType = TypeSystem.inferType(node.previous, cache)
+        if (TypeSystem.isArrayType(prevType)) {
+          type = prevType.elementType
+        }
+      }
+    }
+    return type
   }
 }

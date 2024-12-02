@@ -102,8 +102,10 @@ export function registerValidationChecks(services: ScalaScriptServices) {
   const checks: ValidationChecks<ScalaScriptAstType> = {
     VariableDef: validator.checkVariableDef,
     FunctionDef: validator.checkFunctionDef,
-    ObjectDef: validator.checkClassDeclaration,
+    ObjectDef: validator.checkObjectDef,
     Assignment: validator.checkAssignment,
+    IfExpression: validator.checkIfExpression,
+    ObjectValue: validator.checkObjectDef,
     FunctionValue: validator.checkFunctionDef,
     UnaryExpression: validator.checkUnaryOperationAllowed,
     BinaryExpression: validator.checkBinaryOperationAllowed,

@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.5.6 - December 2, 2024
+
+- reinforce TypeSystem
+- fixed bug about inferTypeSimpleType
+
 ### 0.5.5 - November 29, 2024
 
 - refactoring TypeSystem
