@@ -1,6 +1,6 @@
 import { AstNode, AstUtils } from 'langium'
 import * as ast from './generated/ast.js'
-import { enterLog, exitLog, traceLog } from '../language/scala-script-util.js'
+import { enterLog, exitLog, findVariableDefWithName, traceLog } from '../language/scala-script-util.js'
 import chalk from 'chalk'
 
 /**
@@ -129,6 +129,27 @@ export class UnionTypeDescription extends TypeDescription {
     const set1 = TypeSystem.getNormalizedType(this.elementTypes)
     const set2 = TypeSystem.getNormalizedType(otherUnion.elementTypes)
     return set1.length == set2.length && set1.every(value => set2.find(e => value.isEqual(e)))
+  }
+
+  /**
+   * union type을 구성하는 타입 중에 하나라도 other에 할당 가능한 타입이 있으면 true를 리턴한다.
+   * 이것은 다음과 같은 경우를 가능하게 하기 위한 것이다.
+   * var u: string | number
+   * if (typeof u == 'number') n = u else s = u
+   */
+  override isAssignableTo(other: TypeDescription): boolean {
+    if (other.$type == 'any') return true
+    if (other.$type == 'union') {
+      const union = other as UnionTypeDescription
+      if (this.elementTypes.some(e => union.isContain(e))) return true
+    } else {
+      if (this.elementTypes.some(e => e.isEqual(other))) return true
+    }
+    return false
+  }
+
+  isContain(type: TypeDescription): boolean {
+    return this.elementTypes.some(e => e.isEqual(type))
   }
 }
 
@@ -679,8 +700,8 @@ export class TypeSystem {
         type = type.returnType
 
         // 일반적인 함수 호출이면 함수의 리턴 타입을 리턴하고
-        //todo 함수형 메서드 호출인 경우에는 return type을 조정해 준다.
-        // type = TypeSystem.getFunctionalMethodType(type, node, cache)
+        // 함수형 메서드 호출인 경우에는 return type을 조정해 준다.
+        type = TypeSystem.getFunctionalMethodType(type, node, cache)
       }
     }
 
@@ -1209,12 +1230,36 @@ export class TypeSystem {
    */
   static getFunctionalMethodType(type: TypeDescription, node: ast.CallChain, cache: CacheType): TypeDescription {
     const method = node.element?.$refText
-    const methodNames = ['at', 'find', 'findLast', 'pop', 'reduce', 'reduceRight', 'shift']
+    let methodNames = ['at', 'find', 'findLast', 'pop', 'reduce', 'reduceRight', 'shift']
     if (TypeSystem.isAnyType(type) && method && methodNames.includes(method)) {
       if (node.previous) {
         const prevType = TypeSystem.inferType(node.previous, cache)
         if (TypeSystem.isArrayType(prevType)) {
-          type = prevType.elementType
+          return prevType.elementType
+        }
+      }
+    }
+    methodNames = ['get', 'set']
+    if (TypeSystem.isAnyType(type) && method && methodNames.includes(method)) {
+      if (node.previous) {
+        let prevType: TypeDescription = new ErrorTypeDescription('internal error', node)
+        if (ast.isCallChain(node.previous)) {
+          const prevName = node.previous.element?.$refText
+          if (prevName) {
+            const prevNode = findVariableDefWithName(node, prevName)
+            if (prevNode && ast.isVariableDef(prevNode)) {
+              if (ast.isUnaryExpression(prevNode.value) && ast.isNewExpression(prevNode.value.value)) {
+                if (prevNode.value.value.class.$refText == 'Map') {
+                  prevNode.value.value.generic?.types.forEach(g => {
+                    prevType = TypeSystem.inferType(g, cache)
+                  })
+                }
+              }
+            }
+          }
+        }
+        if (TypeSystem.isObjectType(prevType)) {
+          return prevType
         }
       }
     }

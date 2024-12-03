@@ -126,6 +126,7 @@ export function registerValidationChecks(services: ScalaScriptServices) {
     VariableDef: validator.checkVariableDef,
     FunctionDef: validator.checkFunctionDef,
     ObjectDef: validator.checkObjectDef,
+    CallChain: validator.checkCallChain,
     Assignment: validator.checkAssignment,
     IfExpression: validator.checkIfExpression,
     ObjectValue: validator.checkObjectDef,

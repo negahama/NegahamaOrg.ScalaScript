@@ -115,6 +115,22 @@ export class ScalaScriptValidator {
   }
 
   /**
+   * Validates a call chain expression.
+   *
+   * @param expr - The call chain expression to validate.
+   * @param accept - The validation acceptor to collect validation results.
+   * @returns void
+   */
+  checkCallChain(expr: ast.CallChain, accept: ValidationAcceptor): void {
+    const log = enterLog('checkCallChain', expr.$cstNode?.text)
+    // if (expr.isFunction) {
+    //   //todo
+    //   console.log('checkCallChain', expr.$cstNode?.text)
+    // }
+    exitLog(log)
+  }
+
+  /**
    * Validates an assignment expression to ensure the right-hand side value is assignable to the left-hand side variable.
    *
    * @param expr - The assignment expression to validate.

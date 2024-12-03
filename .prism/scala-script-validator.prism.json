@@ -8,9 +8,9 @@
       "title": "`} else if (ast.isObjectType(fromLit)) {` at language\\scala-script-validator.ts#458",
       "source": {
         "file": "/language/scala-script-validator.ts",
-        "startLine": 431,
+        "startLine": 463,
         "startColumn": 0,
-        "endLine": 436,
+        "endLine": 468,
         "endColumn": 0
       },
       "notes": [

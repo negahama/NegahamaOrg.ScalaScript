@@ -177,176 +177,176 @@ export const ScalaScriptBuiltinLibrary = `
 
 @NotTrans export def Number = {
   // 두 개의 표현 가능한 숫자 사이의 최소 간격.
-  val EPSILON: number
+  static val EPSILON: number
   // JavaScript에서 안전한 최대 정수. (2^53 - 1)
-  val MAX_SAFE_INTEGER: number
+  static val MAX_SAFE_INTEGER: number
   // JavaScript에서 안전한 최소 정수. (-(2^53 - 1)).
-  val MIN_SAFE_INTEGER: number
+  static val MIN_SAFE_INTEGER: number
   // 표현 가능한 가장 큰 양수.
-  val MAX_VALUE: number
+  static val MAX_VALUE: number
   // 표현 가능한 가장 작은 양수. 즉, 0보다 크지만 0에 가장 가까운 양수
-  val MIN_VALUE: number
+  static val MIN_VALUE: number
   // "Not a Number"(숫자가 아님)을 나타내는 특별한 값.
-  val NaN: number
+  static val NaN: number
   // 음의 무한대를 나타내는 특수한 값. 오버플로우 시 반환됩니다.
-  val NEGATIVE_INFINITY: number
+  static val NEGATIVE_INFINITY: number
   // 양의 무한대를 나타내는 특수한 값. 오버플로우 시 반환됩니다.
-  val POSITIVE_INFINITY: number
+  static val POSITIVE_INFINITY: number
   // 주어진 값이 NaN인지 확인합니다.
-  val isNaN: () -> boolean
+  static val isNaN: () -> boolean
   // 주어진 값이 유한수 인지 확인합니다.
-  val isFinite: () -> boolean
+  static val isFinite: () -> boolean
   // 주어진 값이 정수인지 확인합니다.
-  val isInteger: () -> boolean
+  static val isInteger: () -> boolean
   // 주어진 값이 안전한 정수(-(2^53 - 1)과 2^53 - 1 사이의 정수)인지 확인합니다.
-  val isSafeInteger: () -> boolean
+  static val isSafeInteger: () -> boolean
   // 전역 객체 parseFloat()와 동일한 값입니다.
-  val parseFloat: (x: string) -> number
+  static val parseFloat: (x: string) -> number
   // 전역 객체 parseInt()와 동일한 값입니다.
-  val parseInt: (x: string) -> number
+  static val parseInt: (x: string) -> number
   // 지수 표기법으로 표기된 숫자를 표현하는 문자열을 반환한다
-  val toExponential: (fractionDigits: number) -> string
+  static val toExponential: (fractionDigits: number) -> string
   // 고정 소수점 표기법으로 숫자를 표현하는 문자열을 반환합니다.
-  val toFixed: (digits: number) -> string
+  static val toFixed: (digits: number) -> string
   // 이 숫자를 해당 언어 방식으로 표현된 문자열을 반환합니다.
-  val toLocaleString: (locales: string) -> string
+  static val toLocaleString: (locales: string) -> string
   // 고정 소수점 또는 지수 표기법으로 지정된 정밀도로 숫자를 표현하는 문자열을 반환합니다.
-  val toPrecision: (precision: number) -> string
+  static val toPrecision: (precision: number) -> string
   // 지정한 기수("base")에서 지정한 개체를 표현하는 문자열을 반환합니다.
-  val toString: () -> string
+  static val toString: () -> string
   // 명시된 객체의 원시 값을 반환합니다.
-  val valueOf: () -> number
+  static val valueOf: () -> number
 }
 
 @NotTrans export def Math = {
   // 오일러의 상수이며 자연로그의 밑. 약 2.718.
-  val E: number
+  static val E: number
   // 원의 둘레와 지름의 비율. 약 3.14159.
-  val PI: number
+  static val PI: number
   // 2의 자연로그. 약 0.693.
-  val LN2: number
+  static val LN2: number
   // 10의 자연로그. 약 2.303.
-  val LN10: number
+  static val LN10: number
   // 밑이 2인 로그 E. 약 1.443.
-  val LOG2E: number
+  static val LOG2E: number
   // 밑이 10인 로그 E. 약 0.434.
-  val LOG10E: number
+  static val LOG10E: number
   // ½의 제곱근. 약 0.707.
-  val SQRT1_2: number
+  static val SQRT1_2: number
   // 2의 제곱근. 약 1.414.
-  val SQRT2: number
+  static val SQRT2: number
   // 숫자의 절댓값을 반환합니다.
-  val abs: (x: number) -> number
+  static val abs: (x: number) -> number
   // 숫자의 아크코사인 값을 반환합니다.
-  val acos: (x: number) -> number
+  static val acos: (x: number) -> number
   // 숫자의 쌍곡아크코사인 값을 반환합니다.
-  val acosh: (x: number) -> number
+  static val acosh: (x: number) -> number
   // 숫자의 아크사인 값을 반환합니다.
-  val asin: (x: number) -> number
+  static val asin: (x: number) -> number
   // 숫자의 쌍곡아크사인 값을 반환합니다.
-  val asinh: (x: number) -> number
+  static val asinh: (x: number) -> number
   // 숫자의 아크탄젠트 값을 반환합니다.
-  val atan: (x: number) -> number
+  static val atan: (x: number) -> number
   // 숫자의 쌍곡아크탄젠트 값을 반환합니다.
-  val atanh: (x: number) -> number
+  static val atanh: (x: number) -> number
   // 인수 몫의 아크탄젠트 값을 반환합니다.
-  val atan2: (y: number, x: number) -> number
+  static val atan2: (y: number, x: number) -> number
   // 숫자의 세제곱근을 반환합니다.
-  val cbrt: (x: number) -> number
+  static val cbrt: (x: number) -> number
   // 인수보다 크거나 같은 수 중에서 가장 작은 정수를 반환합니다.
-  val ceil: (x: number) -> number
+  static val ceil: (x: number) -> number
   // 주어진 32비트 정수의 선행 0 개수를 반환합니다.
-  val clz32: (x: number) -> number
+  static val clz32: (x: number) -> number
   // 숫자의 코사인 값을 반환합니다.
-  val cos: (x: number) -> number
+  static val cos: (x: number) -> number
   // 숫자의 쌍곡코사인 값을 반환합니다.
-  val cosh: (x: number) -> number
+  static val cosh: (x: number) -> number
   // E^x 를 반환합니다. x는 인수이며 E 는 오일러 상수(2.718...) 또는 자연로그의 밑입니다.
-  val exp: (x: number) -> number
+  static val exp: (x: number) -> number
   // exp(x)에서 1을 뺀 값을 반환합니다.
-  val expm1: (x: number) -> number
+  static val expm1: (x: number) -> number
   // 인수보다 작거나 같은 수 중에서 가장 큰 정수를 반환합니다.
-  val floor: (x: number) -> number
+  static val floor: (x: number) -> number
   // 인수의 가장 가까운 단일 정밀도 표현을 반환합니다.
-  val fround: (x: number) -> number
+  static val fround: (x: number) -> number
   // 두 32비트 정수의 곱을 반환합니다.
-  val imul: (x: number, y) -> number
+  static val imul: (x: number, y) -> number
   // 숫자의 자연로그(e를 밑으로 하는 로그, 즉 ln) 값을 반환합니다.
-  val log: (x: number) -> number
+  static val log: (x: number) -> number
   // 숫자 x에 대해 1 + x의 자연로그(e를 밑으로 하는 로그, ln) 값을 반환합니다.
-  val log1p: (x: number) -> number
+  static val log1p: (x: number) -> number
   // 숫자의 밑이 10인 로그를 반환합니다.
-  val log10: (x: number) -> number
+  static val log10: (x: number) -> number
   // 숫자의 밑이 2인 로그를 반환합니다.
-  val log2: (x: number) -> number
+  static val log2: (x: number) -> number
   // 0개 이상의 인수에서 제일 큰 수를 반환합니다.
-  val max: (x: number, y: number) -> number
+  static val max: (x: number, y: number) -> number
   // 0개 이상의 인수에서 제일 작은 수를 반환합니다.
-  val min: (x: number, y: number) -> number
+  static val min: (x: number, y: number) -> number
   // x의 y 제곱을 반환합니다.
-  val pow: (x: number, y) -> number
+  static val pow: (x: number, y) -> number
   // 0과 1 사이의 난수를 반환합니다.
-  val random: () -> number
+  static val random: () -> number
   // 숫자에서 가장 가까운 정수를 반환합니다.
-  val round: (x: number) -> number
+  static val round: (x: number) -> number
   // x의 양의 수인지 음의 수인지 나타내는 부호를 반환합니다.
-  val sign: (x: number) -> number
+  static val sign: (x: number) -> number
   // 숫자의 사인 값을 반환합니다.
-  val sin: (x: number) -> number
+  static val sin: (x: number) -> number
   // 숫자의 쌍곡사인 값을 반환합니다.
-  val sinh: (x: number) -> number
+  static val sinh: (x: number) -> number
   // 숫자의 제곱근을 반환합니다.
-  val sqrt: (x: number) -> number
+  static val sqrt: (x: number) -> number
   // 숫자의 탄젠트 값을 반환합니다.
-  val tan: (x: number) -> number
+  static val tan: (x: number) -> number
   // 숫자의 쌍곡탄젠트 값을 반환합니다.
-  val tanh: (x: number) -> number
+  static val tanh: (x: number) -> number
   // 숫자의 정수 부분을 반환합니다.
-  val trunc: (x: number) -> number
+  static val trunc: (x: number) -> number
 }
 
 @NotTrans export def console = {
   // 첫 번째 매개변수가 false인 경우 메시지와 스택 추적을 출력합니다.
-  val assert: () -> void
+  static val assert: () -> void
   // 콘솔의 내용을 지웁니다.
-  val clear: () -> void
+  static val clear: () -> void
   // 주어진 레이블로 메서드를 호출한 횟수를 출력합니다.
-  val count: () -> void
+  static val count: () -> void
   // 주어진 라벨의 횟수를 초기화합니다.
-  val countReset: () -> void
+  static val countReset: () -> void
   // debug 중요도로 메시지를 출력합니다.
-  val debug: () -> void
+  static val debug: () -> void
   // 오류 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  val error: () -> void
+  static val error: () -> void
   // 새로운 인라인 그룹을 생성해, 이후 모든 출력을 한 단계 들여씁니다. 그룹을 나오려면 groupEnd()를 호출하세요.
-  val group: () -> void
+  static val group: () -> void
   // 새로운 인라인 그룹을 생성해, 이후 모든 출력을 한 단계 들여씁니다. 그러나 group()과 달리, groupCollapsed()로 생성한 그룹은 처음에 접혀 있습니다. 그룹을 나오려면 groupEnd()를 호출하세요.
-  val groupCollapsed: () -> void
+  static val groupCollapsed: () -> void
   // 현재 인라인 그룹을 나옵니다.
-  val groupEnd: () -> void
+  static val groupEnd: () -> void
   // 정보 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  val info: () -> void
+  static val info: () -> void
   // 일반 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  val log: () -> void
+  static val log: () -> void
   // 브라우저의 내장 프로파일러(Firefox 성능 측정 도구 등)를 실행합니다. 선택 사항으로 프로파일에 이름을 붙일 수 있습니다.
-  val profile: () -> void
+  static val profile: () -> void
   // 프로파일러를 멈춥니다. 프로파일 결과는 브라우저의 성능 측정 도구(Firefox 성능 측정 도구 등)에서 확인할 수 있습니다.
-  val profileEnd: () -> void
+  static val profileEnd: () -> void
   // 표 형태의 데이터를 표에 그립니다.
-  val table: () -> void
+  static val table: () -> void
   // 주어진 이름의 타이머를 실행합니다. 하나의 페이지에서는 최대 10,000개의 타이머를 동시에 실행할 수 있습니다.
-  val time: () -> void
+  static val time: () -> void
   // 지정한 타이머를 멈추고, 소요시간을 출력합니다.
-  val timeEnd: () -> void
+  static val timeEnd: () -> void
   // 스택 추적을 출력합니다.
-  val trace: () -> void
+  static val trace: () -> void
   // 경고 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  val warn: () -> void
+  static val warn: () -> void
 }
   
 @NotTrans export def assert = {
-  val equal: () -> void
-  val notEqual: () -> void
+  static val equal: () -> void
+  static val notEqual: () -> void
 }
 
 @NotTrans export def Array = {}
@@ -397,18 +397,18 @@ export const ScalaScriptBuiltinLibrary = `
 
 @NotTrans export def JSON = {
   // 주어진 값에 해당하는 JSON 문자열을 반환합니다. 선택 사항으로 특정 속성만 포함하거나 사용자 정의 방식으로 속성을 대체합니다.
-  val stringify: () -> string
+  static val stringify: () -> string
   // 문자열을 JSON으로서 구문 분석하고, 선택적으로 분석 결과의 값과 속성을 변환해 반환합니다.
-  val parse: () -> any
+  static val parse: () -> any
 }
 
 @NotTrans export def fs = { 
-  val existsSync: () -> boolean
-  val mkdirSync: () -> void
-  val readdirSync: () -> string[]
-  val readFileSync: () -> void
-  val writeFileSync: () -> void
-  val appendFileSync: () -> void
+  static val existsSync: () -> boolean
+  static val mkdirSync: () -> void
+  static val readdirSync: () -> string[]
+  static val readFileSync: () -> void
+  static val writeFileSync: () -> void
+  static val appendFileSync: () -> void
 }
 
 @NotTrans export val parseFloat: () ->number
