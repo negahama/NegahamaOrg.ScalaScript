@@ -38,9 +38,8 @@ export class ScalaScriptValidator {
     traceLog('stmt.value:', `${stmt.value?.$type}, '${stmt.value?.$cstNode?.text}'`)
 
     if (stmt.type && stmt.value) {
-      const cache = this.getTypeCache()
-      const left = TypeSystem.inferType(stmt.type, cache)
-      const right = TypeSystem.inferType(stmt.value, cache)
+      const left = TypeSystem.inferType(stmt.type)
+      const right = TypeSystem.inferType(stmt.value)
 
       traceLog(`${left.$type} = ${right.$type}`)
 
@@ -78,9 +77,8 @@ export class ScalaScriptValidator {
     const log = enterLog('checkFunctionDef', stmt.$cstNode?.text)
 
     if (stmt.body && stmt.returnType) {
-      const cache = this.getTypeCache()
-      const returnType = TypeSystem.inferType(stmt.returnType, cache)
-      const bodyType = TypeSystem.inferType(stmt.body, cache)
+      const returnType = TypeSystem.inferType(stmt.returnType)
+      const bodyType = TypeSystem.inferType(stmt.body)
 
       if (!this.isAssignable(bodyType, returnType)) {
         const tr = bodyType.toString()
@@ -141,9 +139,8 @@ export class ScalaScriptValidator {
     traceLog(`left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`)
     traceLog(`right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`)
 
-    const cache = this.getTypeCache()
-    const left = TypeSystem.inferType(expr.assign, cache)
-    const right = TypeSystem.inferType(expr.value, cache)
+    const left = TypeSystem.inferType(expr.assign)
+    const right = TypeSystem.inferType(expr.value)
 
     traceLog(`${left.$type} = ${right.$type}`)
 
@@ -175,8 +172,7 @@ export class ScalaScriptValidator {
   checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
     if (unary.operator) {
       const log = enterLog('checkUnaryOperationAllowed', unary.value.$type)
-      const cache = this.getTypeCache()
-      const item = TypeSystem.inferType(unary.value, cache)
+      const item = TypeSystem.inferType(unary.value)
       if (!this.isLegalOperation(unary.operator, item)) {
         accept('error', `Cannot perform operation '${unary.operator}' on value of type '${item.toString()}'.`, {
           node: unary,
@@ -205,9 +201,8 @@ export class ScalaScriptValidator {
     const log = enterLog('checkBinaryOperationAllowed', binary.operator)
     traceLog(`expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`)
 
-    const cache = this.getTypeCache()
-    const left = TypeSystem.inferType(binary.left, cache)
-    const right = TypeSystem.inferType(binary.right, cache)
+    const left = TypeSystem.inferType(binary.left)
+    const right = TypeSystem.inferType(binary.right)
 
     traceLog(`${right.$type} = ${left.$type}`)
 

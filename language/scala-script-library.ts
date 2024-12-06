@@ -83,59 +83,59 @@ export const ScalaScriptBuiltinLibrary = `
   // 주어진 인덱스에 있는 배열의 항목을 반환합니다. 마지막 항목부터 셀 수 있는 음의 정수를 허용합니다.
   val at: (index: number) -> any
   // 다른 배열 및/또는 값과 결합된 호출 배열인 새 배열을 반환합니다.
-  val concat: () -> any[]
+  val concat: (...value: any) -> any[]
   // 배열 내의 배열 요소 시퀀스를 복사하고 변경된 배열을 반환합니다.
-  val copyWithin: () -> any[]
+  val copyWithin: (target: number, start: number, end: number) -> any[]
   // 호출 배열의 모든 요소가 테스트 함수를 만족하면 true를 반환합니다.
-  val every: (callbackFn) -> boolean
+  val every: (callbackFn: any) -> boolean
   // 시작 인덱스부터 끝 인덱스까지 배열의 모든 요소를 고정된 값으로 채우고 변경된 배열을 반환합니다.
-  val fill: (value, start, end) -> any[]
+  val fill: (value: any, start: any, end: any) -> any[]
   // 제공된 필터링 함수가 true를 반환하는 호출 배열의 모든 요소를 포함하는 새 배열을 반환합니다.
-  val filter: (callbackFn) -> any[]
+  val filter: (callbackFn: any) -> any[]
   // 제공된 테스트 함수를 만족하는 배열의 첫 번째 요소의 값을 반환하고, 적절한 요소를 찾을 수 없으면 unvalined를 반환합니다.
-  val find: (callbackFn) -> any
+  val find: (callbackFn: any) -> any
   // 제공된 테스트 함수를 만족하는 배열의 첫 번째 요소의 인덱스를 반환하고, 적절한 요소를 찾을 수 없으면 -1을 반환합니다.
-  val findIndex: (callbackFn) -> number
+  val findIndex: (callbackFn: any) -> number
   // 제공된 테스트 함수를 만족하는 배열의 마지막 요소의 값을 반환하고, 적절한 요소를 찾을 수 없으면 unvalined를 반환합니다.
-  val findLast: (callbackFn) -> any
+  val findLast: (callbackFn: any) -> any
   // 제공된 테스트 함수를 만족하는 배열의 마지막 요소의 인덱스를 반환하고, 적절한 요소를 찾을 수 없는 경우 -1을 반환합니다.
-  val findLastIndex: (callbackFn) -> number
+  val findLastIndex: (callbackFn: any) -> number
   // 지정된 깊이까지 재귀적으로 연결된 모든 하위 배열 요소가 포함된 새 배열을 반환합니다.
-  val flat: (depth) -> any[]
+  val flat: (depth: number) -> any[]
   // 호출 배열의 각 요소에 지정된 콜백 함수를 적용한 다음 결과를 한 단계씩 평탄화하여 만들어진 새 배열을 반환합니다.
-  val flatMap: (callbackFn) -> any[]
+  val flatMap: (callbackFn: any) -> any[]
   // 호출 배열의 각 요소로 함수를 호출합니다.
-  val forEach: (callbackFn) -> void
+  val forEach: (callbackFn: any) -> void
   // 호출하는 배열에 값이 포함되어 있는지 여부를 판단하여 적절하게 true나false를 반환합니다.
-  val includes: (searchElement, fromIndex) -> boolean
+  val includes: (searchElement: any, fromIndex: number) -> boolean
   // 호출 배열에서 지정된 요소를 찾을 수 있는 첫 번째(최소) 인덱스를 반환합니다.
-  val indexOf: (searchElement, fromIndex) -> number
+  val indexOf: (searchElement: any, fromIndex: number) -> number
   // 배열의 모든 요소를 문자열로 결합합니다.
-  val join: (separate) -> string
+  val join: (separate: string) -> string
   // 호출 배열에서 지정된 요소를 찾을 수 있는 마지막(가장 큰) 인덱스를 반환하고, 찾을 수 없는 경우 -1을 반환합니다.
-  val lastIndexOf: (searchElement, fromIndex) -> number
+  val lastIndexOf: (searchElement: any, fromIndex: number) -> number
   // 호출 배열의 모든 요소에 함수를 호출한 결과를 포함하는 새 배열을 반환합니다.
-  val map: (callbackFn) -> any[]
+  val map: (callbackFn: any) -> any[]
   // 배열에서 마지막 요소를 제거하고 해당 요소를 반환합니다.
   val pop: () -> any
   // 배열 끝에 하나 이상의 요소를 추가하고, 배열의 새 length를 반환합니다.
-  val push: (element) -> number
+  val push: (...element: any) -> number
   // 배열의 각 요소(왼쪽에서 오른쪽으로)에 대해 사용자가 제공한 "리듀서" 콜백 함수를 실행하여 하나의 값으로 줄입니다.
-  val reduce: (callbackFn) -> any
+  val reduce: (callbackFn: any) -> any
   // 배열의 각 요소(오른쪽에서 왼쪽으로)에 대해 사용자가 제공한 "리듀서" 콜백 함수를 실행하여 하나의 값으로 줄입니다.
-  val reduceRight: (callbackFn) -> any
+  val reduceRight: (callbackFn: any) -> any
   // 배열 요소의 순서를 반대로 바꿉니다. (첫 번째가 마지막이 되고, 마지막이 첫 번째가 됩니다.)
   val reverse: () -> any[]
   // 배열에서 첫 번째 요소를 제거하고 해당 요소를 반환합니다.
   val shift: () -> any
   // 호출 배열의 구획을 추출하고 새 배열을 반환합니다.
-  val slice: () -> any[]
+  val slice: (begin: number, end: number) -> any[]
   // 호출 배열의 요소 중 하나 이상이 제공된 테스트 함수를 만족하면 true를 반환합니다.
-  val some: (callbackFn) -> boolean
+  val some: (callbackFn: any) -> boolean
   // 배열의 요소를 제자리 정렬하고 배열을 반환합니다.
-  val sort: (callbackFn) -> any[]
+  val sort: (callbackFn: any) -> any[]
   // 배열에서 요소를 추가 및/또는 제거합니다.
-  val splice: () -> any[]
+  val splice: (start: number, deleteCount: number, ...item: any) -> any[]
   // 호출 배열과 그 요소를 나타내는 문자열을 반환합니다.
   val toString: () -> string
   // 배열 앞쪽에 하나 이상의 요소를 추가하고, 배열의 새 length를 반환합니다.
@@ -307,46 +307,46 @@ export const ScalaScriptBuiltinLibrary = `
 
 @NotTrans export def console = {
   // 첫 번째 매개변수가 false인 경우 메시지와 스택 추적을 출력합니다.
-  static val assert: () -> void
+  static val assert: (...args: any) -> void
   // 콘솔의 내용을 지웁니다.
   static val clear: () -> void
   // 주어진 레이블로 메서드를 호출한 횟수를 출력합니다.
-  static val count: () -> void
+  static val count: (label?: string) -> void
   // 주어진 라벨의 횟수를 초기화합니다.
-  static val countReset: () -> void
+  static val countReset: (label?: string) -> void
   // debug 중요도로 메시지를 출력합니다.
-  static val debug: () -> void
+  static val debug: (...args: any) -> void
   // 오류 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  static val error: () -> void
+  static val error: (...args: any) -> void
   // 새로운 인라인 그룹을 생성해, 이후 모든 출력을 한 단계 들여씁니다. 그룹을 나오려면 groupEnd()를 호출하세요.
-  static val group: () -> void
+  static val group: (label?: string) -> void
   // 새로운 인라인 그룹을 생성해, 이후 모든 출력을 한 단계 들여씁니다. 그러나 group()과 달리, groupCollapsed()로 생성한 그룹은 처음에 접혀 있습니다. 그룹을 나오려면 groupEnd()를 호출하세요.
-  static val groupCollapsed: () -> void
+  static val groupCollapsed: (label?: string) -> void
   // 현재 인라인 그룹을 나옵니다.
-  static val groupEnd: () -> void
+  static val groupEnd: (label?: string) -> void
   // 정보 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  static val info: () -> void
+  static val info: (...args: any) -> void
   // 일반 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  static val log: () -> void
+  static val log: (...args: any) -> void
   // 브라우저의 내장 프로파일러(Firefox 성능 측정 도구 등)를 실행합니다. 선택 사항으로 프로파일에 이름을 붙일 수 있습니다.
-  static val profile: () -> void
+  static val profile: (profileName: string) -> void
   // 프로파일러를 멈춥니다. 프로파일 결과는 브라우저의 성능 측정 도구(Firefox 성능 측정 도구 등)에서 확인할 수 있습니다.
-  static val profileEnd: () -> void
+  static val profileEnd: (profileName: string) -> void
   // 표 형태의 데이터를 표에 그립니다.
-  static val table: () -> void
+  static val table: (data: any, columns: any) -> void
   // 주어진 이름의 타이머를 실행합니다. 하나의 페이지에서는 최대 10,000개의 타이머를 동시에 실행할 수 있습니다.
-  static val time: () -> void
+  static val time: (label?: string) -> void
   // 지정한 타이머를 멈추고, 소요시간을 출력합니다.
-  static val timeEnd: () -> void
+  static val timeEnd: (label?: string) -> void
   // 스택 추적을 출력합니다.
-  static val trace: () -> void
+  static val trace: (...args: any) -> void
   // 경고 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  static val warn: () -> void
+  static val warn: (...args: any) -> void
 }
   
 @NotTrans export def assert = {
-  static val equal: () -> void
-  static val notEqual: () -> void
+  static val equal: (value1: any, value2: any, message?: string) -> void
+  static val notEqual: (value1: any, value2: any, message?: string) -> void
 }
 
 @NotTrans export def Array = {}
@@ -355,13 +355,13 @@ export const ScalaScriptBuiltinLibrary = `
   // 요소의 개수를 반환합니다.
   var size: number
   // key를 이용해 value를 저장합니다.
-  val set: (key, value) -> any
+  val set: (key: any, value: any) -> any
   // key에 해당하는 값을 반환합니다. key가 존재하지 않으면 undefined를 반환합니다.
-  val get: (key) -> any
+  val get: (key: any) -> any
   // key가 존재하면 true, 존재하지 않으면 false를 반환합니다.
-  val has: (key) -> boolean
+  val has: (key: any) -> boolean
   // key에 해당하는 값을 삭제합니다.
-  val delete: (key) -> void
+  val delete: (key: any) -> void
   // 맵 안의 모든 요소를 제거합니다.
   val clear: () -> void
   // 각 요소의 키를 모은 반복 가능한(iterable, 이터러블) 객체를 반환합니다.
@@ -378,11 +378,11 @@ export const ScalaScriptBuiltinLibrary = `
   // 셋에 몇 개의 값이 있는지 세줍니다.
   var size: number
   // 값을 추가하고 셋 자신을 반환합니다.
-  val add: (value) -> any
+  val add: (value: any) -> any
   // 셋 내에 값이 존재하면 true, 아니면 false를 반환합니다.
-  val has: (value) -> boolean
+  val has: (value: any) -> boolean
   // 값을 제거합니다. 호출 시점에 셋 내에 값이 있어서 제거에 성공하면 true, 아니면 false를 반환합니다.
-  val delete: (value) -> boolean 
+  val delete: (value: any) -> boolean 
   // 셋을 비웁니다.
   val clear: () -> void
   // 각 요소의 키를 모은 반복 가능한(iterable, 이터러블) 객체를 반환합니다.
@@ -414,4 +414,5 @@ export const ScalaScriptBuiltinLibrary = `
 @NotTrans export val parseFloat: () ->number
 @NotTrans export val parseInt: () ->number
 @NotTrans export val escape: () -> string
+//@NotTrans export val assert: (value: any, message?: any) -> void
 `.trim()
