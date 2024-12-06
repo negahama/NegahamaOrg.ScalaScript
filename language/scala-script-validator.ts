@@ -93,7 +93,7 @@ export class ScalaScriptValidator {
     } else {
       log = enterLog('checkObjectValue', stmt.$cstNode?.text)
     }
-    // TODO: implement classes
+    // todo: implement classes
     // accept("error", "Classes are currently unsupported.", {
     //   node: decl,
     //   property: "name",
