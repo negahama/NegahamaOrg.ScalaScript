@@ -1,5 +1,3 @@
-import { AstNode, AstUtils } from 'langium'
-import * as ast from './generated/ast.js'
 import { TypeDescription, TypeSystem } from './scala-script-types.js'
 
 /**
@@ -83,39 +81,8 @@ export function exitLog(log: string, type?: TypeDescription, ...optionalParams: 
 
   let typeInfo = ''
   if (TypeSystem.isErrorType(type)) typeInfo = type.message
-  else typeInfo = `-type: ${type?.$type}`
+  else typeInfo = `type: ${type.toString()}`
 
   // console.timeLog(log, typeInfo, ...optionalParams)
   console.log(log, typeInfo, ...optionalParams)
-}
-
-/**
- * Finds a variable definition or parameter with the specified name within the given AST node and its ancestors.
- *
- * ObjectDef의 name으로 property를 호출하면 static property만을 대상으로 해야 한다.
- * 그런데 이때 이 name이 object name인지 variable name인지를 구분해야 한다. 즉 다음과 같은 경우를 구분해야 한다.
- * def T = {
- *   val name: String = "name"
- * }
- * val f = (T: T) => {
- *   return T.name
- * }
- *
- * 이를 구분하기 위해서는 해당 이름이 있는지 먼저 확인해야 한다.
- *
- * @param node - The starting AST node to search within. If undefined, the function returns undefined.
- * @param name - The name of the variable or parameter to find. If undefined, the function returns undefined.
- * @returns The found variable definition or parameter node, or undefined if not found.
- */
-export function findVariableDefWithName(node: AstNode | undefined, name: string | undefined) {
-  if (!node || !name) return undefined
-  let item: AstNode | undefined = node
-  while (item) {
-    const found = AstUtils.streamContents(item).find(
-      i => (ast.isVariableDef(i) || ast.isParameter(i)) && i.name === name
-    )
-    if (found) return found
-    item = item.$container
-  }
-  return undefined
 }

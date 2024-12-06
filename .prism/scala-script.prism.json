@@ -8,9 +8,9 @@
       "title": "`ArrayType:` at language\\scala-script.langium#62",
       "source": {
         "file": "/language/scala-script.langium",
-        "startLine": 28,
+        "startLine": 55,
         "startColumn": 0,
-        "endLine": 28,
+        "endLine": 55,
         "endColumn": 63
       },
       "notes": [
@@ -28,9 +28,9 @@
       "title": "`// Parentheses` at language\\scala-script.langium#499",
       "source": {
         "file": "/language/scala-script.langium",
-        "startLine": 499,
+        "startLine": 524,
         "startColumn": 0,
-        "endLine": 518,
+        "endLine": 543,
         "endColumn": 0
       },
       "notes": [
@@ -48,9 +48,9 @@
       "title": "`TypeChain:` at language\\scala-script.langium#49",
       "source": {
         "file": "/language/scala-script.langium",
-        "startLine": 49,
+        "startLine": 80,
         "startColumn": 0,
-        "endLine": 51,
+        "endLine": 82,
         "endColumn": 0
       },
       "notes": [
@@ -60,6 +60,26 @@
           "importance": "Medium",
           "createdAt": "2024-11-30T02:51:55.981Z",
           "content": "TypeChain은 다음과 같은 경우를 위한 것인데 실제로 이런 경우는 transpile되면 interface안에 inferface가 정의되는 것이기 때문에 error가 된다.\r\n\r\n```ts\r\ndef Corp = {\r\n  def Firm = {\r\n    var name: string\r\n  }\r\n  var firms: Firm[]\r\n}\r\n```\r\n"
+        }
+      ]
+    },
+    {
+      "id": "415be60f7aff9b23aca9618d3ab17269",
+      "title": "`// '{' elements+=ObjectTypeElement? (','? elements+=ObjectTypeElement)* '}';` at language\\scala-script.langium#60",
+      "source": {
+        "file": "/language/scala-script.langium",
+        "startLine": 60,
+        "startColumn": 0,
+        "endLine": 60,
+        "endColumn": 0
+      },
+      "notes": [
+        {
+          "id": "5edbc4b905819596b79582b8034aa642",
+          "category": "Todo",
+          "importance": "Medium",
+          "createdAt": "2024-12-04T04:58:34.055Z",
+          "content": "이게 정석인데 이 방식을 사용하면 모호성 문제가 생긴다. 어떤 차이가 있는걸까?"
         }
       ]
     }

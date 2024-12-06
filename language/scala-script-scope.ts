@@ -2,7 +2,8 @@ import { AstNode, DefaultScopeProvider, ReferenceInfo, Scope, stream, StreamScop
 import * as ast from './generated/ast.js'
 import { LangiumServices } from 'langium/lsp'
 import { TypeSystem } from './scala-script-types.js'
-import { enterLog, exitLog, traceLog, findVariableDefWithName } from '../language/scala-script-util.js'
+import { enterLog, exitLog, traceLog } from './scala-script-util.js'
+import { ScalaScriptCache } from './scala-script-cache.js'
 import chalk from 'chalk'
 
 /**
@@ -52,18 +53,18 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       }
 
       // previous 의 타입을 추론한 결과가...
-      const prevTypeDesc = TypeSystem.inferType(previous, new Map())
+      const prevTypeDesc = TypeSystem.inferType(previous)
 
       // 클래스이면
       // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
       if (TypeSystem.isObjectType(prevTypeDesc)) {
-        traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.literal?.$type}`)
-        if (!ast.isObjectType(prevTypeDesc.literal)) {
-          console.error(chalk.red('internal error: prevTypeDesc is not object type:', prevTypeDesc.literal.$type))
+        traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.node?.$type}`)
+        if (!ast.isObjectType(prevTypeDesc.node)) {
+          console.error(chalk.red('internal error: prevTypeDesc is not object type:', prevTypeDesc.node.$type))
           return superScope
         }
 
-        const type = prevTypeDesc.literal
+        const type = prevTypeDesc.node
         let scope = this.scopeCacheForObjectType.get(type)
         if (!scope) {
           const removedBypass = type.elements.filter(e => !ast.isBypass(e))
@@ -122,7 +123,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // }
 
     // previous 의 타입을 추론한 결과가...
-    const prevTypeDesc = TypeSystem.inferType(previous, new Map())
+    const prevTypeDesc = TypeSystem.inferType(previous)
 
     // union type이면 포함된 타입중에 class, string, ... 등이 있는지 확인하고 있으면 이를 추론 타입으로 사용한다.
     let classDesc = prevTypeDesc
@@ -159,10 +160,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
 
     let scope: Scope | undefined
     if (TypeSystem.isObjectType(classDesc)) {
-      if (ast.isObjectDef(classDesc.literal)) {
-        scope = this.scopeObjectDef(context, previous, classDesc.literal)
-      } else if (ast.isObjectType(classDesc.literal)) {
-        scope = this.scopeObjectType(context, previous, classDesc.literal)
+      if (ast.isObjectDef(classDesc.node)) {
+        scope = this.scopeObjectDef(context, previous, classDesc.node)
+      } else if (ast.isObjectType(classDesc.node)) {
+        scope = this.scopeObjectType(context, previous, classDesc.node)
       } else {
         console.error(chalk.red('internal error in classDesc:', classDesc))
       }
@@ -221,7 +222,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       staticOnly = true
     }
 
-    const variableNode = findVariableDefWithName(previous, previousNodeText)
+    const variableNode = ScalaScriptCache.findVariableDefWithName(previous, previousNodeText)
     if (variableNode) {
       staticOnly = false
     }

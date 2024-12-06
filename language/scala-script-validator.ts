@@ -1,4 +1,4 @@
-import { AstNode, type ValidationAcceptor } from 'langium'
+import { type ValidationAcceptor } from 'langium'
 import * as ast from './generated/ast.js'
 import { TypeDescription, TypeSystem } from './scala-script-types.js'
 import { enterLog, exitLog, traceLog } from './scala-script-util.js'
@@ -21,39 +21,26 @@ export class ScalaScriptValidator {
    * - If neither type nor value is present, it reports an error indicating that variables require a type hint or an assignment at creation.
    */
   checkVariableDef(stmt: ast.VariableDef, accept: ValidationAcceptor): void {
-    // const text = AstUtils.getDocument(stmt).parseResult.value.$cstNode?.text
-    // const text = (AstUtils.getDocument(stmt).parseResult.value.$cstNode as RootCstNode).fullText
-    // console.log(text)
-    // const thenKeyword = GrammarUtils.findNodeForKeyword(stmt.$cstNode, "=")
-    // if (thenKeyword) {
-    //   const index = thenKeyword.offset
-    //   const previousChar = text.charAt(index - 1)
-    //   if (previousChar !== ' ') {
-    //     acceptor('error', ...)
-    //   }
-    // }
-
-    const log = enterLog('checkVariableDef', stmt.name)
-    traceLog('stmt.type:', `'${stmt.type?.$cstNode?.text}'`)
+    const log = enterLog('checkVariableDef', `variable name: ${stmt.name}`)
+    traceLog('stmt.type :', `${stmt.type?.$type}, '${stmt.type?.$cstNode?.text}'`)
     traceLog('stmt.value:', `${stmt.value?.$type}, '${stmt.value?.$cstNode?.text}'`)
 
     if (stmt.type && stmt.value) {
-      const cache = this.getTypeCache()
-      const left = TypeSystem.inferType(stmt.type, cache)
-      const right = TypeSystem.inferType(stmt.value, cache)
+      const left = TypeSystem.inferType(stmt.type)
+      const right = TypeSystem.inferType(stmt.value)
 
-      traceLog(`${left.$type} = ${right.$type}`)
+      traceLog(`checkVariableDef result: ${left.$type} = ${right.$type}`)
 
-      if (!this.isAssignable(right, left)) {
-        const tr = right.toString()
-        const tl = left.toString()
-        accept('error', `checkVariableDef: Type '${tr}' is not assignable to type '${tl}'.`, {
+      if (!right.isAssignableTo(left)) {
+        const msg = `checkVariableDef: Type '${right.toString()}' is not assignable to type '${left.toString()}'.`
+        accept('error', msg, {
           node: stmt,
           property: 'value',
         })
       }
     } else if (!stmt.type && !stmt.value) {
-      accept('error', 'Variables require a type hint or an assignment at creation', {
+      const msg = 'Variables require a type hint or an assignment at creation'
+      accept('error', msg, {
         node: stmt,
         property: 'name',
       })
@@ -78,14 +65,14 @@ export class ScalaScriptValidator {
     const log = enterLog('checkFunctionDef', stmt.$cstNode?.text)
 
     if (stmt.body && stmt.returnType) {
-      const cache = this.getTypeCache()
-      const returnType = TypeSystem.inferType(stmt.returnType, cache)
-      const bodyType = TypeSystem.inferType(stmt.body, cache)
+      const returnType = TypeSystem.inferType(stmt.returnType)
+      const bodyType = TypeSystem.inferType(stmt.body)
 
-      if (!this.isAssignable(bodyType, returnType)) {
-        const tr = bodyType.toString()
-        const tl = returnType.toString()
-        accept('error', `checkFunctionDef: Type '${tr}' is not assignable to type ` + `'${tl}'.`, {
+      traceLog(`checkFunctionDef result: ${returnType.$type} => ${bodyType.$type}`)
+
+      if (!bodyType.isAssignableTo(returnType)) {
+        const msg = `checkFunctionDef: Type '${bodyType.toString()}' is not assignable to type '${returnType.toString()}'.`
+        accept('error', msg, {
           node: stmt.body,
         })
       }
@@ -123,10 +110,107 @@ export class ScalaScriptValidator {
    */
   checkCallChain(expr: ast.CallChain, accept: ValidationAcceptor): void {
     const log = enterLog('checkCallChain', expr.$cstNode?.text)
-    // if (expr.isFunction) {
-    //   //todo
-    //   console.log('checkCallChain', expr.$cstNode?.text)
+    // if (expr.previous) {
+    //   const previousType = TypeSystem.inferType(expr.previous)
+    //   if (TypeSystem.isObjectType(previousType)) {
+    //     const previous = expr.previous as ast.CallChain
+    //     console.log('previous:', previous.$type, previous.$cstNode?.text)
+    //     const found = findObjectDefWithName(expr, previous.$cstNode?.text)
+    //     if (!found) {
+    //       accept('error', `Object '${previous.$cstNode?.text}' is not defined.`, {
+    //         node: expr,
+    //       })
+    //     }
+    //   }
     // }
+
+    //todo
+    // default parameter, optional parameter, rest parameter등으로 인해 파라미터의 처리가 간단하지 않다.
+    // 아울러 def에서 정의된 함수들은 아직 이름으로 함수를 찾지 못하고 있으며
+    // 어떤 def인가에 따라서도 다르기 때문에 이름으로만 찾는 것도 불가능하다.
+    // 또한 기정의된 console.log 같은 함수도 이 대상이 되는데 이것들의 파라미터도 정의되어져 있지 않다.
+    if (expr.isFunction) {
+      // const tt = TypeSystem.inferType(expr)
+      // console.log('function:', expr.element?.$refText, expr.$cstNode?.text)
+      // console.log('🚀 ~ ScalaScriptValidator ~ checkCallChain ~ tt:', tt.toString())
+      // //todo 'e.date.isEqual()'에서 isEqual의 ref가 없다. 아니면 e.date이거나...
+      // const ref = expr.element?.ref
+      // const type = TypeSystem.inferType(ref)
+      // if (!TypeSystem.isFunctionType(type)) {
+      // } else {
+      //   expr.args.forEach((arg, index) => {
+      //     const argType = TypeSystem.inferType(arg)
+      //     if (type.parameters.length === 1 && type.parameters[0].spread) {
+      //       // rest parameter
+      //       //todo 일단은 파라미터 체크를 하지 않는다.
+      //     } else {
+      //       const paramInfo = type.parameters[index]
+      //       if (index >= type.parameters.length || !paramInfo) {
+      //         console.log('function:', expr.element?.$refText, expr.$cstNode?.text)
+      //         console.log('  ref:', ref.name, 'type:', type.$type, type.toString())
+      //         console.log('  length:', index)
+      //       } else {
+      //         if (!paramInfo.type.isAssignableTo(argType)) {
+      //           console.log('function:', expr.element?.$refText, expr.$cstNode?.text)
+      //           console.log('  ref:', ref.name, 'type:', type.$type, type.toString())
+      //           console.log(
+      //             '  arg and param not match:',
+      //             paramInfo.name,
+      //             argType.toString(),
+      //             paramInfo.type.toString()
+      //           )
+      //           // accept('error', `Arguments for function is not matched '${expr.element?.$refText}'.`, {
+      //           //   node: expr,
+      //           // })
+      //         }
+      //       }
+      //     }
+      //   })
+      // }
+      // const t = ScalaScriptCache.get(expr.element?.ref)
+      // if (t) {
+      //   console.log('  found in cache:', t.$type, t.toString())
+      // } else {
+      //   const found = ScalaScriptCache.findFunctionDefWithName(expr, expr.element?.$refText)
+      //   if (found) {
+      //     console.log('  found in defs:', found.$type)
+      //   }
+      // }
+      // let definedName: string | undefined
+      // let definedParams: ast.Parameter[] = []
+      // if (ast.isFunctionDef(found)) {
+      //   const func = found as ast.FunctionDef
+      //   definedName = func.name
+      //   definedParams = func.params
+      // } else if (ast.isFunctionValue(found)) {
+      //   const func = found as ast.FunctionValue
+      //   definedName = func.$cstNode?.text
+      //   definedParams = func.params
+      // } else {
+      //   console.error(chalk.red('internal error', found.$type))
+      // }
+      // console.log('defined:', definedName, definedParams.length, expr.args.length)
+      // console.log('function:', expr.element?.$refText, expr.args.length)
+      // if (expr.args.length > definedParams.length) {
+      //   console.log('error', expr.args.length, definedParams.length)
+      //   console.log('function:', definedName)
+      //   accept('error', `Too many arguments for function '${expr.element?.$refText}'.`, {
+      //     node: expr,
+      //   })
+      //   return
+      // }
+      // expr.args.forEach((arg, index) => {
+      //   const definedType = TypeSystem.inferType(definedParams[index].type)
+      //   const argType = TypeSystem.inferType(arg)
+      //   if (!argType.isAssignableTo(definedType)) {
+      //     const tr = argType.toString()
+      //     const tl = definedType.toString()
+      //     accept('error', `Type '${tr}' is not assignable to type '${tl}'.`, {
+      //       node: arg,
+      //     })
+      //   }
+      // })
+    }
     exitLog(log)
   }
 
@@ -138,19 +222,17 @@ export class ScalaScriptValidator {
    */
   checkAssignment(expr: ast.Assignment, accept: ValidationAcceptor): void {
     const log = enterLog('checkAssignment', expr.assign.$type)
-    traceLog(`left: ${expr.assign.$container.$type}, ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`)
-    traceLog(`right: ${expr.value.$container.$type}, ${expr.value.$type}, ${expr.value.$cstNode?.text}`)
+    traceLog(`left : ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`)
+    traceLog(`right: ${expr.value.$type}, ${expr.value.$cstNode?.text}`)
 
-    const cache = this.getTypeCache()
-    const left = TypeSystem.inferType(expr.assign, cache)
-    const right = TypeSystem.inferType(expr.value, cache)
+    const left = TypeSystem.inferType(expr.assign)
+    const right = TypeSystem.inferType(expr.value)
 
-    traceLog(`${left.$type} = ${right.$type}`)
+    traceLog(`checkAssignment result: ${left.$type} = ${right.$type}`)
 
-    if (!this.isAssignable(right, left)) {
-      const tr = right.toString()
-      const tl = left.toString()
-      accept('error', `checkAssignment: Type '${tr}' is not assignable to type '${tl}'.`, {
+    if (!right.isAssignableTo(left)) {
+      const msg = `checkAssignment: Type '${right.toString()}' is not assignable to type '${left.toString()}'.`
+      accept('error', msg, {
         node: expr,
         property: 'value',
       })
@@ -173,17 +255,17 @@ export class ScalaScriptValidator {
    * @param accept - The validation acceptor to report errors.
    */
   checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
+    const log = enterLog('checkUnaryOperationAllowed', unary.value.$type)
     if (unary.operator) {
-      const log = enterLog('checkUnaryOperationAllowed', unary.value.$type)
-      const cache = this.getTypeCache()
-      const item = TypeSystem.inferType(unary.value, cache)
+      const item = TypeSystem.inferType(unary.value)
       if (!this.isLegalOperation(unary.operator, item)) {
-        accept('error', `Cannot perform operation '${unary.operator}' on value of type '${item.toString()}'.`, {
+        const msg = `Cannot perform operation '${unary.operator}' on value of type '${item.toString()}'.`
+        accept('error', msg, {
           node: unary,
         })
       }
-      exitLog(log)
     }
+    exitLog(log)
   }
 
   /**
@@ -205,41 +287,30 @@ export class ScalaScriptValidator {
     const log = enterLog('checkBinaryOperationAllowed', binary.operator)
     traceLog(`expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`)
 
-    const cache = this.getTypeCache()
-    const left = TypeSystem.inferType(binary.left, cache)
-    const right = TypeSystem.inferType(binary.right, cache)
+    const left = TypeSystem.inferType(binary.left)
+    const right = TypeSystem.inferType(binary.right)
 
-    traceLog(`${right.$type} = ${left.$type}`)
+    traceLog(`checkBinary result: ${right.$type} = ${left.$type}`)
 
     const tr = right.toString()
     const tl = left.toString()
     if (!this.isLegalOperation(binary.operator, left, right)) {
-      accept('error', `Cannot perform operation '${binary.operator}' on values of type ` + `'${tl}' and '${tr}'.`, {
+      const msg = `Cannot perform operation '${binary.operator}' on values of type '${tl}' and '${tr}'.`
+      accept('error', msg, {
         node: binary,
       })
     } else if (['==', '!='].includes(binary.operator)) {
       if (!this.isLegalOperation(binary.operator, left, right)) {
-        accept(
-          'warning',
+        const msg =
           `This comparison will always return '${binary.operator === '==' ? 'false' : 'true'}' as types ` +
-            `'${tl}' and '${tr}' are not compatible.`,
-          {
-            node: binary,
-            property: 'operator',
-          }
-        )
+          `'${tl}' and '${tr}' are not compatible.`
+        accept('warning', msg, {
+          node: binary,
+          property: 'operator',
+        })
       }
     }
     exitLog(log)
-  }
-
-  /**
-   * Retrieves a new type cache.
-   *
-   * @returns {Map<AstNode, TypeDescription>} A new map instance to be used as a type cache.
-   */
-  getTypeCache(): Map<AstNode, TypeDescription> {
-    return new Map()
   }
 
   /**
@@ -382,75 +453,5 @@ export class ScalaScriptValidator {
       } else return isLegal(operator, left, right)
     }
     return false
-  }
-
-  /**
-   * Determines if a type can be assigned to another type.
-   * any type은 모든 타입과 연산이 가능하며 nil type은 모든 타입과 가능한 연산이 없다.
-   *
-   * @param from - The source type description.
-   * @param to - The target type description.
-   * @param indent - The indentation level for logging (default is 0).
-   * @returns `true` if the `from` type can be assigned to the `to` type, otherwise `false`.
-   *
-   * The function checks for the following conditions:
-   * - If the types are identical or if either type is `any`, it returns `true`.
-   * - If the target type is a union type, it checks if the source type can be assigned to any of the union's element types.
-   * - If the source type is a union type, it checks if any of the union's element types can be assigned to the target type.
-   * - If either type is `nil`, it returns `true` only if both types are `nil`.
-   * - If the source type is a class type, it checks if the target type is also a class type and if the source class is in the inheritance chain of the target class.
-   * - If the source type is a function type, it checks if the target type is also a function type, if their return types are assignable, and if their parameters are assignable.
-   */
-  isAssignable(from: TypeDescription, to: TypeDescription): boolean {
-    return from.isAssignableTo(to)
-
-    // // 성능 향상을 위해 어느 하나의 타입이 any이면 바로 return true
-    // if (TypeSystem.isAnyType(from) || TypeSystem.isAnyType(to)) {
-    //   return true
-    // }
-
-    // // 성능 향상을 위해 둘의 타입이 동일하면 바로 return true
-    // // function type이면 return type과 parameter type을 비교한다.
-    // if (from.isEqual(to)) {
-    //   return true
-    // }
-
-    // // to가 union type이면 각 세부 타입들의 조합을 검사한다.
-    // if (TypeSystem.isUnionType(to)) {
-    //   return to.elementTypes.some(t => this.isAssignable(from, t))
-    // }
-
-    // // from이 union type이면 to도 동일한 union type이어야 한다.
-    // if (TypeSystem.isUnionType(from)) {
-    //   return from.isEqual(to)
-    // }
-
-    // // nil type은 다른 타입과 연산이 되지 않지만 같은 nil인 경우에는 assignable될 수 있다.
-    // // 이 경우가 허락되지 않으면 nil을 return하는 함수의 경우가 문제가 된다.
-    // if (TypeSystem.isNilType(from) || TypeSystem.isNilType(to)) {
-    //   return from.isEqual(to)
-    // }
-
-    // if (TypeSystem.isObjectType(from)) {
-    //   if (!TypeSystem.isObjectType(to)) {
-    //     return false
-    //   }
-    //   const fromLit = from.literal
-    //   if (ast.isObjectDef(fromLit)) {
-    //     const fromChain = TypeSystem.getClassChain(fromLit)
-    //     const toClass = to.literal
-    //     for (const fromClass of fromChain) {
-    //       if (fromClass === toClass) {
-    //         return true
-    //       }
-    //     }
-    //   } else if (ast.isObjectType(fromLit)) {
-    //     console.error(chalk.red('from is object type', fromLit.$cstNode?.text))
-    //   } else if (ast.isObjectValue(fromLit)) {
-    //     console.error(chalk.red('from is object value', fromLit.$cstNode?.text))
-    //   }
-    // }
-
-    // return from.isEqual(to)
   }
 }

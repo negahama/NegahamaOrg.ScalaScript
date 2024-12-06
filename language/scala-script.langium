@@ -4,6 +4,33 @@ entry Program: codes+=Code*;
 
 Code: Statement | Expression;
 
+/*
+  변수
+  변수는 타입이나 값이 아니다. 값을 가질 수 있는 상자이다. 값의 종류(타입)에 따라서 사용법이 달라진다.
+  VariableDef   | Definition | var n: number = 3
+  VariableType  | X          | 변수의 타입은 primitive, function, object, array 등이 type이 될 수 있다.
+  VariableValue | X          | 변수의 값도 타입들의 값이다.
+  VariableCall  | Name       | 변수 이름만으로 변수 사용
+                | Name(...)  | 타입이 함수인 경우 예) f(msg)
+                | Name[...]  | 타입이 배열인 경우 예) ary[1]
+                | Name.name  | 타입이 오브젝트인 경우 예) obj.name
+
+  함수
+  FunctionDef   | Definition | fun f = (msg: string) -> void => { ... }
+  FunctionType  | Type       | (msg: string) -> void
+  FunctionValue | Expression | (msg: string) -> void => { ... }
+
+  배열
+  ArrayDef      | X          | 배열 자체를 정의하지는 않는다.
+  ArrayType     | Type       | number[]
+  ArrayValue    | Expression | [ 1, 2, 3 ]
+
+  오브젝트
+  ObjectDef     | Definition | def Person = { var name: string, var age: number }
+  ObjectType    | Type       | { var name: string, var age: number }
+  ObjectValue   | Expression | { name: "samuel", age: 20 }
+*/
+
 //-----------------------------------------------------------------------------
 // 스칼라스크립트의 자료형 관련
 //-----------------------------------------------------------------------------
@@ -27,9 +54,13 @@ ArrayType:
   // SimpleType ({infer ArrayType.elementType=current} '[' ']')? ;
   elementType=(ObjectType | PrimitiveType | TypeChain) '[' ']';
 
-// ex) var obj: { name: string age: number }
+// ex) var obj: { name: string, age: number }
 ObjectType:
-  '{' elements+=(Bypass | VariableDef | FunctionDef | ObjectDef)* '}';
+  '{' elements+=ObjectTypeElement* '}';
+  // '{' elements+=ObjectTypeElement? (','? elements+=ObjectTypeElement)* '}';
+
+ObjectTypeElement:
+  (Bypass | VariableDef | FunctionDef | ObjectDef) (',')?;
 
 // 하나의 항목만을 가지는 타입들
 ElementType:
@@ -55,7 +86,6 @@ Generic:
 //todo
 // TupleType:
 //   '[' types+=SimpleType (',' types+=SimpleType)* ']';
-
 
 type NamedElement =
   VariableDef
@@ -103,12 +133,16 @@ Statement:
   하지만 스칼라스크립트는 타입스크립트의 let, const와 동일하기 때문에 스칼라의 var, val와 엄밀히는 다르다.
 */
 VariableDef:
-  (Annotation)? (export?='export')? (private?='private')? (static?='static')?
-  kind=('val' | 'var') name=Id (nullable?='?')? (':' type=Types)?
-  ('=' value=Expression)?;
+  (Annotation)? Modifier kind=('val' | 'var') TypedId ('=' value=Expression)?;
 
 fragment Annotation:
   '@' annotate=Id;
+
+fragment Modifier:
+  (export?='export')? (private?='private')? (static?='static')?;
+
+fragment TypedId:
+  name=Id (nullable?='?')? (':' type=Types)?;
 
 /*
   Function Defintion
@@ -152,7 +186,7 @@ FunctionValue:
 // parameter는 함수의 매개변수를 의미하는 용어이며 초기값을 가질 수 있지만
 // argument는 함수의 호출에서 함수에 전달되는 값으로 초기값 같은 선언적 의미가 없다.
 Parameter:
-  (spread?='...')? name=Id (nullable?='?')? (':' type=Types)? ('=' value=Expression)?;
+  (spread?='...')? TypedId ('=' value=Expression)?;
 
 fragment Parameters:
   params+=Parameter (',' params+=Parameter)*;
@@ -163,14 +197,10 @@ fragment FunctionReturn:
 fragment FunctionBody:
   '=>' body=Block;
 
-fragment Spread:
-  '...' spread=[NamedElement:Id];
-
 // 함수의 정의 자체는 값에 대한 이름 부여이고 위에서 설명하였듯이 ScalaScript에서는 이를 예외적인 경우로 본다.
 // var, val, def 와 동일하게 이름 다음에 = 이 오고 그 다음에 함수값(FunctionValue)이 위치한다.
 FunctionDef:
-  (Annotation)? (export?='export')? (private?='private')? (static?='static')? 
-  'fun' (extension=[ObjectDef:Id] '.')? name=Id
+  (Annotation)? Modifier 'fun' (extension=[ObjectDef:Id] '.')? name=Id
   '=' '(' Parameters? ')' (FunctionReturn)? (FunctionBody)?;
 
 Block:
@@ -204,12 +234,12 @@ ObjectDef:
   'def' name=Id ('extends' superClass=[ObjectDef:Id])?
   '=' body=ObjectType;
 
-// ex) var obj = { name = "samuel" age = 20 ...ary }
+// ex) var obj = { name = "samuel", age = 20, ...ary }
 ObjectValue:
   '{' elements+=(AssignBinding)* '}';
 
 // AssignBinding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
-AssignBinding: name=Id ':' value=Expression | Spread;
+AssignBinding: (name=Id ':' value=Expression | spread=SpreadExpression) (',')?;
 
 // 기타
 //-----------------------------------------------------------------------------
@@ -463,8 +493,11 @@ IfExpression:
   (elif+=IfElseExpression)*
   ('else' else=Block)?;
 
+// Logical, LogicalNot은 거의 모든 expression을 취급하기 때문에 조건절의 validation이 별도로 필요하다.
+// 조건절은 괄호가 없지만 괄호를 사용할 수도 있는데 이때는 GroupExpression이 사용된 것이다.
+// 반드시 괄호를 사용해야 할 경우에는 다음을 사용한다.
+// '(' condition=(Logical | LogicalNot) ')';
 fragment ConditionClause:
-  // '(' condition=(Logical | LogicalNot) ')';
   condition=(Logical | LogicalNot);
 
 IfElseExpression:
@@ -477,14 +510,13 @@ InfixExpression:
 ReturnExpression:
   'return' (value=Expression | ";");
 
+//todo NamedElement를 사용하는 것은 적합하지 않다.
 SpreadExpression:
   '...' spread=[NamedElement:Id];
 
 // ex) ary = [ 1, 2, 3 ], [], [ 1, ...ary ]
 ArrayValue:
   '[' items+=Expression? (',' items+=Expression )* ']';
-
-// ArrayExpression - CallChain 참고
 
 //-----------------------------------------------------------------------------
 // terminal & literal
@@ -544,20 +576,16 @@ terminal Digit          returns number: /[0-9]/;
 
 // String Literals
 // terminal STRING: /"[^"]*"/;
+// terminal StringElement: PrintableChar |  CharEscapeSeq;
+// terminal StringLiteral: '"' (StringElement)+ '"';
 // terminal StringLiteral: /`[^`]*`|"[^"]*"|'[^']*'/;
 terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'|`(\\.|[^`\\])*`/;
-// terminal StringLiteral: '"' (StringElement)+ '"';
-// terminal StringElement: PrintableChar |  CharEscapeSeq;
 terminal RegExStringLiteral: /\/[^\/]*\/g/;
 
 // Identifiers
 // 이것은 BooleanLiteral 다음에 와야 한다.
 // 그렇지 않으면 true, false가 ID로 취급되어진다.
 terminal ID: /[_$a-zA-Zㄱ-ㅎ가-힣][\w$ㄱ-ㅎ가-힣]*/;
-
-// opchar ::= // printableChar not matched by (whiteSpace | upper | lower |
-//            // letter | digit | paren | delim | opchar | Unicode_Sm | Unicode_So)
-// op     ::= opchar {opchar}
 
 // terminal Upper  : /[A-Z$_]/;     // and Unicode category Lu
 // terminal Lower  : /[a-z]/;       // and Unicode category Ll
@@ -567,7 +595,6 @@ terminal ID: /[_$a-zA-Zㄱ-ㅎ가-힣][\w$ㄱ-ㅎ가-힣]*/;
 
 // Identifiers
 terminal Id returns string: ID;
-// TypedId: name=Id ':' type=Types;
 
 // Whitespace and Comments
 // hidden terminal WS: /\s+/;
