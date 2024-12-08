@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.5.7 - December 9, 2024
+
+- make comma to be possible in ObjectDef, ObjectValue
+- improve the Generic and functional method
+- reinforce Scope and TypeSystem
+- and bug fix
+
 ### 0.5.6 - December 2, 2024
 
 - reinforce TypeSystem
