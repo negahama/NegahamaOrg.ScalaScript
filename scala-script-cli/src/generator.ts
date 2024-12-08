@@ -253,10 +253,14 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
   //   따라서 적절한 에러 처리를 해야 한다.
   // 3-2) 해당 이름이 var 변수이면 재정의되어질 수 있으므로 대부분 일반적인 변환 과정을 거치면 된다.
   //   하지만 일부 함수형 변수는 변환시 함수로 변환되어야 하는 것들이 있는데 아래와 같은 경우들이다.
-  //   3-2-1) constructor인 경우
-  //   3-2-2) argument가 디폴트 값을 가지는 경우
-  //   3-2-3) super 호출이 있는 경우
+  //   3-2-1) argument가 디폴트 값을 가지는 경우
+  //   3-2-2) super 호출이 있는 경우
+  // 4) 함수형 변수의 이름이 constructor인 경우는 어떤 경우라도 함수로 변환되어야 한다.
   // 위의 주석 [[al=42c6f56d6b52aeb10a6d766534a7d38a]]도 참조.
+
+  if (stmt.name == 'constructor') {
+    isFunction = true
+  }
 
   const currClass = AstUtils.getContainerOfType(stmt, ast.isObjectDef)
   if (currClass && currClass.superClass) {
@@ -281,10 +285,6 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
           } else if (foundName.kind == 'var') {
             isOverride = true
             // 함수형 변수로 변환하는데 몇가지 경우에는 함수로 변환한다.
-            if (stmt.name == 'constructor') {
-              isFunction = true
-            }
-
             stmt.value.params.forEach(param => {
               if (param.value) {
                 isFunction = true
