@@ -416,6 +416,7 @@ function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMeth
     includeFunction: !isClassMethod,
     override: isOverride,
     name: stmt.name,
+    generic: stmt.generic,
     params: stmt.params,
     returnType: stmt.returnType,
     body: stmt.body,
@@ -455,11 +456,15 @@ function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
   })
 
   if (isInterface) {
-    result += `interface ${stmt.name} {\n`
+    result += `interface ${stmt.name}`
+    result += generateGeneric(stmt.generic, indent)
+    result += ' {\n'
   } else {
-    result += `class ${stmt.name} `
+    result += `class ${stmt.name}`
+    result += generateGeneric(stmt.generic, indent) + ' '
     result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : '{\n'
   }
+
   stmt.body.elements.forEach(m => {
     if (ast.isVariableDef(m)) {
       result += applyIndent(indent + 1, transpileVariableDef(m, indent + 1, true))
@@ -909,14 +914,7 @@ function transplieSpreadExpression(expr: ast.SpreadExpression, indent: number): 
  */
 function transpileNewExpression(expr: ast.NewExpression, indent: number): string {
   let result = `new ${expr.class.$refText}`
-  if (expr.generic) {
-    result += '<'
-    expr.generic.types.forEach((t, index) => {
-      if (index != 0) result += ', '
-      result += generateSimpleType(t, indent)
-    })
-    result += '>'
-  }
+  result += generateGeneric(expr.generic, indent)
   result += '('
   expr.args.map((arg, index) => {
     if (index != 0) result += ', '
@@ -1061,14 +1059,7 @@ function generateTypeChain(expr: ast.TypeChain, indent: number): string {
   } else {
     if (expr.reference) {
       result += expr.reference.$refText
-      if (expr.generic) {
-        result += '<'
-        expr.generic.types.forEach((t, index) => {
-          if (index != 0) result += ', '
-          result += generateSimpleType(t, indent)
-        })
-        result += '>'
-      }
+      result += generateGeneric(expr.generic, indent)
     }
   }
   return result
@@ -1136,6 +1127,11 @@ interface GenerateFunctionParams {
   name?: string
 
   /**
+   * The generic type of the function.
+   */
+  generic?: ast.GenericDef | ast.GenericValue
+
+  /**
    * The parameters of the function.
    */
   params: ast.Parameter[]
@@ -1190,6 +1186,7 @@ function generateFunction(param: GenerateFunctionParams): string {
   let result = param.includeFunction ? 'function ' : ''
   result += param.override ? 'override ' : ''
   result += param.name ? param.name : ''
+  result += generateGeneric(param.generic, 0)
 
   const paramsText = param.params
     .map(arg => {
@@ -1285,6 +1282,34 @@ function generateArrayIndex(expr: ast.Expression | undefined, indent: number): s
     return (expr.value.value - 1).toString()
   }
   return generateExpression(expr, indent) + ' - 1'
+}
+
+/**
+ * Generates a generic type into a string representation.
+ *
+ * @param generic - The generic type to transpile. It can be undefined.
+ * @param indent - The indentation level to use for formatting.
+ * @returns The string representation of the generic type.
+ */
+function generateGeneric(generic: ast.GenericDef | ast.GenericValue | undefined, indent: number): string {
+  let result = ''
+  if (!generic) return result
+  if (ast.isGenericDef(generic)) {
+    result += '<'
+    generic.types.forEach((t, index) => {
+      if (index != 0) result += ', '
+      result += t
+    })
+    result += '>'
+  } else if (ast.isGenericValue(generic)) {
+    result += '<'
+    generic.types.forEach((t, index) => {
+      if (index != 0) result += ', '
+      result += generateSimpleType(t, indent)
+    })
+    result += '>'
+  }
+  return result
 }
 
 /**

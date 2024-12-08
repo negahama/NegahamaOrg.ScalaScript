@@ -29,10 +29,12 @@ export class ScalaScriptValidator {
       const left = TypeSystem.inferType(stmt.type)
       const right = TypeSystem.inferType(stmt.value)
 
-      traceLog(`checkVariableDef result: ${left.$type} = ${right.$type}`)
+      const tl = left.toString()
+      const tr = right.toString()
+      traceLog(`checkVariableDef result: ${tl} = ${tr}`)
 
       if (!right.isAssignableTo(left)) {
-        const msg = `checkVariableDef: Type '${right.toString()}' is not assignable to type '${left.toString()}'.`
+        const msg = `checkVariableDef: Type '${tr}' is not assignable to type '${tl}'.`
         accept('error', msg, {
           node: stmt,
           property: 'value',
@@ -65,13 +67,15 @@ export class ScalaScriptValidator {
     const log = enterLog('checkFunctionDef', stmt.$cstNode?.text)
 
     if (stmt.body && stmt.returnType) {
-      const returnType = TypeSystem.inferType(stmt.returnType)
+      const retType = TypeSystem.inferType(stmt.returnType)
       const bodyType = TypeSystem.inferType(stmt.body)
 
-      traceLog(`checkFunctionDef result: ${returnType.$type} => ${bodyType.$type}`)
+      const tr = retType.toString()
+      const tb = bodyType.toString()
+      traceLog(`checkFunctionDef result: ${tr} => ${tb}`)
 
-      if (!bodyType.isAssignableTo(returnType)) {
-        const msg = `checkFunctionDef: Type '${bodyType.toString()}' is not assignable to type '${returnType.toString()}'.`
+      if (!bodyType.isAssignableTo(retType)) {
+        const msg = `checkFunctionDef: Type '${tb}' is not assignable to type '${tr}'.`
         accept('error', msg, {
           node: stmt.body,
         })
@@ -228,7 +232,9 @@ export class ScalaScriptValidator {
     const left = TypeSystem.inferType(expr.assign)
     const right = TypeSystem.inferType(expr.value)
 
-    traceLog(`checkAssignment result: ${left.$type} = ${right.$type}`)
+    const tl = left.toString()
+    const tr = right.toString()
+    traceLog(`checkAssignment result: ${tl} = ${tr}`)
 
     if (!right.isAssignableTo(left)) {
       const msg = `checkAssignment: Type '${right.toString()}' is not assignable to type '${left.toString()}'.`
@@ -290,10 +296,10 @@ export class ScalaScriptValidator {
     const left = TypeSystem.inferType(binary.left)
     const right = TypeSystem.inferType(binary.right)
 
-    traceLog(`checkBinary result: ${right.$type} = ${left.$type}`)
-
-    const tr = right.toString()
     const tl = left.toString()
+    const tr = right.toString()
+    traceLog(`checkBinary result: ${tl} ${binary.operator} ${tr}`)
+
     if (!this.isLegalOperation(binary.operator, left, right)) {
       const msg = `Cannot perform operation '${binary.operator}' on values of type '${tl}' and '${tr}'.`
       accept('error', msg, {
@@ -401,10 +407,18 @@ export class ScalaScriptValidator {
 
       // 각종 산술 연산자, 비교 연산자
       // 모두 이항 연산자이며 number 타입과 관련된 연산자이다
+      // string 간의 비교도 가능한 것으로 한다.
       else if (['**', '*', '/', '%', '<', '<=', '>', '>='].includes(operator)) {
         if (!r) {
           console.error(chalk.red('internal error'))
           return false
+        }
+
+        if (['<', '<=', '>', '>='].includes(operator)) {
+          return (
+            (TypeSystem.isNumberType(l) && TypeSystem.isNumberType(r)) ||
+            (TypeSystem.isStringType(l) && TypeSystem.isStringType(r))
+          )
         }
 
         return TypeSystem.isNumberType(l) && TypeSystem.isNumberType(r)

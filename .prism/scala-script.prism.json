@@ -8,9 +8,9 @@
       "title": "`ArrayType:` at language\\scala-script.langium#62",
       "source": {
         "file": "/language/scala-script.langium",
-        "startLine": 55,
+        "startLine": 57,
         "startColumn": 0,
-        "endLine": 55,
+        "endLine": 57,
         "endColumn": 63
       },
       "notes": [
@@ -28,9 +28,9 @@
       "title": "`// Parentheses` at language\\scala-script.langium#499",
       "source": {
         "file": "/language/scala-script.langium",
-        "startLine": 524,
+        "startLine": 537,
         "startColumn": 0,
-        "endLine": 543,
+        "endLine": 556,
         "endColumn": 0
       },
       "notes": [
@@ -48,9 +48,9 @@
       "title": "`TypeChain:` at language\\scala-script.langium#49",
       "source": {
         "file": "/language/scala-script.langium",
-        "startLine": 80,
+        "startLine": 84,
         "startColumn": 0,
-        "endLine": 82,
+        "endLine": 86,
         "endColumn": 0
       },
       "notes": [
@@ -68,9 +68,9 @@
       "title": "`// '{' elements+=ObjectTypeElement? (','? elements+=ObjectTypeElement)* '}';` at language\\scala-script.langium#60",
       "source": {
         "file": "/language/scala-script.langium",
-        "startLine": 60,
+        "startLine": 62,
         "startColumn": 0,
-        "endLine": 60,
+        "endLine": 62,
         "endColumn": 0
       },
       "notes": [

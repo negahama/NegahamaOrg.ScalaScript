@@ -39,12 +39,14 @@ Code: Statement | Expression;
 Types: 
   types+=SimpleType ('|' types+=SimpleType)*;
 
-// 타입으로 사용될 수 있는 모든 타입들
-// ElementType은 하나의 항목만을 가지는 타입들이며 
-// CompoundType과 ArrayType은 두개 이상의 항목을 가지는 타입들이다.
-// ArrayType은 동일한 타입이 연속된 구조를 취하는 특수한 Compound 타입이다.
-// ArrayType을 CompoundType과 구분해서 처리하는 것은 표기 방법과 처리가 매우 다르기 때문이다.
-// 현재 CompoundType은 ObjectType 밖에 없기 때문에 이를 별도로 구분하지 않고 ObjectType으로 사용한다.
+/*
+  타입으로 사용될 수 있는 모든 타입들
+  ElementType은 하나의 항목만을 가지는 타입들이며 
+  CompoundType과 ArrayType은 두개 이상의 항목을 가지는 타입들이다.
+  ArrayType은 동일한 타입이 연속된 구조를 취하는 특수한 Compound 타입이다.
+  ArrayType을 CompoundType과 구분해서 처리하는 것은 표기 방법과 처리가 매우 다르기 때문이다.
+  현재 CompoundType은 ObjectType 밖에 없기 때문에 이를 별도로 구분하지 않고 ObjectType으로 사용한다.
+*/
 SimpleType:
   ArrayType | ObjectType | ElementType;
 
@@ -71,16 +73,21 @@ ElementType:
 PrimitiveType:
   type=('any' | 'nil' | 'void' | 'string' | 'number' | 'boolean');
 
-// 함수 타입이란 함수의 파라메터와 리턴 타입을 명시한 것을 말한다.
-// 일반적으로 FunctionValue와 FunctionCall(CallChain에 포함됨)이 주로 쓰이지만 변수의 타입으로 사용되는 경우에 단독으로 사용된다.
-// ex) (msg: string) -> void
+/*
+  함수 타입이란 함수의 파라메터와 리턴 타입을 명시한 것을 말한다.
+  일반적으로 FunctionValue와 FunctionCall(CallChain에 포함됨)이 주로 쓰이지만 변수의 타입으로 사용되는 경우에 단독으로 사용된다.
+  ex) (msg: string) -> void
+*/
 FunctionType:
   '(' Parameters? ')' FunctionReturn;
 
 TypeChain:
-  reference=[ObjectDef:Id] (generic=Generic)? ({infer TypeChain.previous=current} "." reference=[ObjectDef:Id] (generic=Generic)?)*;
+  reference=[ObjectDef:Id] (generic=GenericValue)? ({infer TypeChain.previous=current} "." reference=[ObjectDef:Id] (generic=GenericValue)?)*;
 
-Generic:
+GenericDef:
+  '<' types+=Id (',' types+=Id)* '>';
+
+GenericValue:
   '<' types+=SimpleType (',' types+=SimpleType)* '>';
 
 //todo
@@ -182,9 +189,11 @@ fragment TypedId:
 FunctionValue:
   ('(' Parameters? ')' | params+=Parameter) (FunctionReturn)? FunctionBody;
 
-// parameter와 argument는 다르다.
-// parameter는 함수의 매개변수를 의미하는 용어이며 초기값을 가질 수 있지만
-// argument는 함수의 호출에서 함수에 전달되는 값으로 초기값 같은 선언적 의미가 없다.
+/*
+  parameter와 argument는 다르다.
+  parameter는 함수의 매개변수를 의미하는 용어이며 초기값을 가질 수 있지만
+  argument는 함수의 호출에서 함수에 전달되는 값으로 초기값 같은 선언적 의미가 없다.
+*/
 Parameter:
   (spread?='...')? TypedId ('=' value=Expression)?;
 
@@ -197,10 +206,12 @@ fragment FunctionReturn:
 fragment FunctionBody:
   '=>' body=Block;
 
-// 함수의 정의 자체는 값에 대한 이름 부여이고 위에서 설명하였듯이 ScalaScript에서는 이를 예외적인 경우로 본다.
-// var, val, def 와 동일하게 이름 다음에 = 이 오고 그 다음에 함수값(FunctionValue)이 위치한다.
+/*
+  함수의 정의 자체는 값에 대한 이름 부여이고 위에서 설명하였듯이 ScalaScript에서는 이를 예외적인 경우로 본다.
+  var, val, def 와 동일하게 이름 다음에 = 이 오고 그 다음에 함수값(FunctionValue)이 위치한다.
+*/
 FunctionDef:
-  (Annotation)? Modifier 'fun' (extension=[ObjectDef:Id] '.')? name=Id
+  (Annotation)? Modifier 'fun' (extension=[ObjectDef:Id] '.')? name=Id (generic=GenericDef)? 
   '=' '(' Parameters? ')' (FunctionReturn)? (FunctionBody)?;
 
 Block:
@@ -231,7 +242,7 @@ Block:
 */
 ObjectDef:
   (Annotation)? (export?='export')?
-  'def' name=Id ('extends' superClass=[ObjectDef:Id])?
+  'def' name=Id (generic=GenericDef)? ('extends' superClass=[ObjectDef:Id])?
   '=' body=ObjectType;
 
 // ex) var obj = { name = "samuel", age = 20, ...ary }
@@ -452,7 +463,7 @@ GroupExpression:
 
 // new expression
 NewExpression:
-  'new' class=[ObjectDef:Id] (generic=Generic)? '(' (args+=Expression (',' args+=Expression)*)? ')';
+  'new' class=[ObjectDef:Id] (generic=GenericValue)? '(' (args+=Expression (',' args+=Expression)*)? ')';
 
 /*
   Literals
@@ -493,10 +504,12 @@ IfExpression:
   (elif+=IfElseExpression)*
   ('else' else=Block)?;
 
-// Logical, LogicalNot은 거의 모든 expression을 취급하기 때문에 조건절의 validation이 별도로 필요하다.
-// 조건절은 괄호가 없지만 괄호를 사용할 수도 있는데 이때는 GroupExpression이 사용된 것이다.
-// 반드시 괄호를 사용해야 할 경우에는 다음을 사용한다.
-// '(' condition=(Logical | LogicalNot) ')';
+/*
+  Logical, LogicalNot은 거의 모든 expression을 취급하기 때문에 조건절의 validation이 별도로 필요하다.
+  조건절은 괄호가 없지만 괄호를 사용할 수도 있는데 이때는 GroupExpression이 사용된 것이다.
+  반드시 괄호를 사용해야 할 경우에는 다음을 사용한다.
+  '(' condition=(Logical | LogicalNot) ')';
+*/
 fragment ConditionClause:
   condition=(Logical | LogicalNot);
 

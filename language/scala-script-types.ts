@@ -2,6 +2,7 @@ import { AstNode, AstUtils } from 'langium'
 import * as ast from './generated/ast.js'
 import { enterLog, exitLog, traceLog } from '../language/scala-script-util.js'
 import { ScalaScriptCache } from './scala-script-cache.js'
+import assert from 'assert'
 import chalk from 'chalk'
 
 /**
@@ -176,6 +177,14 @@ export class ArrayTypeDescription extends TypeDescription {
 }
 
 /**
+ * Represents generic information with a name and type description.
+ */
+export interface GenericInfo {
+  name: string
+  type: TypeDescription
+}
+
+/**
  * Represents a parameter of a function.
  */
 export interface FunctionParameter {
@@ -195,14 +204,17 @@ export interface FunctionParameter {
  */
 export class FunctionTypeDescription extends TypeDescription {
   returnType: TypeDescription
-  parameters: FunctionParameter[]
+  parameters: FunctionParameter[] = []
+  generic: GenericInfo[] = []
 
-  constructor(node: ast.FunctionDef | ast.FunctionType | ast.FunctionValue) {
+  constructor(node: ast.FunctionDef | ast.FunctionType | ast.FunctionValue | undefined) {
     super('function')
     // 명시된 리턴 타입이 있으면 이를 근거로 한다.
     // 명시된 리턴 타입도 없으면 함수의 바디를 근거로 한다.
     // 명시된 리턴 타입도 없고 함수의 바디도 없으면 void type으로 간주한다
     this.returnType = new VoidTypeDescription()
+    if (!node) return
+
     if (node.returnType) this.returnType = TypeSystem.inferType(node.returnType)
     else if ((ast.isFunctionDef(node) || ast.isFunctionValue(node)) && node.body)
       this.returnType = TypeSystem.inferType(node.body)
@@ -213,6 +225,16 @@ export class FunctionTypeDescription extends TypeDescription {
       nullable: e.nullable,
       spread: e.spread,
     }))
+
+    this.generic = []
+    if (ast.isFunctionDef(node)) {
+      node.generic?.types.forEach(name => {
+        this.generic.push({
+          name,
+          type: new AnyTypeDescription(),
+        })
+      })
+    }
   }
 
   override toString(): string {
@@ -254,6 +276,7 @@ export interface ObjectElement {
  */
 export class ObjectTypeDescription extends TypeDescription {
   elements: ObjectElement[]
+  generic: GenericInfo[]
 
   constructor(public node: ast.ObjectDef | ast.ObjectType | ast.ObjectValue) {
     super('object')
@@ -283,12 +306,21 @@ export class ObjectTypeDescription extends TypeDescription {
           elements.push({ name: e.name })
         } else {
           //todo spread 처리
-          console.error(chalk.red('interal error in createObjectType:', e))
+          console.error(chalk.red('internal error in createObjectType:', e))
         }
       })
     }
-
     this.elements = elements
+
+    this.generic = []
+    if (ast.isObjectDef(node)) {
+      node.generic?.types.forEach(name => {
+        this.generic.push({
+          name,
+          type: new AnyTypeDescription(),
+        })
+      })
+    }
   }
 
   override toString(): string {
@@ -338,6 +370,10 @@ export class ObjectTypeDescription extends TypeDescription {
 export class ErrorTypeDescription extends TypeDescription {
   constructor(public message: string, public source?: AstNode) {
     super('error')
+  }
+
+  override toString(): string {
+    return this.$type + ': ' + this.message
   }
 }
 
@@ -654,10 +690,10 @@ export class TypeSystem {
           if (ast.isObjectDef(ref)) {
             type = new ObjectTypeDescription(ref)
           } else {
-            console.error(chalk.red('node.reference.ref is not class'))
+            console.error(chalk.red('node.reference.ref is not class:', node.reference.ref.name))
           }
         } else {
-          console.error(chalk.red('node.reference.ref is not valid'))
+          console.error(chalk.red('node.reference.ref is not valid:', node.reference.$refText))
         }
       }
     }
@@ -749,9 +785,10 @@ export class TypeSystem {
         traceLog('함수 호출이면 함수 리턴 타입이 리턴되어야 한다', type.returnType.$type)
         // 일반적인 함수 호출이면 함수의 리턴 타입을 리턴하고
         // 함수형 메서드 호출인 경우에는 return type을 조정해 준다.
+        // 이때 if (fmt) type.returnType = fmt 같이 하면 정의된 함수의 리턴 타입이 변경되므로 주의해야 한다.
         const fmt = TypeSystem.getFunctionalMethodType(node)
-        if (fmt) type.returnType = fmt
-        type = type.returnType
+        if (fmt) type = fmt.retType
+        else type = type.returnType
       }
     }
 
@@ -803,22 +840,22 @@ export class TypeSystem {
     if (node.type) type = TypeSystem.inferType(node.type)
     else if (node.value) type = TypeSystem.inferType(node.value)
     else {
-      // Parameter를 any 타입으로 취급하면 함수 호출시 타입 체크를 할 수 없으며 해당 파라미터가 개체이면
-      // 이 파라미터를 통한 함수 호출도 타입 체크를 할 수 없게 된다. 예를들어 f = (date: Date) => { date.display() }는 정상적이지만
-      // dateList.forEach(date => date.display())는 display()의 ref가 정확하게 설정되지 않는다.
+      // Parameter를 any 타입으로 취급하면 함수 호출시 타입 체크를 할 수 없으며
+      // 해당 파라미터가 개체이면 이 파라미터를 통한 함수 호출도 타입 체크를 할 수 없게 된다.
+      // 예를들어 f = (date: Date) => { date.display() }에서 display()는 정상적으로 체크되지만
+      // dateList.forEach(date => date.display())에서는 display()의 ref가 정확하게 설정되지 않는다.
       // 왜냐하면 date의 타입이 정확하지 않기 때문이다.
+      // 파라미터의 타입을 추론하기 위해서는 파라미터가 사용되는 함수를 찾아서 그 함수의 타입을 참조해야 하는데
+      // 함수를 찾기 위해서 Parameter의 Container를 사용한다. node.$type이 Parameter이면 node.$container.$type는
+      // FunctionDef, FunctionValue, FunctionType이 될 수 있다. 하지만 이것만으로 파라미터의 타입을 정할 수는 없다.
+      // 위의 예에서처럼 date의 타입이 무엇인지를 알기 위해서는 dateList의 타입을 알아야 한다.
 
-      //todo 일단은 함수형 메서드인지를 판별해서 그 타입으로 설정한다.
-      // console.error(chalk.red('Parameter has no type or value:'), node.name)
-      if (node.$container.params.length == 1) {
-        const grandContainer = node.$container.$container
-        if (grandContainer) {
-          const fmt = TypeSystem.getFunctionalMethodType(grandContainer)
-          if (fmt) {
-            // console.log('parameter infered type:', fmt.toString())
-            type = fmt
-          }
-        }
+      const grandContainer = node.$container.$container
+      let fmt = TypeSystem.getFunctionalMethodType(grandContainer)
+      if (fmt) {
+        fmt.argType.forEach(arg => {
+          if (arg.name === node.name) type = arg.type
+        })
       }
     }
     exitLog(log, type)
@@ -1061,6 +1098,19 @@ export class TypeSystem {
     const log = enterLog('inferNewExpression', node.class.$refText)
     let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     if (node.class.ref) type = new ObjectTypeDescription(node.class.ref)
+
+    // 생성시 generic정보가 있으면 오브젝트의 타입에 이를 추가한다.
+    // new Set<string>(), new Set<number>()와 같은 경우에도 ObjectTypeDescription은 동일하지 않기 때문에 상관없다.
+    if (node.generic && TypeSystem.isObjectType(type)) {
+      type.generic = node.generic.types.map(g => {
+        const t = TypeSystem.inferType(g)
+        return {
+          type: t,
+          name: g.$cstNode?.text ? g.$cstNode.text : '',
+        }
+      })
+    }
+
     exitLog(log, type)
     return type
   }
@@ -1189,7 +1239,11 @@ export class TypeSystem {
       // 여러 개의 return문이 있으면 각각의 타입이 union으로 처리한다.
       const types: TypeDescription[] = extractReturns(node).map(r => TypeSystem.inferType(r))
       type = TypeSystem.createUnionType(types)
-      if (TypeSystem.isErrorType(type)) type = new VoidTypeDescription()
+      if (TypeSystem.isErrorType(type)) {
+        // console.error(chalk.red(type.toString()), types.length)
+        // types.forEach(t => console.error('  ', t.toString()))
+        type = new VoidTypeDescription()
+      }
     } else {
       // Block이 단일 식인 경우 이 식의 타입을 리턴한다.
       if (node.codes.length == 1) type = TypeSystem.inferType(node.codes[0])
@@ -1267,6 +1321,45 @@ export class TypeSystem {
   }
 
   /**
+   * Creates a new function type by replacing the return type and parameter types of an existing function type.
+   *
+   * @param exist - The existing function type description.
+   * @param other - The type description to replace with.
+   * @returns An object containing the new return type and argument types.
+   */
+  static getNewFunctionType(
+    exist: FunctionTypeDescription,
+    other: TypeDescription
+  ): {
+    retType: TypeDescription
+    argType: FunctionParameter[]
+  } {
+    const replace = (t: TypeDescription, n: TypeDescription) => {
+      if (TypeSystem.isAnyType(t)) return n
+      else if (TypeSystem.isArrayType(t)) {
+        if (TypeSystem.isAnyType(t.elementType)) return new ArrayTypeDescription(n)
+        else return new ArrayTypeDescription(t.elementType)
+      } else if (TypeSystem.isFunctionType(t)) {
+        const desc = new FunctionTypeDescription(undefined)
+        desc.returnType = replace(t.returnType, n)
+        desc.parameters = t.parameters.map(p => {
+          const type = replace(p.type, n)
+          return { name: p.name, type, nullable: p.nullable, spread: p.spread }
+        })
+        return desc
+      } else return t
+    }
+
+    const retType = replace(exist.returnType, other)
+    const argType = exist.parameters.map(p => {
+      const type = replace(p.type, other)
+      return { name: p.name, type, nullable: p.nullable, spread: p.spread }
+    })
+
+    return { retType, argType }
+  }
+
+  /**
    * Determines the functional method type for a given node in the call chain.
    *
    * This method checks if the provided type is of any type and if the method
@@ -1279,56 +1372,100 @@ export class TypeSystem {
    * @param node - The AST node representing the call chain.
    * @returns The inferred type description.
    */
-  static getFunctionalMethodType(node: AstNode): TypeDescription | undefined {
+  static getFunctionalMethodType(node: AstNode | undefined):
+    | {
+        argType: FunctionParameter[]
+        retType: TypeDescription
+      }
+    | undefined {
+    if (!node) return undefined
     if (ast.isCallChain(node)) {
-      const method = node.element?.$refText
-      let methodNames = ['at', 'find', 'findLast', 'pop', 'reduce', 'reduceRight', 'shift']
-      if (method && methodNames.includes(method)) {
-        if (node.previous) {
-          const prevType = TypeSystem.inferType(node.previous)
-          if (TypeSystem.isArrayType(prevType)) {
-            // console.log(`'${method}' is ${prevType.toString()} in getFunctionalMethodType`)
-            return prevType.elementType
-          } else {
-            console.error(
-              chalk.red('getFunctionalMethodType 3:'),
-              method,
-              'is not array type',
-              prevType.$type,
-              node.$cstNode?.text
-            )
-          }
-        } else {
-          console.error(chalk.red('getFunctionalMethodType 4:'), method, 'has no previous node', node.$cstNode?.text)
+      const methodName = node.element?.$refText
+      // 이 함수형 메서드들은 이름이 없거나 previous가 없으면 추론할 수 없다.
+      if (!methodName || !node.previous) return undefined
+
+      let methodNames = [
+        'every',
+        'filter',
+        'find',
+        'findIndex',
+        'findLast',
+        'findLastIndex',
+        'flatMap',
+        'forEach',
+        'map',
+        'reduce',
+        'reduceRight',
+        'some',
+        'sort',
+      ]
+
+      // this.corpList.find(corp => corp.name == 'name')와 같은 코드에서 corp의 타입과 find의 리턴 타입을 추론한다.
+      // 전달되는 node는 find이며 이것의 이전 노드인 this.corpList의 타입을 이용해서 corp, find의 타입을 추론한다.
+      // methodNames에 포함된 메서드들은 모두 배열에 관한 것이며 find는 변수나 함수로 정의되어져 있다.
+      if (methodNames.includes(methodName)) {
+        const prevType = TypeSystem.inferType(node.previous)
+        if (TypeSystem.isArrayType(prevType)) {
+          const methodRef = node.element?.ref
+          const methodType = TypeSystem.inferType(methodRef)
+          assert.ok(ast.isVariableDef(methodRef) || ast.isFunctionDef(methodRef), 'it is not method definition')
+          assert.ok(TypeSystem.isFunctionType(methodType), 'method type is not function type')
+          // map()인 경우에는 타입이 변경될 수 있다.
+          let other = new AnyTypeDescription()
+          if (methodName != 'map') other = prevType.elementType
+          return TypeSystem.getNewFunctionType(methodType, other)
         }
       }
 
+      // 이 부분은 Map에 대한 처리이다. 즉 다음과 같은 구문을 처리하기 위한 것이다.
+      // var corpMap = new Map<string, Corp>()
+      // this.corpMap.get('name')
+      // this.corpMap의 타입을 추론하면 object형 타입이 된다.
+      // 그리고 inferTypeNewExpression()에서 generic의 정보를 저장하기 때문에 corpMap의 타입에 string, Corp가 저장되어져 있다.
       methodNames = ['get', 'set']
-      if (method && methodNames.includes(method)) {
-        if (node.previous) {
-          let prevType: TypeDescription = new ErrorTypeDescription('internal error', node)
-          if (ast.isCallChain(node.previous)) {
-            const prevName = node.previous.element?.$refText
-            if (prevName) {
-              const prevNode = ScalaScriptCache.findVariableDefWithName(node, prevName)
-              if (prevNode && ast.isVariableDef(prevNode)) {
-                if (ast.isUnaryExpression(prevNode.value) && ast.isNewExpression(prevNode.value.value)) {
-                  if (prevNode.value.value.class.$refText == 'Map') {
-                    prevNode.value.value.generic?.types.forEach(g => {
-                      prevType = TypeSystem.inferType(g)
-                    })
-                  }
-                }
+      if (methodNames.includes(methodName) && ast.isCallChain(node.previous)) {
+        let prevType = TypeSystem.inferType(node.previous)
+        if (TypeSystem.isObjectType(prevType) && prevType.toString() == 'Map') {
+          // methodRef = ScalaScriptCache.findVariableDefWithName(node, node.previous.element?.$refText)
+          // methodRef = ScalaScriptCache.findVariableDefWithNode(node, node.previous.element?.ref)
+          //todo 이 부분은 추후에 수정해야 한다. K, V를 사용해야 한다.
+          const methodRef = node.element?.ref
+          const methodType = TypeSystem.inferType(methodRef)
+          assert.ok(ast.isVariableDef(methodRef) || ast.isFunctionDef(methodRef), 'it is not method definition')
+          assert.ok(TypeSystem.isFunctionType(methodType), 'method type is not function type')
+
+          let t: TypeDescription = new AnyTypeDescription()
+          if (prevType.generic) {
+            prevType.generic.forEach(g => {
+              // console.log(chalk.red('generic type:'), g.name, g.type.toString())
+              t = g.type
+            })
+            return TypeSystem.getNewFunctionType(methodType, t)
+          }
+
+          // 아래 코드는 prevType.generic이 없는 경우에만 실행된다.
+          // 필요하지 않을 것으로 생각이 되지만 혹시 모르니까 남겨둔다.
+          console.log(chalk.red('prevType.generic is not defined'))
+
+          // Map이 실제로 정의되어져 있는 부분을 찾아서 Generic을 사용한다.
+          // 실제 정의되어진 부분을 찾지 못하면 그냥 get, set이 정의되어진 대로 사용한다.
+          const ref = node.previous.element?.ref
+          if (ref && ast.isVariableDef(ref)) {
+            if (ast.isUnaryExpression(ref.value) && ast.isNewExpression(ref.value.value)) {
+              if (ref.value.value.class.$refText == 'Map') {
+                ref.value.value.generic?.types.forEach(g => {
+                  t = TypeSystem.inferType(g)
+                })
+                return TypeSystem.getNewFunctionType(methodType, t)
               }
             }
           }
-          if (TypeSystem.isObjectType(prevType)) {
-            return prevType
+          return {
+            retType: methodType.returnType,
+            argType: methodType.parameters,
           }
         }
       }
-    } else {
-      //console.error(chalk.red('getFunctionalMethodType 6:'), 'node is not CallChain', node.$type, node.$cstNode?.text)
     }
 
     return undefined
