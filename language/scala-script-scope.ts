@@ -1,4 +1,4 @@
-import { AstNode, DefaultScopeProvider, ReferenceInfo, Scope, stream, StreamScope } from 'langium'
+import { AstNode, AstUtils, DefaultScopeProvider, MapScope, ReferenceInfo, Scope, stream, StreamScope } from 'langium'
 import * as ast from './generated/ast.js'
 import { LangiumServices } from 'langium/lsp'
 import { TypeSystem } from './scala-script-types.js'
@@ -44,38 +44,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
 
     // 타입의 참조는 따로 처리한다.
     if (ast.isTypeChain(context.container)) {
-      const typeChain = context.container as ast.TypeChain
-      const previous = typeChain.previous
-      traceLog(`TypeChain.previous is ${previous?.$type}`)
-      if (!previous) {
-        exitLog(scopeLog, undefined, 'Exit(NO previous)')
-        return superScope
-      }
-
-      // previous 의 타입을 추론한 결과가...
-      const prevTypeDesc = TypeSystem.inferType(previous)
-
-      // 클래스이면
-      // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
-      if (TypeSystem.isObjectType(prevTypeDesc)) {
-        traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.node?.$type}`)
-        if (!ast.isObjectType(prevTypeDesc.node)) {
-          console.error(chalk.red('internal error: prevTypeDesc is not object type:', prevTypeDesc.node.$type))
-          return superScope
-        }
-
-        const type = prevTypeDesc.node
-        let scope = this.scopeCacheForObjectType.get(type)
-        if (!scope) {
-          const removedBypass = type.elements.filter(e => !ast.isBypass(e))
-          scope = this.createScopeForNodes(removedBypass)
-          this.scopeCacheForObjectType.set(type, scope)
-        }
-
-        exitLog(scopeLog, prevTypeDesc, 'Exit6')
-        return scope
-      } else console.error(chalk.red('internal error in typechain:', prevTypeDesc))
-      return superScope
+      const scope = this.scopeTypeChain(context, superScope)
+      exitLog(scopeLog, undefined, 'Exit(typechain)')
+      return scope
     }
 
     // check if the reference is CallChain or RefCall
@@ -192,6 +163,72 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   scopeCacheForObjectType = new Map<ast.ObjectType, Scope>()
   localScopeCacheForObjectDef = new Map<string, Scope>()
   globalScopeCacheForObjectDef = new Map<string, Scope>()
+
+  /**
+   * Generates a scope based on the type chain of the given context and super scope.
+   *
+   * @param context - The reference information containing the type chain and reference details.
+   * @param superScope - The parent scope to be used if no specific scope is found.
+   * @returns A new scope based on the type chain or the super scope if no specific scope is found.
+   *
+   * This function performs the following steps:
+   * 1. Retrieves the type chain from the context.
+   * 2. Logs the entry into the function.
+   * 3. Checks if the reference is found in the super scope.
+   * 4. If not found, checks if the reference is a generic type and creates a new scope for it.
+   * 5. If the reference is found, infers the type of the previous element in the type chain.
+   * 6. If the previous element is an object type, creates a scope for the object type and its members.
+   * 7. Returns the created scope or the super scope if no specific scope is found.
+   */
+  scopeTypeChain(context: ReferenceInfo, superScope: Scope): Scope {
+    const typeChain = context.container as ast.TypeChain
+    const log = enterLog('scopeTypeChain', typeChain.$cstNode?.text)
+
+    // generic의 추가로 TypeChain에서 superScope로 처리되지 않는 즉 reference가 없는 경우가 생긴다.
+    // generic의 Id로 예를들어 T, K, V 등이 사용될때 이것과 동일한 이름의 오브젝트가 존재하는 경우에도 문제가 된다.
+    // 그래서 먼저 generic인지를 확인하고 generic이면 새로운 scope를 생성해서 리턴한다.
+    const container = AstUtils.getContainerOfType(context.container, ast.isObjectDef)
+    if (container && container.generic?.types.includes(context.reference.$refText)) {
+      const s = this.descriptions.createDescription(context.container, context.reference.$refText)
+      const scope = new MapScope([s])
+      exitLog(log, undefined, 'Exit(make scope for generic)')
+      return scope
+    }
+
+    const previous = typeChain.previous
+    traceLog(`TypeChain.previous is ${previous?.$type}`)
+    if (!previous) {
+      exitLog(log, undefined, 'Exit(NO previous)')
+      return superScope
+    }
+
+    // previous 의 타입을 추론한 결과가...
+    const prevTypeDesc = TypeSystem.inferType(previous)
+
+    //todo 타입인데...
+    // 클래스이면
+    // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
+    if (TypeSystem.isObjectType(prevTypeDesc)) {
+      traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.node?.$type}`)
+      console.log(`FIND Class: ${previous.$type}, ${prevTypeDesc.node?.$type}`)
+      if (!ast.isObjectType(prevTypeDesc.node)) {
+        console.error(chalk.red('internal error: prevTypeDesc is not object type:', prevTypeDesc.node.$type))
+        return superScope
+      }
+
+      const type = prevTypeDesc.node
+      let scope = this.scopeCacheForObjectType.get(type)
+      if (!scope) {
+        const removedBypass = type.elements.filter(e => !ast.isBypass(e))
+        scope = this.createScopeForNodes(removedBypass)
+        this.scopeCacheForObjectType.set(type, scope)
+      }
+
+      exitLog(log, prevTypeDesc, 'Exit6')
+      return scope
+    } else console.error(chalk.red('internal error in typechain:', prevTypeDesc))
+    return superScope
+  }
 
   /**
    * 아래 함수들은 모두 동일한 메커니즘으로 동작한다.

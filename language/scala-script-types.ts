@@ -107,6 +107,30 @@ export class BooleanTypeDescription extends TypeDescription {
 }
 
 /**
+ * Represents a generic type description that extends the base `TypeDescription` class.
+ * This class is used to describe generic types in the ScalaScript language.
+ *
+ * @property $type - A string literal that identifies the type as 'generic'.
+ * @property name - The name of the generic type.
+ * @property type - The type description of the generic type.
+ */
+export class GenericTypeDescription extends TypeDescription {
+  constructor(public name: string, public type: TypeDescription = new AnyTypeDescription()) {
+    super('generic')
+  }
+
+  override toString(): string {
+    return `${this.$type}<${this.name}:${this.type.toString()}>`
+  }
+
+  override isEqual(other: TypeDescription): boolean {
+    if (other.$type !== 'generic') return false
+    const otherGeneric = other as GenericTypeDescription
+    return this.type.isEqual(otherGeneric.type)
+  }
+}
+
+/**
  * Represents a union type description.
  *
  * @interface UnionTypeDescription
@@ -179,7 +203,7 @@ export class ArrayTypeDescription extends TypeDescription {
 /**
  * Represents generic information with a name and type description.
  */
-export interface GenericInfo {
+interface GenericInfo {
   name: string
   type: TypeDescription
 }
@@ -205,7 +229,7 @@ export interface FunctionParameter {
 export class FunctionTypeDescription extends TypeDescription {
   returnType: TypeDescription
   parameters: FunctionParameter[] = []
-  generic: GenericInfo[] = []
+  generic: GenericTypeDescription[] = []
 
   constructor(node: ast.FunctionDef | ast.FunctionType | ast.FunctionValue | undefined) {
     super('function')
@@ -226,14 +250,11 @@ export class FunctionTypeDescription extends TypeDescription {
       spread: e.spread,
     }))
 
+    // ObjectDef, FunctionDef에서 정의되어진 것들은 디폴트로 AnyTypeDescritption을 가지고 있다가
+    // NewExpression에서 실제 타입으로 대체된다.
     this.generic = []
     if (ast.isFunctionDef(node)) {
-      node.generic?.types.forEach(name => {
-        this.generic.push({
-          name,
-          type: new AnyTypeDescription(),
-        })
-      })
+      this.generic = node.generic?.types.map(name => new GenericTypeDescription(name)) ?? []
     }
   }
 
@@ -276,7 +297,7 @@ export interface ObjectElement {
  */
 export class ObjectTypeDescription extends TypeDescription {
   elements: ObjectElement[]
-  generic: GenericInfo[]
+  generic: GenericTypeDescription[]
 
   constructor(public node: ast.ObjectDef | ast.ObjectType | ast.ObjectValue) {
     super('object')
@@ -306,7 +327,7 @@ export class ObjectTypeDescription extends TypeDescription {
           elements.push({ name: e.name })
         } else {
           //todo spread 처리
-          console.error(chalk.red('internal error in createObjectType:', e))
+          console.error(chalk.red('internal error in createObjectType:', e.$cstNode?.text, e.name, e.value))
         }
       })
     }
@@ -314,12 +335,7 @@ export class ObjectTypeDescription extends TypeDescription {
 
     this.generic = []
     if (ast.isObjectDef(node)) {
-      node.generic?.types.forEach(name => {
-        this.generic.push({
-          name,
-          type: new AnyTypeDescription(),
-        })
-      })
+      this.generic = node.generic?.types.map(name => new GenericTypeDescription(name)) ?? []
     }
   }
 
@@ -485,6 +501,16 @@ export class TypeSystem {
    */
   static isBooleanType(item: TypeDescription): item is BooleanTypeDescription {
     return item.$type === 'boolean'
+  }
+
+  /**
+   * Determines if the given type description is a generic type.
+   *
+   * @param item - The type description to check.
+   * @returns True if the type description is a generic type, otherwise false.
+   */
+  static isGenericType(item: TypeDescription): item is GenericTypeDescription {
+    return item.$type === 'generic'
   }
 
   /**
@@ -683,17 +709,20 @@ export class TypeSystem {
         type = new FunctionTypeDescription(node)
       } else if (ast.isPrimitiveType(node)) {
         type = TypeSystem.createPrimitiveType(node.type)
-      } else if (node.reference) {
+      } else if (ast.isTypeChain(node)) {
         traceLog('Type is reference')
         if (node.reference.ref) {
           const ref = node.reference.ref
           if (ast.isObjectDef(ref)) {
             type = new ObjectTypeDescription(ref)
-          } else {
-            console.error(chalk.red('node.reference.ref is not class:', node.reference.ref.name))
           }
-        } else {
-          console.error(chalk.red('node.reference.ref is not valid:', node.reference.$refText))
+        }
+        if (TypeSystem.isErrorType(type)) {
+          // type 중에 ref가 없는 것은 Generic일 가능성이 있다.
+          const container = AstUtils.getContainerOfType(node, ast.isObjectDef)
+          if (container && container.generic?.types.includes(node.reference.$refText)) {
+            type = new GenericTypeDescription(node.reference.$refText)
+          } else console.error(chalk.red('node.reference.ref is not valid:', node.reference.$refText))
         }
       }
     }
@@ -1078,11 +1107,14 @@ export class TypeSystem {
    * @returns The inferred type description of the return expression.
    */
   static inferTypeSpreadExpression(node: ast.SpreadExpression): TypeDescription {
-    const log = enterLog('inferSpreadExpr')
+    const log = enterLog('inferSpreadExpr', node.$cstNode?.text)
     let type: TypeDescription = new AnyTypeDescription()
     if (node.spread && node.spread.ref) {
-      type = TypeSystem.inferType(node.spread.ref)
-      // console.log(chalk.red('spread type:'), node.spread.ref.name, node.spread.ref.$type, type.$type)
+      const t = TypeSystem.inferType(node.spread.ref)
+      //todo 일단은 spread가 배열에서 사용되어질 경우를 고려해서 element type을 리턴한다.
+      // console.log(chalk.red('spread type:'), node.spread.ref.name, node.spread.ref.$type, t.toString())
+      if (TypeSystem.isArrayType(t)) type = t.elementType
+      else type = t
     }
     exitLog(log, type)
     return type
@@ -1102,12 +1134,9 @@ export class TypeSystem {
     // 생성시 generic정보가 있으면 오브젝트의 타입에 이를 추가한다.
     // new Set<string>(), new Set<number>()와 같은 경우에도 ObjectTypeDescription은 동일하지 않기 때문에 상관없다.
     if (node.generic && TypeSystem.isObjectType(type)) {
-      type.generic = node.generic.types.map(g => {
+      type.generic = node.generic.types.map((g, index) => {
         const t = TypeSystem.inferType(g)
-        return {
-          type: t,
-          name: g.$cstNode?.text ? g.$cstNode.text : '',
-        }
+        return new GenericTypeDescription(index.toString(), t)
       })
     }
 
@@ -1327,17 +1356,19 @@ export class TypeSystem {
    * @param other - The type description to replace with.
    * @returns An object containing the new return type and argument types.
    */
-  static getNewFunctionType(
+  static convertTypeWithGeneric(
     exist: FunctionTypeDescription,
-    other: TypeDescription
+    other: GenericInfo[]
   ): {
     retType: TypeDescription
     argType: FunctionParameter[]
   } {
-    const replace = (t: TypeDescription, n: TypeDescription) => {
-      if (TypeSystem.isAnyType(t)) return n
-      else if (TypeSystem.isArrayType(t)) {
-        if (TypeSystem.isAnyType(t.elementType)) return new ArrayTypeDescription(n)
+    const replace = (t: TypeDescription, n: GenericInfo[]) => {
+      if (TypeSystem.isGenericType(t)) {
+        const g = n.find(e => e.name == t.name)
+        return g?.type || new AnyTypeDescription()
+      } else if (TypeSystem.isArrayType(t)) {
+        if (TypeSystem.isGenericType(t.elementType)) return new ArrayTypeDescription(n[0].type)
         else return new ArrayTypeDescription(t.elementType)
       } else if (TypeSystem.isFunctionType(t)) {
         const desc = new FunctionTypeDescription(undefined)
@@ -1378,96 +1409,75 @@ export class TypeSystem {
         retType: TypeDescription
       }
     | undefined {
-    if (!node) return undefined
-    if (ast.isCallChain(node)) {
-      const methodName = node.element?.$refText
-      // 이 함수형 메서드들은 이름이 없거나 previous가 없으면 추론할 수 없다.
-      if (!methodName || !node.previous) return undefined
+    if (!node || !ast.isCallChain(node)) return undefined
 
-      let methodNames = [
-        'every',
-        'filter',
-        'find',
-        'findIndex',
-        'findLast',
-        'findLastIndex',
-        'flatMap',
-        'forEach',
-        'map',
-        'reduce',
-        'reduceRight',
-        'some',
-        'sort',
-      ]
+    const methodName = node.element?.$refText
+    // 이 함수형 메서드들은 이름이 없거나 previous가 없으면 추론할 수 없다.
+    if (!methodName || !node.previous) return undefined
 
-      // this.corpList.find(corp => corp.name == 'name')와 같은 코드에서 corp의 타입과 find의 리턴 타입을 추론한다.
-      // 전달되는 node는 find이며 이것의 이전 노드인 this.corpList의 타입을 이용해서 corp, find의 타입을 추론한다.
-      // methodNames에 포함된 메서드들은 모두 배열에 관한 것이며 find는 변수나 함수로 정의되어져 있다.
-      if (methodNames.includes(methodName)) {
-        const prevType = TypeSystem.inferType(node.previous)
-        if (TypeSystem.isArrayType(prevType)) {
-          const methodRef = node.element?.ref
-          const methodType = TypeSystem.inferType(methodRef)
-          assert.ok(ast.isVariableDef(methodRef) || ast.isFunctionDef(methodRef), 'it is not method definition')
-          assert.ok(TypeSystem.isFunctionType(methodType), 'method type is not function type')
-          // map()인 경우에는 타입이 변경될 수 있다.
-          let other = new AnyTypeDescription()
-          if (methodName != 'map') other = prevType.elementType
-          return TypeSystem.getNewFunctionType(methodType, other)
-        }
+    // this.corpList.find(corp => corp.name == 'name')와 같은 코드에서 corp의 타입과 find의 리턴 타입을 추론한다.
+    // 전달되는 node는 find이며 이것의 이전 노드인 this.corpList의 타입을 이용해서 corp, find의 타입을 추론한다.
+    // methodNames에 포함된 메서드들은 모두 배열에 관한 것이며 find는 변수나 함수로 정의되어져 있다.
+    const prevType = TypeSystem.inferType(node.previous)
+    if (TypeSystem.isArrayType(prevType)) {
+      const methodRef = node.element?.ref
+      const methodType = TypeSystem.inferType(methodRef)
+      assert.ok(ast.isVariableDef(methodRef) || ast.isFunctionDef(methodRef), 'it is not method definition')
+      assert.ok(TypeSystem.isFunctionType(methodType), 'method type is not function type')
+      let generic: GenericInfo[] = []
+      const grandContainer = methodRef.$container?.$container
+      if (grandContainer && ast.isObjectDef(grandContainer)) {
+        let t = new AnyTypeDescription()
+        //todo 하나로 가정하고 있음
+        // map()인 경우에는 타입이 변경될 수 있다.
+        if (methodName != 'map') t = prevType.elementType
+        grandContainer.generic?.types.forEach(name => {
+          generic.push({ name, type: t })
+        })
       }
 
-      // 이 부분은 Map에 대한 처리이다. 즉 다음과 같은 구문을 처리하기 위한 것이다.
-      // var corpMap = new Map<string, Corp>()
-      // this.corpMap.get('name')
-      // this.corpMap의 타입을 추론하면 object형 타입이 된다.
-      // 그리고 inferTypeNewExpression()에서 generic의 정보를 저장하기 때문에 corpMap의 타입에 string, Corp가 저장되어져 있다.
-      methodNames = ['get', 'set']
-      if (methodNames.includes(methodName) && ast.isCallChain(node.previous)) {
-        let prevType = TypeSystem.inferType(node.previous)
-        if (TypeSystem.isObjectType(prevType) && prevType.toString() == 'Map') {
-          // methodRef = ScalaScriptCache.findVariableDefWithName(node, node.previous.element?.$refText)
-          // methodRef = ScalaScriptCache.findVariableDefWithNode(node, node.previous.element?.ref)
-          //todo 이 부분은 추후에 수정해야 한다. K, V를 사용해야 한다.
-          const methodRef = node.element?.ref
-          const methodType = TypeSystem.inferType(methodRef)
-          assert.ok(ast.isVariableDef(methodRef) || ast.isFunctionDef(methodRef), 'it is not method definition')
-          assert.ok(TypeSystem.isFunctionType(methodType), 'method type is not function type')
-
-          let t: TypeDescription = new AnyTypeDescription()
-          if (prevType.generic) {
-            prevType.generic.forEach(g => {
-              // console.log(chalk.red('generic type:'), g.name, g.type.toString())
-              t = g.type
-            })
-            return TypeSystem.getNewFunctionType(methodType, t)
-          }
-
-          // 아래 코드는 prevType.generic이 없는 경우에만 실행된다.
-          // 필요하지 않을 것으로 생각이 되지만 혹시 모르니까 남겨둔다.
-          console.log(chalk.red('prevType.generic is not defined'))
-
-          // Map이 실제로 정의되어져 있는 부분을 찾아서 Generic을 사용한다.
-          // 실제 정의되어진 부분을 찾지 못하면 그냥 get, set이 정의되어진 대로 사용한다.
-          const ref = node.previous.element?.ref
-          if (ref && ast.isVariableDef(ref)) {
-            if (ast.isUnaryExpression(ref.value) && ast.isNewExpression(ref.value.value)) {
-              if (ref.value.value.class.$refText == 'Map') {
-                ref.value.value.generic?.types.forEach(g => {
-                  t = TypeSystem.inferType(g)
-                })
-                return TypeSystem.getNewFunctionType(methodType, t)
-              }
-            }
-          }
-          return {
-            retType: methodType.returnType,
-            argType: methodType.parameters,
-          }
-        }
-      }
+      const result = TypeSystem.convertTypeWithGeneric(methodType, generic)
+      // console.log(chalk.blue('methodType:'), methodType.toString())
+      // console.log(chalk.blue('prevType:'), prevType.toString())
+      // console.log(
+      //   chalk.blue('result:'),
+      //   result.retType.toString(),
+      //   result.argType.map(a => a.type.toString())
+      // )
+      return result
     }
 
+    // 이 부분은 Map, Set에 대한 처리이다. 즉 다음과 같은 구문을 처리하기 위한 것이다.
+    // var corpMap = new Map<string, Corp>()
+    // this.corpMap.get('name')
+    // this.corpMap의 타입을 추론하면 object형 타입이 된다.
+    // 그리고 inferTypeNewExpression()에서 generic의 정보를 저장하기 때문에 corpMap의 타입에 string, Corp가 저장되어져 있다.
+    if (
+      ast.isCallChain(node.previous) &&
+      TypeSystem.isObjectType(prevType) &&
+      (prevType.toString() == 'Map' || prevType.toString() == 'Set')
+    ) {
+      const methodRef = node.element?.ref
+      const methodType = TypeSystem.inferType(methodRef)
+      assert.ok(ast.isVariableDef(methodRef) || ast.isFunctionDef(methodRef), 'it is not method definition')
+      assert.ok(TypeSystem.isFunctionType(methodType), 'method type is not function type')
+
+      let generic: GenericInfo[] = []
+      let genericIds: string[] = []
+      const grandContainer = methodRef.$container?.$container
+      if (grandContainer && ast.isObjectDef(grandContainer)) {
+        genericIds = grandContainer.generic?.types.map(name => name) ?? []
+      }
+      if (genericIds && prevType.generic && genericIds.length == prevType.generic.length) {
+        prevType.generic.forEach((g, index) => {
+          // console.log(chalk.red('generic type:'), genericIds[index], g.type.toString())
+          generic.push({ name: genericIds[index], type: g.type })
+        })
+        return TypeSystem.convertTypeWithGeneric(methodType, generic)
+      } else {
+        console.error(chalk.red('genericIds and prevType.generic is not matched'))
+      }
+    }
     return undefined
   }
 }

@@ -71,71 +71,71 @@ export const ScalaScriptBuiltinLibrary = `
 
 @NotTrans export def $array$<T> = {
   // 순회 가능 또는 유사 배열 객체에서 새 Array인스턴스를 생성합니다.
-  val from: () -> any[]
+  val from: () -> T[]
   // 비동기 순회 가능, 순회 가능, 또는 유사 배열 객체에서 새 Array 인스턴스를 생성합니다.
-  val fromAsync: () -> any[]
+  val fromAsync: () -> T[]
   // 인자가 배열이면 true를 반환하고, 그렇지 않으면 false를 반환합니다.
-  val isArray: () -> any[]
+  val isArray: () -> T[]
   // 인자의 개수나 유형에 관계없이 가변적인 수의 인자를 가진 새 Array 인스턴스를 생성합니다.
-  val of: () -> any[]
+  val of: () -> T[]
   // 배열 요소의 개수를 반영합니다.
   var length: number
   // 주어진 인덱스에 있는 배열의 항목을 반환합니다. 마지막 항목부터 셀 수 있는 음의 정수를 허용합니다.
-  val at: (index: number) -> any
+  val at: (index: number) -> T
   // 다른 배열 및/또는 값과 결합된 호출 배열인 새 배열을 반환합니다.
-  val concat: (...value: any) -> any[]
+  val concat: (...value: T) -> T[]
   // 배열 내의 배열 요소 시퀀스를 복사하고 변경된 배열을 반환합니다.
-  val copyWithin: (target: number, start: number, end: number) -> any[]
+  val copyWithin: (target: number, start: number, end: number) -> T[]
   // 호출 배열의 모든 요소가 테스트 함수를 만족하면 true를 반환합니다.
-  val every: (callbackFn: (arg: any, index?: number) -> boolean) -> boolean
+  val every: (callbackFn: (arg: T, index?: number) -> boolean) -> boolean
   // 시작 인덱스부터 끝 인덱스까지 배열의 모든 요소를 고정된 값으로 채우고 변경된 배열을 반환합니다.
-  val fill: (value: any, start: any, end: any) -> any[]
+  val fill: (value: T, start: number, end: number) -> T[]
   // 제공된 필터링 함수가 true를 반환하는 호출 배열의 모든 요소를 포함하는 새 배열을 반환합니다.
-  val filter: (callbackFn: (arg: any, index?: number) -> boolean) -> any[]
+  val filter: (callbackFn: (arg: T, index?: number) -> boolean) -> T[]
   // 제공된 테스트 함수를 만족하는 배열의 첫 번째 요소의 값을 반환하고, 적절한 요소를 찾을 수 없으면 unvalined를 반환합니다.
-  val find: (callbackFn: (arg: any, index?: number) -> boolean) -> any
+  val find: (callbackFn: (arg: T, index?: number) -> boolean) -> T
   // 제공된 테스트 함수를 만족하는 배열의 첫 번째 요소의 인덱스를 반환하고, 적절한 요소를 찾을 수 없으면 -1을 반환합니다.
-  val findIndex: (callbackFn: (arg: any, index?: number) -> boolean) -> number
+  val findIndex: (callbackFn: (arg: T, index?: number) -> boolean) -> number
   // 제공된 테스트 함수를 만족하는 배열의 마지막 요소의 값을 반환하고, 적절한 요소를 찾을 수 없으면 unvalined를 반환합니다.
-  val findLast: (callbackFn: (arg: any, index?: number) -> boolean) -> any
+  val findLast: (callbackFn: (arg: T, index?: number) -> boolean) -> T
   // 제공된 테스트 함수를 만족하는 배열의 마지막 요소의 인덱스를 반환하고, 적절한 요소를 찾을 수 없는 경우 -1을 반환합니다.
-  val findLastIndex: (callbackFn: (arg: any, index?: number) -> boolean) -> number
+  val findLastIndex: (callbackFn: (arg: T, index?: number) -> boolean) -> number
   // 지정된 깊이까지 재귀적으로 연결된 모든 하위 배열 요소가 포함된 새 배열을 반환합니다.
-  val flat: (depth: number) -> any[]
+  val flat: (depth: number) -> T[]
   // 호출 배열의 각 요소에 지정된 콜백 함수를 적용한 다음 결과를 한 단계씩 평탄화하여 만들어진 새 배열을 반환합니다.
-  val flatMap: (callbackFn: (arg: any, index?: number) -> any) -> any[]
+  val flatMap: (callbackFn: (arg: T, index?: number) -> T) -> T[]
   // 호출 배열의 각 요소로 함수를 호출합니다.
-  val forEach: (callbackFn: (arg: any, index?: number) -> any) -> void
+  val forEach: (callbackFn: (arg: T, index?: number) -> void) -> void
   // 호출하는 배열에 값이 포함되어 있는지 여부를 판단하여 적절하게 true나false를 반환합니다.
-  val includes: (searchElement: any, fromIndex: number) -> boolean
+  val includes: (searchElement: T, fromIndex: number) -> boolean
   // 호출 배열에서 지정된 요소를 찾을 수 있는 첫 번째(최소) 인덱스를 반환합니다.
-  val indexOf: (searchElement: any, fromIndex: number) -> number
+  val indexOf: (searchElement: T, fromIndex: number) -> number
   // 배열의 모든 요소를 문자열로 결합합니다.
   val join: (separate: string) -> string
   // 호출 배열에서 지정된 요소를 찾을 수 있는 마지막(가장 큰) 인덱스를 반환하고, 찾을 수 없는 경우 -1을 반환합니다.
-  val lastIndexOf: (searchElement: any, fromIndex: number) -> number
+  val lastIndexOf: (searchElement: T, fromIndex: number) -> number
   // 호출 배열의 모든 요소에 함수를 호출한 결과를 포함하는 새 배열을 반환합니다.
-  val map: (callbackFn: (arg: any, index?: number) -> any) -> any[]
+  val map: (callbackFn: (arg: T, index?: number) -> T) -> T[]
   // 배열에서 마지막 요소를 제거하고 해당 요소를 반환합니다.
-  val pop: () -> any
+  val pop: () -> T
   // 배열 끝에 하나 이상의 요소를 추가하고, 배열의 새 length를 반환합니다.
-  val push: (...element: any) -> number
+  val push: (...element: T) -> number
   // 배열의 각 요소(왼쪽에서 오른쪽으로)에 대해 사용자가 제공한 "리듀서" 콜백 함수를 실행하여 하나의 값으로 줄입니다.
-  val reduce: (callbackFn: (arg: any, index?: number) -> any) -> any
+  val reduce: (callbackFn: (arg: T, index?: number) -> T) -> T
   // 배열의 각 요소(오른쪽에서 왼쪽으로)에 대해 사용자가 제공한 "리듀서" 콜백 함수를 실행하여 하나의 값으로 줄입니다.
-  val reduceRight: (callbackFn: (arg: any, index?: number) -> any) -> any
+  val reduceRight: (callbackFn: (arg: T, index?: number) -> T) -> T
   // 배열 요소의 순서를 반대로 바꿉니다. (첫 번째가 마지막이 되고, 마지막이 첫 번째가 됩니다.)
-  val reverse: () -> any[]
+  val reverse: () -> T[]
   // 배열에서 첫 번째 요소를 제거하고 해당 요소를 반환합니다.
-  val shift: () -> any
+  val shift: () -> T
   // 호출 배열의 구획을 추출하고 새 배열을 반환합니다.
-  val slice: (begin: number, end: number) -> any[]
+  val slice: (begin: number, end: number) -> T[]
   // 호출 배열의 요소 중 하나 이상이 제공된 테스트 함수를 만족하면 true를 반환합니다.
-  val some: (callbackFn: (arg: any, index?: number) -> boolean) -> boolean
+  val some: (callbackFn: (arg: T, index?: number) -> boolean) -> boolean
   // 배열의 요소를 제자리 정렬하고 배열을 반환합니다.
-  val sort: (callbackFn: (arg1: any, arg2: any) -> boolean) -> any[]
+  val sort: (callbackFn: (arg1: T, arg2: T) -> boolean) -> T[]
   // 배열에서 요소를 추가 및/또는 제거합니다.
-  val splice: (start: number, deleteCount: number, ...item: any) -> any[]
+  val splice: (start: number, deleteCount: number, ...item: T) -> T[]
   // 호출 배열과 그 요소를 나타내는 문자열을 반환합니다.
   val toString: () -> string
   // 배열 앞쪽에 하나 이상의 요소를 추가하고, 배열의 새 length를 반환합니다.
@@ -145,7 +145,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 배열의 각 인덱스에 대한 키/값 쌍을 포함하는 새 배열 반복자 객체를 반환합니다.
   val entries: () -> any
   // 
-  val values: () -> any
+  val values: () -> T[]
 }
 
 @NotTrans export def $number$ = {
@@ -355,34 +355,34 @@ export const ScalaScriptBuiltinLibrary = `
   // 요소의 개수를 반환합니다.
   var size: number
   // key를 이용해 value를 저장합니다.
-  val set: (key: any, value: any) -> any
+  val set: (key: K, value: V) -> V
   // key에 해당하는 값을 반환합니다. key가 존재하지 않으면 undefined를 반환합니다.
-  val get: (key: any) -> any
+  val get: (key: K) -> V
   // key가 존재하면 true, 존재하지 않으면 false를 반환합니다.
-  val has: (key: any) -> boolean
+  val has: (key: K) -> boolean
   // key에 해당하는 값을 삭제합니다.
-  val delete: (key: any) -> void
+  val delete: (key: K) -> void
   // 맵 안의 모든 요소를 제거합니다.
   val clear: () -> void
   // 각 요소의 키를 모은 반복 가능한(iterable, 이터러블) 객체를 반환합니다.
-  val keys: () -> any
+  val keys: () -> K[]
   // 각 요소의 값을 모은 이터러블 객체를 반환합니다.
-  val values: () -> any
+  val values: () -> any[]
   // 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다. 이 이터러블 객체는 for..of반복문의 기초로 쓰입니다.
   val entries: () -> any
   //
-  val forEach: () -> void
+  val forEach: (callbackFn: (arg: V, index?: number) -> void) -> void
 }
 
-@NotTrans export def Set = {
+@NotTrans export def Set<T> = {
   // 셋에 몇 개의 값이 있는지 세줍니다.
   var size: number
   // 값을 추가하고 셋 자신을 반환합니다.
-  val add: (value: any) -> any
+  val add: (value: T) -> any
   // 셋 내에 값이 존재하면 true, 아니면 false를 반환합니다.
-  val has: (value: any) -> boolean
+  val has: (value: T) -> boolean
   // 값을 제거합니다. 호출 시점에 셋 내에 값이 있어서 제거에 성공하면 true, 아니면 false를 반환합니다.
-  val delete: (value: any) -> boolean 
+  val delete: (value: T) -> boolean 
   // 셋을 비웁니다.
   val clear: () -> void
   // 각 요소의 키를 모은 반복 가능한(iterable, 이터러블) 객체를 반환합니다.
@@ -392,7 +392,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다. 이 이터러블 객체는 for..of반복문의 기초로 쓰입니다.
   val entries: () -> any
   //
-  val forEach: () -> void
+  val forEach: (callbackFn: (arg: T, index?: number) -> void) -> void
 }
 
 @NotTrans export def JSON = {
