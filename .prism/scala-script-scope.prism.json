@@ -8,9 +8,9 @@
       "title": "`// (isFunction?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 Arguments를 그대로 대입한` at language\\scala-script-scope.ts#96",
       "source": {
         "file": "/language/scala-script-scope.ts",
-        "startLine": 115,
+        "startLine": 86,
         "startColumn": 0,
-        "endLine": 120,
+        "endLine": 94,
         "endColumn": 0
       },
       "notes": [
@@ -29,9 +29,9 @@
       "title": "`if (TypeSystem.isUnionType(prevTypeDesc)) {` at language\\scala-script-scope.ts#120",
       "source": {
         "file": "/language/scala-script-scope.ts",
-        "startLine": 147,
+        "startLine": 118,
         "startColumn": 0,
-        "endLine": 171,
+        "endLine": 142,
         "endColumn": 0
       },
       "notes": [
@@ -45,34 +45,14 @@
       ]
     },
     {
-      "id": "21678cf61caf988829843014bda674c1",
-      "title": "`console.error(chalk.red('find class, but error:', object?.$type, object.$cstNode?.text))` at language\\scala-script-scope.ts#212",
-      "source": {
-        "file": "/language/scala-script-scope.ts",
-        "startLine": 489,
-        "startColumn": 0,
-        "endLine": 489,
-        "endColumn": 0
-      },
-      "notes": [
-        {
-          "id": "227aeba43cb52147b2ac071909991255",
-          "category": "Todo",
-          "importance": "Medium",
-          "createdAt": "2024-11-29T17:01:05.241Z",
-          "content": "ObjectValue가 여기까지 올 수 있을까?"
-        }
-      ]
-    },
-    {
       "id": "8d961b64a7305b84b909bab9a8aed9cd",
       "title": "`// precomputedScopes가 있는지를 확인해 본다` at language\\scala-script-scope.ts#104",
       "source": {
         "file": "/language/scala-script-scope.ts",
-        "startLine": 131,
+        "startLine": 102,
         "startColumn": 0,
-        "endLine": 136,
-        "endColumn": 8
+        "endLine": 108,
+        "endColumn": 0
       },
       "notes": [
         {
@@ -89,9 +69,9 @@
       "title": "`private getScopeForAnytype(context: ReferenceInfo, expr: ast.Expression): Scope {` at language\\scala-script-scope.ts#301",
       "source": {
         "file": "/language/scala-script-scope.ts",
-        "startLine": 489,
+        "startLine": 401,
         "startColumn": 0,
-        "endLine": 489,
+        "endLine": 418,
         "endColumn": 0
       },
       "notes": [

@@ -7,9 +7,19 @@ import { ScalaScriptCache } from './scala-script-cache.js'
 import chalk from 'chalk'
 
 /**
+ * Provides scope resolution for ScalaScript language elements.
+ * Extends the DefaultScopeProvider to handle specific scope requirements
+ * for ScalaScript, including handling of type chains, call chains, and
+ * built-in types like string, number, and array.
  *
+ * @extends DefaultScopeProvider
  */
 export class ScalaScriptScopeProvider extends DefaultScopeProvider {
+  /**
+   * Creates an instance of the ScalaScript scope.
+   *
+   * @param services - The language services provided by Langium.
+   */
   constructor(services: LangiumServices) {
     super(services)
   }
@@ -18,20 +28,18 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * getScope()는 cross-reference를 처리하기 위해 호출된다는 점이 중요하다.
    *
    * 이것은 a.b 와 같은 구문에서 b가 무엇을 가르키는 것인지를 확인하기 위한 것이다.
-   * 이를 위해서 a가 무엇인지를 먼저 파악하고 이것이 클래스이면 클래스의 멤버들 이름을 모두 제시해 준다.
+   * 이를 위해서 a가 무엇인지를 먼저 파악하고 이것이 오브젝트이면 오브젝트의 프로퍼티 이름을 모두 제시해 준다.
    * 여기서는 b의 후보가 될 수 있는 것들을 제시만 할 뿐 실제 b를 결정하는 것은 linker에서 처리한다.
    * a가 문자열이거나 배열이고 b가 문자열이나 배열 관련 함수일 수도 있다.
-   * 이를 위해서 확장 함수를 등록해 주고 이를 사용한다.
+   * 이들 string, number, array 함수 처리를 위해 내부 오브젝트가 라이브러리 형태로 등록되어져 있다.
+   * 이들 string, number, array 관련 빌트인 함수들은 아래와 같은 형태로 저장되어져 있고
+   * def $string$ = { ... }, def $number$ = { ... }, def $array$ = { ... }
+   * 라이브러리로 빠져있기 때문에 전역 오브젝트로 되어져 있다. 따라서 previous가 string이면
+   * 전역 오브젝트 중 이름이 $string$인 것의 프로퍼티들을 scope로 구성해서 리턴해 주면 된다.
    *
    * Scope caching에 대해서...
-   * 예를들어 다음과 같이 동일한 참조가 있을때 context, previous는 모두 다르다.
-   * 즉 corp1을 처리할 때의 이들의 값과 corp2를 처리할때의 값이 다르기 때문에 context, previous를 키로 해서
-   * 정보를 저장해도 다시 사용할 수 없다.
-   * var corp1: Engine.Corp
-   * var corp2: Engine.Corp
-   *
-   * 하지만 prevTypeDesc.literal는 동일하다. 이는 이 literal을 ref 를 통해서 얻었기 때문이다.
-   * TypeSystem.inferTypeSimpleType()을 참고
+   * Scope에 대한 잦은 참조가 있기 때문에 이곳에서 caching을 사용하였는데
+   * 이것은 편집시 편집 내용이 반영되지 않는 원인이 되었다.
    *
    * @param context
    * @returns
@@ -41,6 +49,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const scopeId = `${context.container.$type}.${context.property} = '${refText}'`
     const scopeLog = enterLog('getScope', scopeId)
     const superScope = super.getScope(context)
+
+    // 현재 node의 ref를 구하는 것은 유용할 수 있지만 ref를 호출하면 그 ref의 scope를 처리하기 위해서
+    // 다시 getScope가 호출되기 때문에 Error: Cyclic reference resolution detected 에러가 발생된다.
+    // const refNode = context.reference.ref
+    // console.log(`getScope: ${scopeId}, ${refNode?.$cstNode?.text}('${refNode?.$type})'`)
 
     // 타입의 참조는 따로 처리한다.
     if (ast.isTypeChain(context.container)) {
@@ -160,10 +173,6 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     return superScope
   }
 
-  scopeCacheForObjectType = new Map<ast.ObjectType, Scope>()
-  localScopeCacheForObjectDef = new Map<string, Scope>()
-  globalScopeCacheForObjectDef = new Map<string, Scope>()
-
   /**
    * Generates a scope based on the type chain of the given context and super scope.
    *
@@ -206,8 +215,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const prevTypeDesc = TypeSystem.inferType(previous)
 
     //todo 타입인데...
-    // 클래스이면
-    // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
+    // 클래스이면 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
     if (TypeSystem.isObjectType(prevTypeDesc)) {
       traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.node?.$type}`)
       console.log(`FIND Class: ${previous.$type}, ${prevTypeDesc.node?.$type}`)
@@ -215,15 +223,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
         console.error(chalk.red('internal error: prevTypeDesc is not object type:', prevTypeDesc.node.$type))
         return superScope
       }
-
-      const type = prevTypeDesc.node
-      let scope = this.scopeCacheForObjectType.get(type)
-      if (!scope) {
-        const removedBypass = type.elements.filter(e => !ast.isBypass(e))
-        scope = this.createScopeForNodes(removedBypass)
-        this.scopeCacheForObjectType.set(type, scope)
-      }
-
+      const removedBypass = prevTypeDesc.node.elements.filter(e => !ast.isBypass(e))
+      const scope = this.createScopeForNodes(removedBypass)
       exitLog(log, prevTypeDesc, 'Exit6')
       return scope
     } else console.error(chalk.red('internal error in typechain:', prevTypeDesc))
@@ -232,9 +233,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
 
   /**
    * 아래 함수들은 모두 동일한 메커니즘으로 동작한다.
-   * corp.process()에서 현재 값(context.reference)은 process인데 이것의 scope를 제공하기 위해서 corp를 찾는다.
-   * corp의 종류에 따라서 ObjectDef, ObjectType, any type등으로 나눠지지만 모두 corp에서 가능한 모든 이름을
-   * Scope로 리턴한다.
+   * 예를 들어 corp.process() 이란 구문이 있을 때 현재 값(context.reference)은 process인데
+   * 이것의 scope를 제공하기 위해서 corp를 찾는다. corp의 종류에 따라서 ObjectDef, ObjectType, any type등으로
+   * 나눠지지만 모두 corp에서 가능한 모든 이름을 Scope로 리턴한다.
    */
   /**
    * Retrieves the scope for a specific class within the given context.
@@ -250,35 +251,59 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * and caches the scope locally. If none of these conditions are met, it logs an error and returns the
    * default scope from the superclass.
    */
+  /*
+    이 함수는 previous의 추론 타입이 object이고 ref의 astNode가 ObjectDef인 경우에 호출된다.
+    ```
+    def Corp = {
+      var name: string
+      var process = () => {
+        console.log('process')
+      }
+      static var process = () => {
+        console.log('static process')
+      }
+    }
+
+    Corp.process()
+
+    var corp = new Corp()
+    corp.process()
+
+    val f = (Corp: Corp) => {
+      return Corp.process
+    }
+    ```
+    위와 같은 코드가 있을 때 첫번째 process는 static으로 정의되어진 것이 호출되어야 한다.
+    반면 두번째와 세번째 process static이 아닌 것이 호출되어야 한다.
+    위 코드는 다음과 같이 나와야 한다.
+    ```
+    console.log(`scopeObjectDef: ${previous.$cstNode?.text}, staticOnly: ${staticOnly}`)
+
+    scopeObjectDef: console, staticOnly: true
+    scopeObjectDef: console, staticOnly: true
+    scopeObjectDef: Corp, staticOnly: true
+    scopeObjectDef: corp, staticOnly: false
+    scopeObjectDef: Corp, staticOnly: false
+    ``` 
+  */
   scopeObjectDef(context: ReferenceInfo, previous: ast.Expression, object: ast.ObjectDef) {
     const log = enterLog('scopeObjectDef', object.$cstNode?.text)
 
+    // previous와 object의 이름이 동일하면 일단 static으로 처리한다.
     let staticOnly = false
     const previousNodeText = previous?.$cstNode?.text
     if (previousNodeText && previousNodeText === object.name) {
       staticOnly = true
     }
 
+    // 하지만 previous가 변수나 파라메터의 이름인 경우에는 static이 아닌 것으로 처리한다.
     const variableNode = ScalaScriptCache.findVariableDefWithName(previous, previousNodeText)
     if (variableNode) {
       staticOnly = false
     }
 
-    let scope: Scope | undefined
-    if (staticOnly) {
-      scope = this.getGlobalObjectDef(object.name, staticOnly, context)
-      if (!scope) scope = this.createScopeWithOption(object, { staticOnly: true })
-    } else {
-      scope = this.localScopeCacheForObjectDef.get(object.name)
-      if (!scope) {
-        scope = this.getGlobalObjectDef(object.name, staticOnly, context)
-        if (!scope) {
-          scope = this.createScopeWithOption(object, { staticOnly: false })
-          this.localScopeCacheForObjectDef.set(object.name, scope)
-        }
-      }
-    }
-
+    let scope = this.getGlobalObjectDef(object.name, staticOnly, context)
+    if (!scope) scope = this.createScopeWithOption(object, { staticOnly })
     exitLog(log)
     return scope
   }
@@ -292,16 +317,25 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @param type - The object type for which the scope is being constructed.
    * @returns The constructed scope object.
    */
+  /*
+    이 함수는 previous의 추론 타입이 object이고 ref의 astNode가 ObjectType인 아래와 같은 경우에 호출된다.
+    ```
+    val result: {
+      var 누적매출: number
+      var 누적매입: number
+    } = {
+      누적매출: 0
+      누적매입: 0
+    }
+    result.누적매출 += 1
+    ```
+  */
   scopeObjectType(context: ReferenceInfo, previous: ast.Expression, type: ast.ObjectType) {
-    // 클래스이면
-    // 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
-    const log = enterLog('scopeObjectType')
-    let scope = this.scopeCacheForObjectType.get(type)
-    if (scope) return scope
+    const log = enterLog('scopeObjectType', type.$cstNode?.text)
 
+    // 클래스이면 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
     const removedBypass = type.elements.filter(e => !ast.isBypass(e))
-    scope = this.createScopeForNodes(removedBypass)
-    this.scopeCacheForObjectType.set(type, scope)
+    const scope = this.createScopeForNodes(removedBypass)
     exitLog(log)
     return scope
   }
@@ -318,9 +352,6 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns The scope containing members of the global object named `$string$`.
    */
   scopeString(context: ReferenceInfo, previous: ast.Expression) {
-    // 문자열이면
-    // string, number, array 관련 빌트인 함수들은 전역으로 def $string$ = { ... } 형태로 저장되어져 있기 때문에
-    // 전역 클래스 중 이름이 $string$인 것의 멤버들을 scope로 구성해서 리턴한다.
     const log = enterLog('scopeString')
     const scope = this.getGlobalObjectDef('$string$', false, context)
     exitLog(log)
@@ -431,15 +462,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       const node = sc.node as ast.ObjectDef
       // 비록 Langium의 GlobalScope에는 존재하더라도 export되어진 것이 아니라면 사용하지 않는다.
       if (node.export) {
-        let scope: Scope | undefined
-        if (!onlyStatic) {
-          //todo 지금은 참조시 등록되지만 선언시 등록되어야 한다.
-          scope = this.globalScopeCacheForObjectDef.get(name)
-          if (scope) return scope
-        }
-        scope = this.createScopeWithOption(node, { staticOnly: onlyStatic })
-        if (!onlyStatic) this.globalScopeCacheForObjectDef.set(name, scope)
-        return scope
+        return this.createScopeWithOption(node, { staticOnly: onlyStatic })
       }
     }
     return undefined
