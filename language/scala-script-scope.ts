@@ -58,7 +58,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 타입의 참조는 따로 처리한다.
     if (ast.isTypeChain(context.container)) {
       const scope = this.scopeTypeChain(context, superScope)
-      exitLog(scopeLog, undefined, 'Exit(typechain)')
+      exitLog(scopeLog, undefined, 'Exit(type-chain)')
       return scope
     }
 
@@ -147,16 +147,16 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       if (ast.isObjectDef(classDesc.node)) {
         scope = this.scopeObjectDef(context, previous, classDesc.node)
       } else if (ast.isObjectType(classDesc.node)) {
-        scope = this.scopeObjectType(context, previous, classDesc.node)
+        scope = this.scopeObjectType(context, classDesc.node)
       } else {
         console.error(chalk.red('internal error in classDesc:', classDesc))
       }
     } else if (TypeSystem.isStringType(stringDesc)) {
-      scope = this.scopeString(context, previous)
+      scope = this.scopeString(context)
     } else if (TypeSystem.isNumberType(numberDesc)) {
-      scope = this.scopeNumber(context, previous)
+      scope = this.scopeNumber(context)
     } else if (TypeSystem.isArrayType(arrayDesc)) {
-      scope = this.scopeArray(context, previous)
+      scope = this.scopeArray(context)
     } else if (TypeSystem.isAnyType(anyDesc)) {
       scope = this.scopeAny(context, previous)
     }
@@ -241,7 +241,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * Retrieves the scope for a specific class within the given context.
    *
    * @param context - The reference information context.
-   * @param className - The name of the class for which the scope is being retrieved.
+   * @param previous - The previous AST expression.
    * @param object - An optional object definition to use for creating the scope.
    * @returns The scope associated with the specified class.
    *
@@ -309,11 +309,12 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   }
 
   /**
-   * Constructs a scope object for a given object type by including all members of the class
-   * and its parent classes, if applicable.
+   * Constructs a scope object for a given context and object type.
+   *
+   * This method creates a scope that includes all members of the specified class
+   * and all its parent classes, excluding any bypass elements.
    *
    * @param context - The reference information for the current context.
-   * @param previous - The previous AST expression.
    * @param type - The object type for which the scope is being constructed.
    * @returns The constructed scope object.
    */
@@ -330,7 +331,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     result.누적매출 += 1
     ```
   */
-  scopeObjectType(context: ReferenceInfo, previous: ast.Expression, type: ast.ObjectType) {
+  scopeObjectType(context: ReferenceInfo, type: ast.ObjectType) {
     const log = enterLog('scopeObjectType', type.$cstNode?.text)
 
     // 클래스이면 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
@@ -348,10 +349,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * which are stored globally in the form `def $string$ = { ... }`.
    *
    * @param context - The reference information for the current context.
-   * @param previous - The previous AST expression.
    * @returns The scope containing members of the global object named `$string$`.
    */
-  scopeString(context: ReferenceInfo, previous: ast.Expression) {
+  scopeString(context: ReferenceInfo) {
     const log = enterLog('scopeString')
     const scope = this.getGlobalObjectDef('$string$', false, context)
     exitLog(log)
@@ -362,10 +362,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * Retrieves the global object definition for the number scope.
    *
    * @param context - The reference information context.
-   * @param previous - The previous AST expression.
    * @returns The global object definition for the number scope.
    */
-  scopeNumber(context: ReferenceInfo, previous: ast.Expression) {
+  scopeNumber(context: ReferenceInfo) {
     const log = enterLog('scopeNumber')
     const scope = this.getGlobalObjectDef('$number$', false, context)
     exitLog(log)
@@ -376,11 +375,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * Retrieves the global object definition for an array scope.
    *
    * @param context - The reference information used to retrieve the scope.
-   * @param previous - The previous AST expression.
    * @returns The global object definition for the array scope.
    */
-  scopeArray(context: ReferenceInfo, previous: ast.Expression) {
-    const log = enterLog('scopeArray')
+  scopeArray(context: ReferenceInfo) {
+    const log = enterLog('scopeArray', context.reference.$refText)
     const scope = this.getGlobalObjectDef('$array$', false, context)
     exitLog(log)
     return scope

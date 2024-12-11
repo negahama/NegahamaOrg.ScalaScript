@@ -273,22 +273,6 @@ export class FunctionTypeDescription extends TypeDescription {
 }
 
 /**
- * Represents an element within an object.
- *
- * @interface ObjectElement
- *
- * @property {string} name - The name of the object element.
- * @property {TypeDescription} [type] - An optional description of the type of the object element.
- * @property {TypeDescription} [value] - An optional description of the value of the object element.
- */
-//todo type을 포함하면 무한 재귀호출이 발생한다.
-export interface ObjectElement {
-  name: string
-  type?: TypeDescription
-  value?: TypeDescription
-}
-
-/**
  * Represents a description of a class type.
  *
  * @interface ClassTypeDescription
@@ -296,42 +280,10 @@ export interface ObjectElement {
  * @property {ast.ObjectDef | ast.ObjectType | ast.ObjectValue} literal - The literal representation of the class type.
  */
 export class ObjectTypeDescription extends TypeDescription {
-  elements: ObjectElement[]
   generic: GenericTypeDescription[]
 
   constructor(public node: ast.ObjectDef | ast.ObjectType | ast.ObjectValue) {
     super('object')
-    const makeElements = (elements: ast.ObjectTypeElement[]): ObjectElement[] => {
-      const result: ObjectElement[] = []
-      elements.forEach(e => {
-        if (ast.isBypass(e)) return
-        result.push({ name: e.name })
-        // let type = TypeSystem.inferType(e)
-        // if (TypeSystem.isErrorType(type)) {
-        //   console.error(chalk.red('Error in createObjectType:'), e.name, e.$cstNode?.text)
-        //   type = new AnyTypeDescription()
-        // }
-        // result.push({ name: e.name, type })
-      })
-      return result
-    }
-
-    let elements: ObjectElement[] = []
-    if (ast.isObjectDef(node)) {
-      elements = makeElements(node.body.elements)
-    } else if (ast.isObjectType(node)) {
-      elements = makeElements(node.elements)
-    } else if (ast.isObjectValue(node)) {
-      node.elements.forEach(e => {
-        if (e.name && e.value) {
-          elements.push({ name: e.name })
-        } else {
-          //todo spread 처리
-          console.error(chalk.red('internal error in createObjectType:', e.$cstNode?.text, e.name, e.value))
-        }
-      })
-    }
-    this.elements = elements
 
     this.generic = []
     if (ast.isObjectDef(node)) {
@@ -341,7 +293,10 @@ export class ObjectTypeDescription extends TypeDescription {
 
   override toString(): string {
     if (ast.isObjectDef(this.node)) return this.node.name
-    else return '{ ' + this.elements.map(e => e.name).join(',') + ' }'
+    else {
+      const names = this.getElementList().map(e => e.name)
+      return '{ ' + names.join(', ') + ' }'
+    }
   }
 
   override isEqual(other: TypeDescription): boolean {
@@ -349,11 +304,23 @@ export class ObjectTypeDescription extends TypeDescription {
     const otherObject = other as ObjectTypeDescription
     let matchAll = true
     if (ast.isObjectDef(this.node) && ast.isObjectDef(otherObject.node)) {
+      //todo 이름만 같으면 같다고 할 수 있을까?
       if (this.node.name !== otherObject.node.name) matchAll = false
     } else {
-      this.elements.forEach(e1 => {
-        if (!otherObject.elements.find(e2 => e1.name === e2.name)) matchAll = false
-      })
+      const otherElements = otherObject.getElementList()
+      for (let e of this.getElementList()) {
+        const found = otherElements.find(o => o.name == e.name)
+        if (!found) {
+          matchAll = false
+          break
+        }
+        // 동일한 이름이 있으면 타입도 같아야 한다.
+        if (!TypeSystem.inferType(e.node).isEqual(TypeSystem.inferType(found.node))) {
+          console.log(chalk.red('타입이 다름:'), e.name, e.node.$cstNode?.text, found.node.$cstNode?.text)
+          matchAll = false
+          break
+        }
+      }
     }
     return matchAll
   }
@@ -374,6 +341,32 @@ export class ObjectTypeDescription extends TypeDescription {
     }
     return false
   }
+
+  // ObjectDef, ObjectType, ObjectValue의 element들을 리턴한다.
+  // ObjectDef, ObjectType는 서로 동일하기 때문에 Bypass를 제거하고 리턴하면 되는데
+  // ObjectValue는 AssignBinding 개체이고 둘과는 다르다.
+  getElementList() {
+    const list: { name: string; node: ast.VariableDef | ast.FunctionDef | ast.ObjectDef | ast.AssignBinding }[] = []
+    if (ast.isObjectDef(this.node)) {
+      this.node.body.elements.forEach(e => {
+        if (!ast.isBypass(e)) list.push({ name: e.name, node: e })
+      })
+    } else if (ast.isObjectType(this.node)) {
+      this.node.elements.forEach(e => {
+        if (!ast.isBypass(e)) list.push({ name: e.name, node: e })
+      })
+    } else if (ast.isObjectValue(this.node)) {
+      this.node.elements.forEach(e => {
+        if (e.element && e.value) {
+          list.push({ name: e.element, node: e })
+        } else {
+          //todo spread 처리
+          console.error(chalk.red('internal error in createObjectType:', e.$cstNode?.text, e.element, e.value))
+        }
+      })
+    }
+    return list
+  }
 }
 
 /**
@@ -389,7 +382,7 @@ export class ErrorTypeDescription extends TypeDescription {
   }
 
   override toString(): string {
-    return this.$type + ': ' + this.message
+    return `{${this.$type}: ${this.message}}`
   }
 }
 
@@ -659,7 +652,7 @@ export class TypeSystem {
     }
 
     if (TypeSystem.isErrorType(type)) {
-      console.error(chalk.red('Error type:'), type.message, node.$cstNode?.text)
+      console.error(chalk.red('inferType Error:'), `${type.toString()}, '${node.$cstNode?.text}'`)
     }
 
     ScalaScriptCache.set(node, type)
@@ -903,9 +896,12 @@ export class TypeSystem {
    * @returns The inferred type description of the assignment binding node.
    */
   static inferTypeAssignBinding(node: ast.AssignBinding): TypeDescription {
-    const log = enterLog('inferAssignBinding', node.name)
+    const log = enterLog('inferAssignBinding', node.element)
     // Assign Binding에는 value가 없을수는 없지만 없으면 nil type으로 취급한다.
-    //todo 원래 타입은?
+    // ObjectValue의 AssignBinding에서 element가 정의된 곳을 알려주기 위해서는 scope를 조작해야 한다.
+    // 이 부분은 다음을 참조한다. [[al=7dd47270e04fc75dddbabd68d294e2b8]]
+
+    //todo 타입스크립트에서는 name과 value가 동일하면 하나만 사용할 수 있는데 스칼라스크립트에서는 아직 그렇지 않다.
     let type: TypeDescription = new NilTypeDescription()
     if (node.value) type = TypeSystem.inferType(node.value)
     exitLog(log, type)
@@ -1130,6 +1126,18 @@ export class TypeSystem {
     const log = enterLog('inferNewExpression', node.class.$refText)
     let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     if (node.class.ref) type = new ObjectTypeDescription(node.class.ref)
+
+    // new Array<number>()와 같은 경우에는 ArrayTypeDescription으로 변경해 준다.
+    // generic이 있으면 generic의 타입을 element type으로 사용하고 없으면 any type으로 처리한다.
+    if (TypeSystem.isObjectType(type) && node.class.$refText === 'Array') {
+      if (node.generic) {
+        assert(node.generic.types.length === 1, 'Array type must have one generic type')
+        const t = TypeSystem.inferType(node.generic.types[0])
+        type = new ArrayTypeDescription(t)
+      } else type = new ArrayTypeDescription(new AnyTypeDescription())
+      exitLog(log, type)
+      return type
+    }
 
     // 생성시 generic정보가 있으면 오브젝트의 타입에 이를 추가한다.
     // new Set<string>(), new Set<number>()와 같은 경우에도 ObjectTypeDescription은 동일하지 않기 때문에 상관없다.

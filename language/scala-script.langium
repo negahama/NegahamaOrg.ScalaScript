@@ -99,8 +99,7 @@ type NamedElement =
   | FunctionDef
   | ObjectDef
   | Iterator
-  | Parameter
-  | AssignBinding;
+  | Parameter;
 
 //-----------------------------------------------------------------------------
 // Statements
@@ -245,12 +244,12 @@ ObjectDef:
   'def' name=Id (generic=GenericDef)? ('extends' superClass=[ObjectDef:Id])?
   '=' body=ObjectType;
 
-// ex) var obj = { name = "samuel", age = 20, ...ary }
+// ex) var obj = { name : "samuel", age : 20, ...ary }
 ObjectValue:
   '{' elements+=(AssignBinding)* '}';
 
 // AssignBinding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
-AssignBinding: (name=Id ':' value=Expression | spread=SpreadExpression) (',')?;
+AssignBinding: (element=Id ':' value=Expression | spread=SpreadExpression) (',')?;
 
 // 기타
 //-----------------------------------------------------------------------------

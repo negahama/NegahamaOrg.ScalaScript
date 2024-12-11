@@ -949,7 +949,7 @@ function transpileObjectValue(expr: ast.ObjectValue, indent: number): string {
     if (item.spread) {
       value = `${item.$cstNode?.text},\n`
     } else {
-      value = item.name + ': ' + (item.value ? generateExpression(item.value, indent + 1) : '') + ',\n'
+      value = item.element + ': ' + (item.value ? generateExpression(item.value, indent + 1) : '') + ',\n'
     }
     result += applyIndent(indent + 1, value)
   })
