@@ -248,7 +248,23 @@ ObjectDef:
 ObjectValue:
   '{' elements+=(AssignBinding)* '}';
 
-// AssignBinding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
+/*
+  AssignBinding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
+  AssignBinding은 이미 named 되어진 있는 ObjectType의 elements를 사용하기 때문에 Id 대신 [NamedElement:Id]를 사용하면 좋겠지만
+  이것을 처리하려면 ScopeProvider가 매우 복잡해진다. 심지어 불가능해보인다. 예를들면 다음과 같은 코드에서
+  ```
+  def Trade = { var item = 'item' }
+  def Sales = { var trade: Trade }
+  def SalesHistory = {
+    private var sales: Sales[] = []
+    var add = () => { this.sales.push({ trade: { item: 'item1' } }) }
+  }
+  ```
+  this.sales.push() 함수의 인수로 전달되는 ObjectValue(여기서는 { trade: { item: 'item1' } }) 부분)의 trade의 cross-reference를
+  설정하기 위해서는 this.sales의 타입을 찾아서 해당 인수가 Sales 타입인지를 먼저 알아내야 하고 그 다음에 어디에 있을지 모르는 
+  Sales 정의를 찾아서 trade가 Trade 타입인지를 또 알아내야 한다.
+  그래서 그냥 Id를 사용하고 Validator에서 타입체크를 하는 것으로 한다.
+*/
 AssignBinding: (element=Id ':' value=Expression | spread=SpreadExpression) (',')?;
 
 // 기타
@@ -453,6 +469,10 @@ RefCall: {infer CallChain}
   설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
   따라서 현재 this, super는 그냥 keyword로 처리하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
   이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
+
+  this의 경우 ScopeProvider에서 처리하지 않고 inferTypeCallChain()에서 처리하고 있다.
+  사실 ScopeProvider에서 this.method를 찾을 때 method의 previous인 this에 대한 inferType() 호출하고
+  이때 inferTypeCallChain()에서 this에 해당하는 바로 상위의 ObjectDef를 리턴해 주고 이를 ScopeProvider가 Scope로 변환한다.
 */
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
 

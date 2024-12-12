@@ -69,9 +69,9 @@
       "title": "`private getScopeForAnytype(context: ReferenceInfo, expr: ast.Expression): Scope {` at language\\scala-script-scope.ts#301",
       "source": {
         "file": "/language/scala-script-scope.ts",
-        "startLine": 369,
+        "startLine": 48,
         "startColumn": 0,
-        "endLine": 386,
+        "endLine": 65,
         "endColumn": 0
       },
       "notes": [

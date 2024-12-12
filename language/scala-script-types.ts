@@ -20,7 +20,7 @@ export class TypeDescription {
   }
 
   isAssignableTo(other: TypeDescription): boolean {
-    if (other.$type == 'any') return true
+    if (this.$type == 'any' || other.$type == 'any') return true
     if (other.$type == 'union') {
       const union = other as UnionTypeDescription
       if (union.elementTypes.some(e => this.isAssignableTo(e))) return true
@@ -214,8 +214,9 @@ interface GenericInfo {
 export interface FunctionParameter {
   name: string
   type: TypeDescription
-  nullable: boolean
   spread: boolean
+  nullable: boolean
+  defaultValue?: ast.Expression
 }
 
 /**
@@ -231,7 +232,7 @@ export class FunctionTypeDescription extends TypeDescription {
   parameters: FunctionParameter[] = []
   generic: GenericTypeDescription[] = []
 
-  constructor(node: ast.FunctionDef | ast.FunctionType | ast.FunctionValue | undefined) {
+  constructor(node?: ast.FunctionDef | ast.FunctionType | ast.FunctionValue) {
     super('function')
     // 명시된 리턴 타입이 있으면 이를 근거로 한다.
     // 명시된 리턴 타입도 없으면 함수의 바디를 근거로 한다.
@@ -246,8 +247,9 @@ export class FunctionTypeDescription extends TypeDescription {
     this.parameters = node.params.map(e => ({
       name: e.name,
       type: TypeSystem.inferType(e),
-      nullable: e.nullable,
       spread: e.spread,
+      nullable: e.nullable,
+      defaultValue: e.value,
     }))
 
     // ObjectDef, FunctionDef에서 정의되어진 것들은 디폴트로 AnyTypeDescritption을 가지고 있다가
@@ -269,6 +271,66 @@ export class FunctionTypeDescription extends TypeDescription {
     if (!this.returnType.isEqual(otherFunction.returnType)) return false
     if (this.parameters.length !== otherFunction.parameters.length) return false
     return this.parameters.every((p, i) => p.type.isEqual(otherFunction.parameters[i].type))
+  }
+
+  override isAssignableTo(other: TypeDescription): boolean {
+    if (other.$type == 'any') return true
+    if (other.$type == 'union') {
+      const union = other as UnionTypeDescription
+      if (union.elementTypes.some(e => e.isEqual(this))) return true
+    }
+    if (other.$type == 'function') {
+      const otherFunction = other as FunctionTypeDescription
+      if (!this.returnType.isAssignableTo(otherFunction.returnType)) {
+        console.log(
+          chalk.red('returnType is not assignable:'),
+          this.returnType.toString(),
+          otherFunction.returnType.toString()
+        )
+        return false
+      }
+      if (this.parameters.find(p => p.spread) || otherFunction.parameters.find(p => p.spread)) {
+        // spread가 있으면 타입 체크를 하지 않는다.
+        return true
+      }
+
+      const getOtherParam = (index: number) => {
+        if (index >= otherFunction.parameters.length) return undefined
+        return otherFunction.parameters[index].type
+      }
+
+      let matchAll = true
+      this.parameters.forEach((p, i) => {
+        // nullable이나 defaultValue가 없는 파라미터는 다른 함수에서도 존재해야 한다.
+        if (!(p.nullable || p.defaultValue)) {
+          const otherParam = getOtherParam(i)
+          if (!otherParam) {
+            console.log(chalk.red('otherParam is not exist:'), i)
+            matchAll = false
+          } else {
+            if (!p.type.isAssignableTo(otherParam)) {
+              console.log(chalk.red('parameter type is not assignable:'), p.type.toString(), otherParam.toString())
+              matchAll = false
+            }
+          }
+        } else {
+          // 다른 함수에서 이 파라미터가 없어도 되지만 있다면 타입이 같아야 한다.
+          const otherParam = getOtherParam(i)
+          if (otherParam) {
+            if (!p.type.isAssignableTo(otherParam)) {
+              console.log(
+                chalk.red('nullable or defaultValue parameter type is not assignable:'),
+                p.type.toString(),
+                otherParam.toString()
+              )
+              matchAll = false
+            }
+          }
+        }
+      })
+      return matchAll
+    }
+    return false
   }
 }
 
@@ -311,6 +373,7 @@ export class ObjectTypeDescription extends TypeDescription {
       for (let e of this.getElementList()) {
         const found = otherElements.find(o => o.name == e.name)
         if (!found) {
+          console.log(chalk.red('이름이 없음:'), e.name, e.node.$cstNode?.text)
           matchAll = false
           break
         }
@@ -774,7 +837,7 @@ export class TypeSystem {
    * @param node - The call chain node to infer the type for.
    * @returns The inferred type description of the call chain node.
    */
-  static inferTypeCallChain(node: ast.CallChain): TypeDescription {
+  static inferTypeCallChain(node: ast.CallChain, fullType: boolean = false): TypeDescription {
     const id = `element='${node.element?.$refText}', cst='${node?.$cstNode?.text}'`
     const log = enterLog('inferCallChain', id)
     traceLog(chalk.redBright('ref 참조전:'), id)
@@ -796,21 +859,36 @@ export class TypeSystem {
       // 즉 ()을 사용해서 함수가 호출되는 경우는 함수의 리턴 타입이 중요하고
       // 그렇지 않으면 함수 자체의 타입이 중요하다.
 
-      // 배열 호출이면 배열 요소가 리턴되어야 한다.
-      if (TypeSystem.isArrayType(type) && node.isArray) {
-        traceLog('배열 호출이면 배열 요소가 리턴되어야 한다', type.elementType.$type)
-        type = type.elementType
-      }
+      // 일반적인 경우 배열이나 함수의 리턴 타입이면 충분하다.
+      // 하지만 경우에 따라서는 전체 타입이 필요할 수도 있는데 특히 함수는 파라미터 검사를 위해서 전체 타입이 필요하다.
+      if (fullType) {
+        traceLog('fullType이면 전체 타입이되어야 한다', type.toString())
+        // 함수 호출이면 함수형 메서드 호출인 경우에는 type을 조정해 준다
+        if (TypeSystem.isFunctionType(type) && node.isFunction) {
+          const fmt = TypeSystem.getFunctionalMethodType(node)
+          if (fmt) {
+            type = new FunctionTypeDescription()
+            ;(type as FunctionTypeDescription).returnType = fmt.retType
+            ;(type as FunctionTypeDescription).parameters = fmt.argType
+          }
+        }
+      } else {
+        // 배열 호출이면 배열 요소가 리턴되어야 한다.
+        if (TypeSystem.isArrayType(type) && node.isArray) {
+          traceLog('배열 호출이면 배열 요소가 리턴되어야 한다', type.elementType.$type)
+          type = type.elementType
+        }
 
-      // 함수 호출이면 함수 리턴 타입이 리턴되어야 한다
-      if (TypeSystem.isFunctionType(type) && node.isFunction) {
-        traceLog('함수 호출이면 함수 리턴 타입이 리턴되어야 한다', type.returnType.$type)
-        // 일반적인 함수 호출이면 함수의 리턴 타입을 리턴하고
-        // 함수형 메서드 호출인 경우에는 return type을 조정해 준다.
-        // 이때 if (fmt) type.returnType = fmt 같이 하면 정의된 함수의 리턴 타입이 변경되므로 주의해야 한다.
-        const fmt = TypeSystem.getFunctionalMethodType(node)
-        if (fmt) type = fmt.retType
-        else type = type.returnType
+        // 함수 호출이면 함수 리턴 타입이 리턴되어야 한다
+        if (TypeSystem.isFunctionType(type) && node.isFunction) {
+          traceLog('함수 호출이면 함수 리턴 타입이 리턴되어야 한다', type.returnType.$type)
+          // 일반적인 함수 호출이면 함수의 리턴 타입을 리턴하고
+          // 함수형 메서드 호출인 경우에는 return type을 조정해 준다.
+          // 이때 if (fmt) type.returnType = fmt 같이 하면 정의된 함수의 리턴 타입이 변경되므로 주의해야 한다.
+          const fmt = TypeSystem.getFunctionalMethodType(node)
+          if (fmt) type = fmt.retType
+          else type = type.returnType
+        }
       }
     }
 
@@ -1169,7 +1247,13 @@ export class TypeSystem {
     if (node.items.length > 0) {
       const types: TypeDescription[] = []
       node.items.forEach(item => {
-        types.push(TypeSystem.inferType(item))
+        if (ast.isSpreadExpression(item)) {
+          //todo ArrayValue에서의 Spread는 spread를 풀어야 한다.
+          const spreadType = TypeSystem.inferType(item.spread.ref)
+          if (TypeSystem.isObjectType(spreadType)) types.push(new AnyTypeDescription())
+          else if (TypeSystem.isArrayType(spreadType)) types.push(spreadType.elementType)
+          else types.push(spreadType)
+        } else types.push(TypeSystem.inferType(item))
       })
       type = new ArrayTypeDescription(TypeSystem.createUnionType(types))
     } else type = new AnyTypeDescription()
@@ -1383,7 +1467,7 @@ export class TypeSystem {
         desc.returnType = replace(t.returnType, n)
         desc.parameters = t.parameters.map(p => {
           const type = replace(p.type, n)
-          return { name: p.name, type, nullable: p.nullable, spread: p.spread }
+          return { name: p.name, type, spread: p.spread, nullable: p.nullable, defaultValue: p.defaultValue }
         })
         return desc
       } else return t
@@ -1392,7 +1476,7 @@ export class TypeSystem {
     const retType = replace(exist.returnType, other)
     const argType = exist.parameters.map(p => {
       const type = replace(p.type, other)
-      return { name: p.name, type, nullable: p.nullable, spread: p.spread }
+      return { name: p.name, type, spread: p.spread, nullable: p.nullable, defaultValue: p.defaultValue }
     })
 
     return { retType, argType }

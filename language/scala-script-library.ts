@@ -14,13 +14,13 @@ export const ScalaScriptBuiltinLibrary = `
   // Combines the text of two (or more) strings and returns a new string.
   val concat: (str: string) -> string
   // Determines whether the calling string contains searchString.
-  val includes: (searchString: string, position: number) -> boolean
+  val includes: (searchString: string, position?: number) -> boolean
   // Determines whether a string ends with the characters of the string searchString.
-  val endsWith: (searchString: string, endPosition: number) -> boolean
+  val endsWith: (searchString: string, endPosition?: number) -> boolean
   // Returns the index within the calling String object of the first occurrence of searchValue, or -1 if not found.
-  val indexOf: (searchValue: string, fromIndex: number) -> number
+  val indexOf: (searchValue: string, fromIndex?: number) -> number
   // Returns the index within the calling String object of the last occurrence of searchValue, or -1 if not found.
-  val lastIndexOf: (searchValue: string, fromIndex: number) -> number
+  val lastIndexOf: (searchValue: string, fromIndex?: number) -> number
   // Returns a number indicating whether the reference string compareString comes before, after, or is equivalent to the given string in sort order.
   val localeCompare: (compareString: string) -> number
   // Used to match regular expression regexp against a string.
@@ -30,9 +30,9 @@ export const ScalaScriptBuiltinLibrary = `
   // Returns the Unicode Normalization Form of the calling string value.
   val normalize: (form: string) -> string
   // Pads the current string from the end with a given string and returns a new string of the length targetLength.
-  val padEnd: (targetLength: number, padString: string) -> string
+  val padEnd: (targetLength: number, padString?: string) -> string
   // Pads the current string from the start with a given string and returns a new string of the length targetLength.
-  val padStart: (targetLength: number, padString: string) -> string
+  val padStart: (targetLength: number, padString?: string) -> string
   // Returns a string consisting of the elements of the object repeated count times.
   val repeat: (count: number) -> string
   // Used to replace occurrences of searchFor using replaceWith. searchFor may be a string or Regular Expression, and replaceWith may be a string or function.
@@ -42,17 +42,17 @@ export const ScalaScriptBuiltinLibrary = `
   // Search for a match between a regular expression regexp and the calling string.
   val search: (regexp: string) -> string
   // Extracts a section of a string and returns a new string.
-  val slice: (beginIndex: number, endIndex: number) -> string
+  val slice: (beginIndex: number, endIndex?: number) -> string
   // Returns an array of strings populated by splitting the calling string at occurrences of the substring sep.
-  val split: (sep: string, limit: number) -> string[]
+  val split: (sep?: string, limit?: number) -> string[]
   // Determines whether the calling string begins with the characters of string searchString.
-  val startsWith: (searchString: string, position: number) -> boolean
+  val startsWith: (searchString: string, position?: number) -> boolean
   // Returns a new string containing characters of the calling string from (or between) the specified index (or indices).
-  val substring: (indexStart: number, indexEnd: number) -> string
+  val substring: (indexStart: number, indexEnd?: number) -> string
   // The characters within a string are converted to lowercase while respecting the current locale.For most languages, this will return the same as toLowerCase().
-  val toLocaleLowerCase: (locale: string) -> string
+  val toLocaleLowerCase: (locale?: string) -> string
   // The characters within a string are converted to uppercase while respecting the current locale.For most languages, this will return the same as toUpperCase().
-  val toLocaleUpperCase: (locale: string) -> string
+  val toLocaleUpperCase: (locale?: string) -> string
   // Returns the calling string value converted to lowercase.
   val toLowerCase: () -> string
   // Returns the calling string value converted to uppercase.
@@ -85,11 +85,11 @@ export const ScalaScriptBuiltinLibrary = `
   // 다른 배열 및/또는 값과 결합된 호출 배열인 새 배열을 반환합니다.
   val concat: (...value: T) -> T[]
   // 배열 내의 배열 요소 시퀀스를 복사하고 변경된 배열을 반환합니다.
-  val copyWithin: (target: number, start: number, end: number) -> T[]
+  val copyWithin: (target: number, start: number, end?: number) -> T[]
   // 호출 배열의 모든 요소가 테스트 함수를 만족하면 true를 반환합니다.
   val every: (callbackFn: (arg: T, index?: number) -> boolean) -> boolean
   // 시작 인덱스부터 끝 인덱스까지 배열의 모든 요소를 고정된 값으로 채우고 변경된 배열을 반환합니다.
-  val fill: (value: T, start: number, end: number) -> T[]
+  val fill: (value: T, start?: number, end?: number) -> T[]
   // 제공된 필터링 함수가 true를 반환하는 호출 배열의 모든 요소를 포함하는 새 배열을 반환합니다.
   val filter: (callbackFn: (arg: T, index?: number) -> boolean) -> T[]
   // 제공된 테스트 함수를 만족하는 배열의 첫 번째 요소의 값을 반환하고, 적절한 요소를 찾을 수 없으면 unvalined를 반환합니다.
@@ -101,19 +101,19 @@ export const ScalaScriptBuiltinLibrary = `
   // 제공된 테스트 함수를 만족하는 배열의 마지막 요소의 인덱스를 반환하고, 적절한 요소를 찾을 수 없는 경우 -1을 반환합니다.
   val findLastIndex: (callbackFn: (arg: T, index?: number) -> boolean) -> number
   // 지정된 깊이까지 재귀적으로 연결된 모든 하위 배열 요소가 포함된 새 배열을 반환합니다.
-  val flat: (depth: number) -> T[]
+  val flat: (depth?: number) -> T[]
   // 호출 배열의 각 요소에 지정된 콜백 함수를 적용한 다음 결과를 한 단계씩 평탄화하여 만들어진 새 배열을 반환합니다.
   val flatMap: (callbackFn: (arg: T, index?: number) -> T) -> T[]
   // 호출 배열의 각 요소로 함수를 호출합니다.
-  val forEach: (callbackFn: (arg: T, index?: number) -> void) -> void
+  val forEach: (callbackFn: (arg: T, index?: number) -> any) -> void
   // 호출하는 배열에 값이 포함되어 있는지 여부를 판단하여 적절하게 true나false를 반환합니다.
-  val includes: (searchElement: T, fromIndex: number) -> boolean
+  val includes: (searchElement: T, fromIndex?: number) -> boolean
   // 호출 배열에서 지정된 요소를 찾을 수 있는 첫 번째(최소) 인덱스를 반환합니다.
-  val indexOf: (searchElement: T, fromIndex: number) -> number
+  val indexOf: (searchElement: T, fromIndex?: number) -> number
   // 배열의 모든 요소를 문자열로 결합합니다.
-  val join: (separate: string) -> string
+  val join: (separate?: string) -> string
   // 호출 배열에서 지정된 요소를 찾을 수 있는 마지막(가장 큰) 인덱스를 반환하고, 찾을 수 없는 경우 -1을 반환합니다.
-  val lastIndexOf: (searchElement: T, fromIndex: number) -> number
+  val lastIndexOf: (searchElement: T, fromIndex?: number) -> number
   // 호출 배열의 모든 요소에 함수를 호출한 결과를 포함하는 새 배열을 반환합니다.
   val map: (callbackFn: (arg: T, index?: number) -> T) -> T[]
   // 배열에서 마지막 요소를 제거하고 해당 요소를 반환합니다.
@@ -129,13 +129,13 @@ export const ScalaScriptBuiltinLibrary = `
   // 배열에서 첫 번째 요소를 제거하고 해당 요소를 반환합니다.
   val shift: () -> T
   // 호출 배열의 구획을 추출하고 새 배열을 반환합니다.
-  val slice: (begin: number, end: number) -> T[]
+  val slice: (begin?: number, end?: number) -> T[]
   // 호출 배열의 요소 중 하나 이상이 제공된 테스트 함수를 만족하면 true를 반환합니다.
   val some: (callbackFn: (arg: T, index?: number) -> boolean) -> boolean
   // 배열의 요소를 제자리 정렬하고 배열을 반환합니다.
-  val sort: (callbackFn: (arg1: T, arg2: T) -> boolean) -> T[]
+  val sort: (callbackFn: (arg1: T, arg2: T) -> number) -> T[]
   // 배열에서 요소를 추가 및/또는 제거합니다.
-  val splice: (start: number, deleteCount: number, ...item: T) -> T[]
+  val splice: (start: number, deleteCount?: number, ...item: T) -> T[]
   // 호출 배열과 그 요소를 나타내는 문자열을 반환합니다.
   val toString: () -> string
   // 배열 앞쪽에 하나 이상의 요소를 추가하고, 배열의 새 length를 반환합니다.
@@ -193,13 +193,13 @@ export const ScalaScriptBuiltinLibrary = `
   // 양의 무한대를 나타내는 특수한 값. 오버플로우 시 반환됩니다.
   static val POSITIVE_INFINITY: number
   // 주어진 값이 NaN인지 확인합니다.
-  static val isNaN: () -> boolean
+  static val isNaN: (value: number) -> boolean
   // 주어진 값이 유한수 인지 확인합니다.
-  static val isFinite: () -> boolean
+  static val isFinite: (value: number) -> boolean
   // 주어진 값이 정수인지 확인합니다.
-  static val isInteger: () -> boolean
+  static val isInteger: (value: number) -> boolean
   // 주어진 값이 안전한 정수(-(2^53 - 1)과 2^53 - 1 사이의 정수)인지 확인합니다.
-  static val isSafeInteger: () -> boolean
+  static val isSafeInteger: (value: number) -> boolean
   // 전역 객체 parseFloat()와 동일한 값입니다.
   static val parseFloat: (x: string) -> number
   // 전역 객체 parseInt()와 동일한 값입니다.
@@ -371,7 +371,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다. 이 이터러블 객체는 for..of반복문의 기초로 쓰입니다.
   val entries: () -> any
   //
-  val forEach: (callbackFn: (arg: V, index?: number) -> void) -> void
+  val forEach: (callbackFn: (arg: V, index?: number) -> any) -> void
 }
 
 @NotTrans export def Set<T> = {
@@ -392,27 +392,27 @@ export const ScalaScriptBuiltinLibrary = `
   // 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다. 이 이터러블 객체는 for..of반복문의 기초로 쓰입니다.
   val entries: () -> any
   //
-  val forEach: (callbackFn: (arg: T, index?: number) -> void) -> void
+  val forEach: (callbackFn: (arg: T, index?: number) -> any) -> void
 }
 
 @NotTrans export def JSON = {
   // 주어진 값에 해당하는 JSON 문자열을 반환합니다. 선택 사항으로 특정 속성만 포함하거나 사용자 정의 방식으로 속성을 대체합니다.
-  static val stringify: () -> string
+  static val stringify: (data: any) -> string
   // 문자열을 JSON으로서 구문 분석하고, 선택적으로 분석 결과의 값과 속성을 변환해 반환합니다.
-  static val parse: () -> any
+  static val parse: (data: any) -> any
 }
 
 @NotTrans export def fs = { 
-  static val existsSync: () -> boolean
-  static val mkdirSync: () -> void
-  static val readdirSync: () -> string[]
-  static val readFileSync: () -> void
-  static val writeFileSync: () -> void
-  static val appendFileSync: () -> void
+  static val existsSync: (filename: string, options?: string) -> boolean
+  static val mkdirSync: (filename: string, options?: string) -> void
+  static val readdirSync: (filename: string, options?: string) -> string[]
+  static val readFileSync: (filename: string, options?: string) -> any
+  static val writeFileSync: (filename: string, data: any, options?: string) -> void
+  static val appendFileSync: (filename: string, data: any, options?: string) -> void
 }
 
-@NotTrans export val parseFloat: () ->number
-@NotTrans export val parseInt: () ->number
-@NotTrans export val escape: () -> string
+@NotTrans export val parseFloat: (arg: any) ->number
+@NotTrans export val parseInt: (arg: any) ->number
+@NotTrans export val escape: (arg: string) -> string
 //@NotTrans export val assert: (value: any, message?: any) -> void
 `.trim()

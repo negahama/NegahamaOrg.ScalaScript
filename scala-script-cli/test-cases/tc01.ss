@@ -1,6 +1,5 @@
-/*
-TestCase
-- 상황: interface 테스트
+/**
+TestCase : interface 테스트
 */
 def InterfaceTest = {
   fun get1 = () -> number => { return 1 }
@@ -12,9 +11,8 @@ def InterfaceTest2 = {
   val get2 = () -> number => { return 2 }
 }
 
-/*
-TestCase
-- 상황: indent를 이용한 블럭 테스트
+/**
+TestCase : indent를 이용한 블럭 테스트
 */
 var a = 0
 if (a == 0) then
@@ -24,12 +22,11 @@ else
   console.log('a != 0')
   a = 0
 
-/*
+/**
 TestCase
 - 상황: def name과 동일한 이름의 변수가 존재하는 경우
 - 기대: 변수와 def name이 충돌하지 않고 static인 경우등이 정상적으로 동작해야 한다.
 */
-
 def Corp1 = {
   val process1 = () => {
     console.log('process')
@@ -65,7 +62,7 @@ val result: {
 
 result.누적매출 += 1
 
-/*
+/**
 TestCase
 - 상황: def에 자신을 타입으로 가지는 element가 존재하는 경우
 - 기대: inferType()에서 object type을 재귀적으로 호출하지 않고 정상적으로 추론해야 한다.
@@ -74,11 +71,9 @@ def Corp2 = {
   var corp: Corp2 = new Corp2()
 }
 
-/*
-TestCase
-- 상황: array, map의 functional method을 사용할 때
+/**
+TestCase : array, map의 functional method을 사용할 때
 */
-
 def Dept1 = {
   var index: number
   var name: string
@@ -100,7 +95,7 @@ val getDept = (deptName: string) -> Dept1 | nil => {
   return dept
 }
 
-/*
+/**
 TestCase
 - 상황: 함수형 변수에 값을 대입할 경우
 - 기대: 파라메터와 리턴 타입의 정확한 경우에만 대입되어야 하고 이외에는 에러가 발생해야 한다.
@@ -122,25 +117,32 @@ var TC01_f3 : () -> number[] = () => [1, 2, 3]
 // var TC01_f4 : (() -> number)[]
 // TC01_f4 = [() => 1, () => 2, () => 3]
 
-/*
+/**
 TestCase
 - 상황: 함수의 파라메터 타입이 올바른 경우와 그렇지 않은 경우
     function이 cache되어지고 cache되어진 것을 사용하는지 테스트
 */
-val TC02 = (a: number) => {
+val TC02 = (a: number, b?: string) => {
   return a
 }
+
 TC02(1)
-TC02()
-TC02('1')
+TC02(1, '2')
+
+// 이건 에러이어야 함
+// TC02()
+// TC02(1, 2)
+// TC02('1')
 
 var TC02_ary = [1, 2, 3]
 TC02_ary.push(4, 5)
 TC02_ary.push('6')
+TC02_ary.forEach(num => {
+  console.log(num)
+})
 
-/*
-TestCase
-- 상황: infer parameter test
+/**
+TestCase : infer parameter test
 */
 def TC03 = {
   var index: number
@@ -178,3 +180,95 @@ val getColumn = (column: number | string, createCallback: (column: string) -> vo
     return col2
   }
 }
+
+/**
+TestCase : object comparison
+*/
+def TC04_1 = {
+  var name = 'TC04_1'
+  var extra = 'extra'
+}
+
+def TC04_2 = {
+  var name = 'TC04_2'
+  var extra = '0'
+}
+
+def TC04_3 = {
+  var name = 'TC04_3'
+}
+
+def TC04_4 = {
+  var name = 'TC04_3'
+  var kind? = 'kind'
+  var extra1? = 0
+  var extra2? = 'extra'
+}
+
+val TC04 = () => {
+  var t1 = new TC04_1()
+  var t2 = new TC04_1()
+  var t3 = if (t1 == t2) then 'equal' else 'not equal'
+
+  // def로 정의된 object는 이름으로만 판단한다.
+  // 즉 elements가 모두 같아도 이름이 다르면 다른 object로 인식하고
+  // 반대로 이름이 같으면 elements가 다르더라도 같은 object로 인식한다.
+  var t4 = new TC04_1()
+  var t5 = new TC04_2()
+  var t6 = if (t4 == t5) then 'equal' else 'not equal'
+
+  // def로 정의되지 않은 objectt는 이름과 타입이 모두 같아야 같다
+  var t7: { var name: string, var extra: string }
+  var t8: { var name: string, var extra: number }
+  var t9 = if (t7 == t8) then 'equal' else 'not equal'
+
+  // element가 더 적은 경우
+  var t10: TC04_3 = t1
+  var t11: TC04_3 = { name: 'TC00_1', extra1: 'extra' }
+
+  // element가 더 많은 경우
+  var t10: TC04_4 = t1
+  var t11: TC04_4 = { name: 'TC00_1', extra1: 1 }
+  var t11: TC04_4 = { name: 'TC00_1', extra1: 'extra' }
+}
+
+/**
+TestCase : object value's element name comparison
+*/
+var name = 'name'
+var t1: { var name: string, var age: number } = { name: name, age: 20 }
+
+/**
+TestCase : array[] vs Array object comparison
+*/
+def Trade = {
+  var item = 'item'
+  var price = 100
+}
+
+def Sales = {
+  var date: number
+  var cash: number
+  var trade: Trade
+}
+
+def SalesHistory = {
+  private var sales: Sales[] = []
+  var add = () => {
+    this.sales.push({
+      date: 10
+      cash: 100
+      trade: {
+        item1: 'item1'
+        price: 100
+      }
+    })
+  }
+  var add2 = () => {
+    this.sales.push({ date1: 20 })
+  }
+}
+
+var t2 = new Array<Trade>()
+var t3: Trade[] = t2
+

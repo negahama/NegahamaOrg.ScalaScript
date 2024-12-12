@@ -114,106 +114,75 @@ export class ScalaScriptValidator {
    */
   checkCallChain(expr: ast.CallChain, accept: ValidationAcceptor): void {
     const log = enterLog('checkCallChain', expr.$cstNode?.text)
-    // if (expr.previous) {
-    //   const previousType = TypeSystem.inferType(expr.previous)
-    //   if (TypeSystem.isObjectType(previousType)) {
-    //     const previous = expr.previous as ast.CallChain
-    //     console.log('previous:', previous.$type, previous.$cstNode?.text)
-    //     const found = findObjectDefWithName(expr, previous.$cstNode?.text)
-    //     if (!found) {
-    //       accept('error', `Object '${previous.$cstNode?.text}' is not defined.`, {
-    //         node: expr,
-    //       })
-    //     }
-    //   }
-    // }
-
     //todo
     // default parameter, optional parameter, rest parameter등으로 인해 파라미터의 처리가 간단하지 않다.
     // 아울러 def에서 정의된 함수들은 아직 이름으로 함수를 찾지 못하고 있으며
     // 어떤 def인가에 따라서도 다르기 때문에 이름으로만 찾는 것도 불가능하다.
     // 또한 기정의된 console.log 같은 함수도 이 대상이 되는데 이것들의 파라미터도 정의되어져 있지 않다.
     if (expr.isFunction) {
-      // const tt = TypeSystem.inferType(expr)
-      // console.log('function:', expr.element?.$refText, expr.$cstNode?.text)
-      // console.log('🚀 ~ ScalaScriptValidator ~ checkCallChain ~ tt:', tt.toString())
-      // //todo 'e.date.isEqual()'에서 isEqual의 ref가 없다. 아니면 e.date이거나...
-      // const ref = expr.element?.ref
-      // const type = TypeSystem.inferType(ref)
-      // if (!TypeSystem.isFunctionType(type)) {
-      // } else {
-      //   expr.args.forEach((arg, index) => {
-      //     const argType = TypeSystem.inferType(arg)
-      //     if (type.parameters.length === 1 && type.parameters[0].spread) {
-      //       // rest parameter
-      //       //todo 일단은 파라미터 체크를 하지 않는다.
-      //     } else {
-      //       const paramInfo = type.parameters[index]
-      //       if (index >= type.parameters.length || !paramInfo) {
-      //         console.log('function:', expr.element?.$refText, expr.$cstNode?.text)
-      //         console.log('  ref:', ref.name, 'type:', type.$type, type.toString())
-      //         console.log('  length:', index)
-      //       } else {
-      //         if (!paramInfo.type.isAssignableTo(argType)) {
-      //           console.log('function:', expr.element?.$refText, expr.$cstNode?.text)
-      //           console.log('  ref:', ref.name, 'type:', type.$type, type.toString())
-      //           console.log(
-      //             '  arg and param not match:',
-      //             paramInfo.name,
-      //             argType.toString(),
-      //             paramInfo.type.toString()
-      //           )
-      //           // accept('error', `Arguments for function is not matched '${expr.element?.$refText}'.`, {
-      //           //   node: expr,
-      //           // })
-      //         }
-      //       }
-      //     }
-      //   })
-      // }
-      // const t = ScalaScriptCache.get(expr.element?.ref)
-      // if (t) {
-      //   console.log('  found in cache:', t.$type, t.toString())
-      // } else {
-      //   const found = ScalaScriptCache.findFunctionDefWithName(expr, expr.element?.$refText)
-      //   if (found) {
-      //     console.log('  found in defs:', found.$type)
-      //   }
-      // }
-      // let definedName: string | undefined
-      // let definedParams: ast.Parameter[] = []
-      // if (ast.isFunctionDef(found)) {
-      //   const func = found as ast.FunctionDef
-      //   definedName = func.name
-      //   definedParams = func.params
-      // } else if (ast.isFunctionValue(found)) {
-      //   const func = found as ast.FunctionValue
-      //   definedName = func.$cstNode?.text
-      //   definedParams = func.params
-      // } else {
-      //   console.error(chalk.red('internal error', found.$type))
-      // }
-      // console.log('defined:', definedName, definedParams.length, expr.args.length)
-      // console.log('function:', expr.element?.$refText, expr.args.length)
-      // if (expr.args.length > definedParams.length) {
-      //   console.log('error', expr.args.length, definedParams.length)
-      //   console.log('function:', definedName)
-      //   accept('error', `Too many arguments for function '${expr.element?.$refText}'.`, {
-      //     node: expr,
-      //   })
-      //   return
-      // }
-      // expr.args.forEach((arg, index) => {
-      //   const definedType = TypeSystem.inferType(definedParams[index].type)
-      //   const argType = TypeSystem.inferType(arg)
-      //   if (!argType.isAssignableTo(definedType)) {
-      //     const tr = argType.toString()
-      //     const tl = definedType.toString()
-      //     accept('error', `Type '${tr}' is not assignable to type '${tl}'.`, {
-      //       node: arg,
-      //     })
-      //   }
-      // })
+      const funcName = expr.element?.$refText
+      // console.log(funcName, expr.$cstNode?.text)
+
+      const type = TypeSystem.inferTypeCallChain(expr, true)
+      if (TypeSystem.isFunctionType(type)) {
+        // 파라미터에서 반드시 필요로 하는 인수의 개수를 계산하고 현재 함수에서 제공하는 인수의 개수와 비교한다.
+        let needParamNum = 0
+        let hasRestParam = false
+        type.parameters.forEach((param, index) => {
+          // nullable인 경우나 default value가 있는 경우는 꼭 필요한 인수에서 제외한다.
+          if (!(param.nullable || param.defaultValue)) needParamNum++
+          if (param.spread) hasRestParam = true
+        })
+        const paramCount = type.parameters.length
+
+        if (hasRestParam) {
+          // rest parameter
+          //todo 일단은 파라미터 체크를 하지 않는다.
+          // console.log('rest parameter')
+        } else {
+          let errorMsg = ''
+          // 최소한의 인수는 있어야 한다.
+          if (expr.args.length < needParamNum) {
+            errorMsg = `checkCallChain: Function '${funcName}' requires at least ${needParamNum} arguments.`
+          }
+          // 인수가 파라미터보다 많을 때
+          if (expr.args.length > paramCount) {
+            errorMsg = `checkCallChain: Function '${funcName}' has too many arguments.`
+          }
+
+          if (errorMsg) {
+            accept('error', errorMsg, {
+              node: expr,
+              property: 'args',
+            })
+            exitLog(log)
+            return
+          }
+
+          expr.args.forEach((arg, index) => {
+            if (index < paramCount) {
+              const argType = TypeSystem.inferType(arg)
+              const paramType = type.parameters[index].type
+              const match = argType.isAssignableTo(paramType)
+
+              // console.log('🚀 ~ arg:', index, arg.$cstNode?.text, argType.$type, argType.toString())
+              // console.log('🚀 ~ prm:', index, type.parameters[index].name, paramType.$type, paramType.toString())
+              // console.log('🚀 ~ match:', match)
+
+              if (!match) {
+                const msg =
+                  `checkCallChain: Function '${funcName}'s` +
+                  ` parameter '${paramType.toString()}' is mismatch with '${argType.toString()}'.`
+                accept('error', msg, {
+                  node: arg,
+                })
+              }
+            } else {
+              console.log('🚀 ~ no: too many args')
+            }
+          })
+        }
+      }
     }
     exitLog(log)
   }

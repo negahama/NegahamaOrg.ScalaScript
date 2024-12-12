@@ -1,4 +1,4 @@
-@NotTrans val setTimeout: () -> void
+@NotTrans val setTimeout: (callback: () -> void, time: number) -> void
 
 %%
 //-----------------------------------------------------------------------------

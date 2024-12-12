@@ -28,9 +28,9 @@
       "title": "`// Parentheses` at language\\scala-script.langium#499",
       "source": {
         "file": "/language/scala-script.langium",
-        "startLine": 535,
+        "startLine": 575,
         "startColumn": 0,
-        "endLine": 554,
+        "endLine": 594,
         "endColumn": 0
       },
       "notes": [

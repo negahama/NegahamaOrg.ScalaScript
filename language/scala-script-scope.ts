@@ -106,6 +106,31 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     //   previousNode = found.node
     // }
 
+    // 아래와 같이 CallChain을 inferType을 통하지 않고 ref로 처리할 수 있다.
+    // 이 방법을 써도 결국은 ref의 타입이 무엇인지를 알아야 하기 때문에 inferType을 사용해야 한다.
+    // 그리고 동일한 이름 즉 오브젝트나 변수(또는 함수)의 이름이 동일한 경우에는 ref가 제대로 되어져 있지 않기 때문에 문제가 된다.
+    // let prevTypeDesc: TypeDescription | undefined
+    // if (ast.isCallChain(previous)) {
+    //   if (!previous.element || previous.$cstNode?.text == 'this' || previous.$cstNode?.text == 'super') {
+    //     let scope: Scope | undefined
+    //     const classItem = AstUtils.getContainerOfType(context.container, ast.isObjectDef)
+    //     if (classItem) scope = this.createScopeForNodes(classItem?.body.elements)
+    //     exitLog(scopeLog, undefined, 'Exit1')
+    //     return scope ? scope : superScope
+    //   }
+
+    //   const ref = previous.element?.ref
+    //   if (!ref) {
+    //     console.log(`ref is undefined`)
+    //     return superScope
+    //   }
+
+    //   //console.log(chalk.blue(ref.name, ref.$cstNode?.text))
+    //   prevTypeDesc = TypeSystem.inferType(ref)
+    // } else {
+    //   prevTypeDesc = TypeSystem.inferType(previous)
+    // }
+
     // previous 의 타입을 추론한 결과가...
     const prevTypeDesc = TypeSystem.inferType(previous)
 
@@ -287,7 +312,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     ``` 
   */
   scopeObjectDef(context: ReferenceInfo, previous: ast.Expression, object: ast.ObjectDef) {
-    const log = enterLog('scopeObjectDef', object.$cstNode?.text)
+    const log = enterLog('scopeObjectDef', context.reference.$refText, previous?.$cstNode?.text, object.name)
 
     // previous와 object의 이름이 동일하면 일단 static으로 처리한다.
     let staticOnly = false
@@ -302,8 +327,19 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       staticOnly = false
     }
 
-    let scope = this.getGlobalObjectDef(object.name, staticOnly, context)
+    // getGlobalObjectDef()는 전역적인 ObjectDef만을 대상으로 하기 때문에
+    // object.name 대신 context.reference.$refText를 사용하면 안된다.
+    let scope = this.getGlobalObjectDef(context, object.name, staticOnly)
     if (!scope) scope = this.createScopeWithOption(object, { staticOnly })
+
+    // 여러가지 이유로 여기서 제공하는 scope를 매우 정밀하게 하고 싶었다.
+    // 예를들면 this.sales.push()에서 push의 scope는 def $array$가 아니라 push() 함수 자체로 한정하고 싶었다.
+    // 하지만 그렇게 해도 push의 ref는 여전히 $array$를 가르킨다.
+    // if (scope) {
+    //   const nodeDesc = scope.getElement(context.reference.$refText)
+    //   scope = new MapScope(nodeDesc ? [nodeDesc] : [])
+    // }
+
     exitLog(log)
     return scope
   }
@@ -353,7 +389,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   scopeString(context: ReferenceInfo) {
     const log = enterLog('scopeString')
-    const scope = this.getGlobalObjectDef('$string$', false, context)
+    const scope = this.getGlobalObjectDef(context, '$string$', false)
     exitLog(log)
     return scope
   }
@@ -366,7 +402,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   scopeNumber(context: ReferenceInfo) {
     const log = enterLog('scopeNumber')
-    const scope = this.getGlobalObjectDef('$number$', false, context)
+    const scope = this.getGlobalObjectDef(context, '$number$', false)
     exitLog(log)
     return scope
   }
@@ -379,7 +415,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   scopeArray(context: ReferenceInfo) {
     const log = enterLog('scopeArray', context.reference.$refText)
-    const scope = this.getGlobalObjectDef('$array$', false, context)
+    const scope = this.getGlobalObjectDef(context, '$array$', false)
     exitLog(log)
     return scope
   }
@@ -453,7 +489,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @param context - The reference information context.
    * @returns The scope of the global object definition if found and exported, otherwise undefined.
    */
-  private getGlobalObjectDef(name: string, onlyStatic: boolean, context: ReferenceInfo) {
+  private getGlobalObjectDef(context: ReferenceInfo, name: string, onlyStatic: boolean) {
     const global = this.getGlobalScope('ObjectDef', context)
     const sc = global.getElement(name)
     if (sc) {
