@@ -2,15 +2,14 @@ import { AstNode, AstUtils, DefaultScopeProvider, MapScope, ReferenceInfo, Scope
 import * as ast from './generated/ast.js'
 import { LangiumServices } from 'langium/lsp'
 import { TypeSystem } from './scala-script-types.js'
-import { enterLog, exitLog, traceLog } from './scala-script-util.js'
+import { enterLog, exitLog, traceLog, trimText } from './scala-script-util.js'
 import { ScalaScriptCache } from './scala-script-cache.js'
 import chalk from 'chalk'
 
 /**
  * Provides scope resolution for ScalaScript language elements.
- * Extends the DefaultScopeProvider to handle specific scope requirements
- * for ScalaScript, including handling of type chains, call chains, and
- * built-in types like string, number, and array.
+ * Extends the DefaultScopeProvider to handle specific scope requirements for ScalaScript,
+ * including handling of type chains, call chains, and built-in types like string, number, and array.
  *
  * @extends DefaultScopeProvider
  */
@@ -31,11 +30,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * 이를 위해서 a가 무엇인지를 먼저 파악하고 이것이 오브젝트이면 오브젝트의 프로퍼티 이름을 모두 제시해 준다.
    * 여기서는 b의 후보가 될 수 있는 것들을 제시만 할 뿐 실제 b를 결정하는 것은 linker에서 처리한다.
    * a가 문자열이거나 배열이고 b가 문자열이나 배열 관련 함수일 수도 있다.
-   * 이들 string, number, array 함수 처리를 위해 내부 오브젝트가 라이브러리 형태로 등록되어져 있다.
    * 이들 string, number, array 관련 빌트인 함수들은 아래와 같은 형태로 저장되어져 있고
    * def $string$ = { ... }, def $number$ = { ... }, def $array$ = { ... }
-   * 라이브러리로 빠져있기 때문에 전역 오브젝트로 되어져 있다. 따라서 previous가 string이면
-   * 전역 오브젝트 중 이름이 $string$인 것의 프로퍼티들을 scope로 구성해서 리턴해 주면 된다.
+   * 라이브러리로 빠져있기 때문에 전역 오브젝트로 되어져 있다.
+   * 따라서 previous가 string이면 전역 오브젝트 중 이름이 $string$인 것의 프로퍼티들을 scope로 구성해서 리턴해 주면 된다.
    *
    * Scope caching에 대해서...
    * Scope에 대한 잦은 참조가 있기 때문에 이곳에서 caching을 사용하였는데
@@ -51,15 +49,15 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const superScope = super.getScope(context)
 
     // 현재 node의 ref를 구하는 것은 유용할 수 있지만 ref를 호출하면 그 ref의 scope를 처리하기 위해서
-    // 다시 getScope가 호출되기 때문에 Error: Cyclic reference resolution detected 에러가 발생된다.
+    // 다시 getScope()가 호출되기 때문에 Error: Cyclic reference resolution detected 에러가 발생된다.
     // const refNode = context.reference.ref
     // console.log(`getScope: ${scopeId}, ${refNode?.$cstNode?.text}('${refNode?.$type})'`)
 
     // 타입의 참조는 따로 처리한다.
     if (ast.isTypeChain(context.container)) {
-      const scope = this.scopeTypeChain(context, superScope)
+      const scope = this.scopeTypeChain(context)
       exitLog(scopeLog, undefined, 'Exit(type-chain)')
-      return scope
+      return scope ? scope : superScope
     }
 
     // check if the reference is CallChain or RefCall
@@ -68,8 +66,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       return superScope
     }
 
-    // // this, super가 [NamedElement:'this'] 인 경우에 호출된다.
-    // // 지금처럼 keyword 인 경우에는 ref 처리가 되지 않아서 여기가 호출되지 않는다.
+    // this, super가 [NamedElement:'this'] 인 경우에 호출된다.
+    // 지금처럼 keyword 인 경우에는 ref 처리가 되지 않아서 여기가 호출되지 않는다.
     // if (refText === 'this' || refText === 'super') {
     //   const objectDef = AstUtils.getContainerOfType(context.container, ast.isObjectDef)
     //   if (objectDef) {
@@ -81,19 +79,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     //   }
     // }
 
-    const callChain = context.container as ast.CallChain
-
-    // (isFunction?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 Arguments를 그대로 대입한
-    // args+=Expression ... 과 동작이 동일할 것 같은데 그렇지 않다. 실제로는 Arguments는 타입은 존재하진 않아도
-    // args를 바로 사용하는 것과는 다른 규칙으로 존재하는 것으로 보이며 이로 인해 함수의 인수가 있는 경우 즉
-    // callChain.args가 있는 경우에 AST node has no document 에러를 유발하게 된다. 개발 노트를 참고
-    // 이 코드는 이를 확인하기 위한 것이다.
-    // if (callChain.args == undefined) {
-    //   traceLog(`'${refText}'.args is undefined`)
-    // }
-
-    const previous = callChain.previous
-    traceLog(`'${refText}'.previous is '${previous?.$cstNode?.text}'(${previous?.$type})`)
+    const previous = (context.container as ast.CallChain).previous
+    traceLog(`'${refText}'.previous is '${trimText(previous?.$cstNode?.text)}'(${previous?.$type})`)
     if (!previous) {
       exitLog(scopeLog, undefined, 'Exit(NOT previous)')
       return superScope
@@ -135,6 +122,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const prevTypeDesc = TypeSystem.inferType(previous)
 
     // union type이면 포함된 타입중에 class, string, ... 등이 있는지 확인하고 있으면 이를 추론 타입으로 사용한다.
+    //todo Union type을 이렇게 처리하는 것은 좋지 못하다...
     let classDesc = prevTypeDesc
     let stringDesc = prevTypeDesc
     let numberDesc = prevTypeDesc
@@ -165,7 +153,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       }
     }
 
-    traceLog(`Finding scope: curr: ${refText}, previous: '${previous.$cstNode?.text}'`)
+    traceLog(`Finding scope: curr: ${refText}, previous: '${trimText(previous.$cstNode?.text)}'`)
 
     let scope: Scope | undefined
     if (TypeSystem.isObjectType(classDesc)) {
@@ -214,16 +202,19 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * 6. If the previous element is an object type, creates a scope for the object type and its members.
    * 7. Returns the created scope or the super scope if no specific scope is found.
    */
-  scopeTypeChain(context: ReferenceInfo, superScope: Scope): Scope {
+  scopeTypeChain(context: ReferenceInfo): Scope | void {
+    const log = enterLog('scopeTypeChain', trimText(context.container.$cstNode?.text))
     const typeChain = context.container as ast.TypeChain
-    const log = enterLog('scopeTypeChain', typeChain.$cstNode?.text)
 
+    // 해당 타입이 generic 타입인지를 확인하고 generic이면 새로운 scope를 생성해서 리턴한다.
+    // 예를 들어 typeChain이 K 인데 이것이 def Map<K, V> = { val get: (key: K) -> V } 에서
+    // 사용된 것인지를 확인한다는 의미이다.
     // generic의 추가로 TypeChain에서 superScope로 처리되지 않는 즉 reference가 없는 경우가 생긴다.
     // generic의 Id로 예를들어 T, K, V 등이 사용될때 이것과 동일한 이름의 오브젝트가 존재하는 경우에도 문제가 된다.
-    // 그래서 먼저 generic인지를 확인하고 generic이면 새로운 scope를 생성해서 리턴한다.
-    const container = AstUtils.getContainerOfType(context.container, ast.isObjectDef)
+    // generic과 관련된 자세한 내용은 scala-script.langium의 generic을 참고한다.
+    const container = AstUtils.getContainerOfType(typeChain, ast.isObjectDef)
     if (container && container.generic?.types.includes(context.reference.$refText)) {
-      const s = this.descriptions.createDescription(context.container, context.reference.$refText)
+      const s = this.descriptions.createDescription(typeChain, context.reference.$refText)
       const scope = new MapScope([s])
       exitLog(log, undefined, 'Exit(make scope for generic)')
       return scope
@@ -233,7 +224,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     traceLog(`TypeChain.previous is ${previous?.$type}`)
     if (!previous) {
       exitLog(log, undefined, 'Exit(NO previous)')
-      return superScope
+      return
     }
 
     // previous 의 타입을 추론한 결과가...
@@ -246,14 +237,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       console.log(`FIND Class: ${previous.$type}, ${prevTypeDesc.node?.$type}`)
       if (!ast.isObjectType(prevTypeDesc.node)) {
         console.error(chalk.red('internal error: prevTypeDesc is not object type:', prevTypeDesc.node.$type))
-        return superScope
+        return
       }
       const removedBypass = prevTypeDesc.node.elements.filter(e => !ast.isBypass(e))
       const scope = this.createScopeForNodes(removedBypass)
       exitLog(log, prevTypeDesc, 'Exit6')
       return scope
     } else console.error(chalk.red('internal error in typechain:', prevTypeDesc))
-    return superScope
   }
 
   /**
@@ -424,7 +414,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * Creates a scope for any type based on the provided context and previous expression.
    *
    * 이 코드는 DefaultScopeProvider의 createScopeForNodes()와 거의 동일하다.
-   * 차이점은 원래 코드는 이름이 없으면 undefined를 리턴하지만 여기서는 이름이 없으면 이름을 생성해서 리턴한다.   *
+   * 차이점은 원래 코드는 이름이 없으면 undefined를 리턴하지만 여기서는 이름이 없으면 이름을 생성해서 리턴한다.
    * 이는 expr이 any type이기 때문에 member 검사를 하지 않고 무조건 멤버가 있다고 보고 처리하는 것이다.
    * 이것 자체는 문제가 안되는데 이름이 있는 경우에는 문제가 될 수 있다.
    *
@@ -432,8 +422,27 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @param previous - The previous AST expression used as a starting point.
    * @returns A new scope containing the descriptions of the elements.
    */
+  /*
+    아래와 같은 구문에서 any type이 발생한다.
+    ```
+    def Corp = {
+      val process = () => {
+        console.log('process')
+      }
+    }
+    var corps: Corp[]
+    corps.forEach(corp => corp.process())
+    ```
+    forEach에서 corp는 아직 타입을 추론하지 못하기 때문에 any로 처리되는데 inferTypeParameter에서 처리하고 있다.
+    그런데 현재 이 코드는 process를 확인하려고 getScope에 들어왔다가 previous인 corp가 any type이어서
+    corp를 expr로 가지고 들어온 상황인데 corp가 있으면 있는 걸 사용하고 없으면 corp를 생성하는 것이 아니라
+    context.reference.$refText인 process를 생성해서 리턴한다. 즉 corp에 process가 있는지의 여부를 검사하지 않는다.
+    문제는 이름이 있는 경우이다. 발생한 적이 없는 것 같긴 한데 이름이 있는 경우에는 corp를 넘기고 그렇지 않은 경우
+    process를 넘기는 것 자체가 잘못되어져 있고 이름이 있을 경우 process를 다시 확인하는 코드도 없어 보인다.
+  */
   scopeAny(context: ReferenceInfo, previous: ast.Expression) {
     const log = enterLog('scopeAny', `ref text: ${previous.$cstNode?.text}, ${context.reference.$refText}`)
+    // console.log(chalk.red('scopeAny'), `ref text: ${previous.$cstNode?.text}, ${context.reference.$refText}`)
     const elements: AstNode[] = [previous]
     const s = stream(elements)
       .map(e => {

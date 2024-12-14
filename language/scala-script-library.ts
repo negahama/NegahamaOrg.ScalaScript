@@ -105,7 +105,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 호출 배열의 각 요소에 지정된 콜백 함수를 적용한 다음 결과를 한 단계씩 평탄화하여 만들어진 새 배열을 반환합니다.
   val flatMap: (callbackFn: (arg: T, index?: number) -> T) -> T[]
   // 호출 배열의 각 요소로 함수를 호출합니다.
-  val forEach: (callbackFn: (arg: T, index?: number) -> any) -> void
+  val forEach: (callbackFn: (arg: T, index?: number) -> any, thisArg?: any) -> void
   // 호출하는 배열에 값이 포함되어 있는지 여부를 판단하여 적절하게 true나false를 반환합니다.
   val includes: (searchElement: T, fromIndex?: number) -> boolean
   // 호출 배열에서 지정된 요소를 찾을 수 있는 첫 번째(최소) 인덱스를 반환합니다.
@@ -371,7 +371,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다. 이 이터러블 객체는 for..of반복문의 기초로 쓰입니다.
   val entries: () -> any
   //
-  val forEach: (callbackFn: (arg: V, index?: number) -> any) -> void
+  val forEach: (callbackFn: (arg: V, index?: number) -> any, thisArg?: any) -> void
 }
 
 @NotTrans export def Set<T> = {
@@ -392,7 +392,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다. 이 이터러블 객체는 for..of반복문의 기초로 쓰입니다.
   val entries: () -> any
   //
-  val forEach: (callbackFn: (arg: T, index?: number) -> any) -> void
+  val forEach: (callbackFn: (arg: T, index?: number) -> any, thisArg?: any) -> void
 }
 
 @NotTrans export def JSON = {

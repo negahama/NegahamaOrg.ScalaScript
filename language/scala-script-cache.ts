@@ -8,39 +8,39 @@ import { TypeDescription, TypeSystem } from './scala-script-types.js'
 export namespace ScalaScriptCache {
   const cache = new Map<AstNode, TypeDescription>()
 
-  const astVariableDefs = new Map<ast.VariableDef, TypeDescription>()
-  const astFunctionDefs = new Map<ast.FunctionDef, TypeDescription>()
-  const astFunctionValues = new Map<ast.FunctionValue, TypeDescription>()
-  const astObjectDefs = new Map<ast.ObjectDef, TypeDescription>()
-  const astObjectValues = new Map<ast.ObjectValue, TypeDescription>()
+  // const astVariableDefs = new Map<ast.VariableDef, TypeDescription>()
+  // const astFunctionDefs = new Map<ast.FunctionDef, TypeDescription>()
+  // const astFunctionValues = new Map<ast.FunctionValue, TypeDescription>()
+  // const astObjectDefs = new Map<ast.ObjectDef, TypeDescription>()
+  // const astObjectValues = new Map<ast.ObjectValue, TypeDescription>()
 
   export function get(node: AstNode) {
-    if (ast.isVariableDef(node)) {
-      return astVariableDefs.get(node)
-    } else if (ast.isFunctionDef(node)) {
-      return astFunctionDefs.get(node)
-    } else if (ast.isFunctionValue(node)) {
-      return astFunctionValues.get(node)
-    } else if (ast.isObjectDef(node)) {
-      return astObjectDefs.get(node)
-    } else if (ast.isObjectValue(node)) {
-      return astObjectValues.get(node)
-    }
+    // if (ast.isVariableDef(node)) {
+    //   return astVariableDefs.get(node)
+    // } else if (ast.isFunctionDef(node)) {
+    //   return astFunctionDefs.get(node)
+    // } else if (ast.isFunctionValue(node)) {
+    //   return astFunctionValues.get(node)
+    // } else if (ast.isObjectDef(node)) {
+    //   return astObjectDefs.get(node)
+    // } else if (ast.isObjectValue(node)) {
+    //   return astObjectValues.get(node)
+    // }
     return cache.get(node)
   }
 
   export function set(node: AstNode, type: TypeDescription) {
-    if (ast.isVariableDef(node)) {
-      astVariableDefs.set(node, type)
-    } else if (ast.isFunctionDef(node)) {
-      astFunctionDefs.set(node, type)
-    } else if (ast.isFunctionValue(node)) {
-      astFunctionValues.set(node, type)
-    } else if (ast.isObjectDef(node)) {
-      astObjectDefs.set(node, type)
-    } else if (ast.isObjectValue(node)) {
-      astObjectValues.set(node, type)
-    }
+    // if (ast.isVariableDef(node)) {
+    //   astVariableDefs.set(node, type)
+    // } else if (ast.isFunctionDef(node)) {
+    //   astFunctionDefs.set(node, type)
+    // } else if (ast.isFunctionValue(node)) {
+    //   astFunctionValues.set(node, type)
+    // } else if (ast.isObjectDef(node)) {
+    //   astObjectDefs.set(node, type)
+    // } else if (ast.isObjectValue(node)) {
+    //   astObjectValues.set(node, type)
+    // }
     cache.set(node, type)
   }
 

@@ -8,9 +8,9 @@
       "title": "`// (isFunction?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 Arguments를 그대로 대입한` at language\\scala-script-scope.ts#96",
       "source": {
         "file": "/language/scala-script-scope.ts",
-        "startLine": 53,
+        "startLine": 52,
         "startColumn": 0,
-        "endLine": 61,
+        "endLine": 53,
         "endColumn": 0
       },
       "notes": [
@@ -21,66 +21,6 @@
           "createdAt": "2024-11-28T04:18:18.866Z",
           "content": "Fragment와 Ref 동시 사용시 문제점",
           "link": "file:///./docs/1d29c20692a691a8fb6ba4b666d9ccef.md"
-        }
-      ]
-    },
-    {
-      "id": "91058f69734ded818ee6f907bb0f978c",
-      "title": "`if (TypeSystem.isUnionType(prevTypeDesc)) {` at language\\scala-script-scope.ts#120",
-      "source": {
-        "file": "/language/scala-script-scope.ts",
-        "startLine": 37,
-        "startColumn": 0,
-        "endLine": 61,
-        "endColumn": 0
-      },
-      "notes": [
-        {
-          "id": "b3cc7b4bf6afdb45432a900efe5ae3cc",
-          "category": "Todo",
-          "importance": "Medium",
-          "createdAt": "2024-11-29T17:00:25.401Z",
-          "content": "Union type을 이렇게 처리하는 것은 좋지 못하다..."
-        }
-      ]
-    },
-    {
-      "id": "8d961b64a7305b84b909bab9a8aed9cd",
-      "title": "`// precomputedScopes가 있는지를 확인해 본다` at language\\scala-script-scope.ts#104",
-      "source": {
-        "file": "/language/scala-script-scope.ts",
-        "startLine": 55,
-        "startColumn": 0,
-        "endLine": 61,
-        "endColumn": 0
-      },
-      "notes": [
-        {
-          "id": "de8e84de34f94d40432fd2d04166f9c8",
-          "category": "Todo",
-          "importance": "Medium",
-          "createdAt": "2024-11-29T17:05:11.099Z",
-          "content": "getGlobalScope는 유용한데... superScope도 분명 도움되는 부분이 있지 않을까?"
-        }
-      ]
-    },
-    {
-      "id": "964497315b5ac2d459cf3635b5f66c67",
-      "title": "`private getScopeForAnytype(context: ReferenceInfo, expr: ast.Expression): Scope {` at language\\scala-script-scope.ts#301",
-      "source": {
-        "file": "/language/scala-script-scope.ts",
-        "startLine": 48,
-        "startColumn": 0,
-        "endLine": 65,
-        "endColumn": 0
-      },
-      "notes": [
-        {
-          "id": "03c971babe5e5495a745da6605b10435",
-          "category": "Bugs",
-          "importance": "Medium",
-          "createdAt": "2024-11-30T03:31:37.413Z",
-          "content": "아래와 같은 구문에서 any type이 발생한다.\r\n\r\n```ts\r\ndef Corp = {\r\n  val process = () => {\r\n    console.log('process')\r\n  }\r\n}\r\nvar corps: Corp[]\r\ncorps.forEach(corp => corp.process())\r\n```\r\n\r\nforEach에서 corp는 아직 타입을 추론하지 못하기 때문에 any로 처리되는데 inferTypeParameter에서 처리하고 있다.\r\n\r\n그런데 현재 이 코드는 process를 확인하려고 getScope에 들어왔다가 previous인 corp가 any type이어서 corp를 expr로 가지고 들어온 상황인데 corp가 있으면 있는 걸 사용하고 없으면 corp를 생성하는 것이 아니라 `context.reference.$refText`인 process를 생성해서 리턴한다. 즉 corp에 process가 있는지의 여부를 검사하지 않는다.\r\n\r\n문제는 이름이 있는 경우이다. 발생한 적이 없는 것 같긴 한데 이름이 있는 경우에는 corp를 넘기고 그렇지 않은 경우 process를 넘기는 것 자체가 잘못되어져 있고 이름이 있을 경우 process를 다시 확인하는 코드도 없어 보인다. \r\n\r\n그리고 이제는 이 부분도 타입 추론을 해야 할 때인 것 같다.\r\n"
         }
       ]
     }

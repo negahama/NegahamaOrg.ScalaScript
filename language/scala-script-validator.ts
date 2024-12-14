@@ -1,7 +1,7 @@
 import { type ValidationAcceptor } from 'langium'
 import * as ast from './generated/ast.js'
 import { TypeDescription, TypeSystem } from './scala-script-types.js'
-import { enterLog, exitLog, traceLog } from './scala-script-util.js'
+import { enterLog, exitLog, traceLog, trimText } from './scala-script-util.js'
 import chalk from 'chalk'
 
 /**
@@ -22,8 +22,8 @@ export class ScalaScriptValidator {
    */
   checkVariableDef(stmt: ast.VariableDef, accept: ValidationAcceptor): void {
     const log = enterLog('checkVariableDef', `variable name: ${stmt.name}`)
-    traceLog('stmt.type :', `${stmt.type?.$type}, '${stmt.type?.$cstNode?.text}'`)
-    traceLog('stmt.value:', `${stmt.value?.$type}, '${stmt.value?.$cstNode?.text}'`)
+    traceLog('stmt.type :', `${stmt.type?.$type}, '${trimText(stmt.type?.$cstNode?.text)}'`)
+    traceLog('stmt.value:', `${stmt.value?.$type}, '${trimText(stmt.value?.$cstNode?.text)}'`)
 
     if (stmt.type && stmt.value) {
       const left = TypeSystem.inferType(stmt.type)
@@ -64,7 +64,7 @@ export class ScalaScriptValidator {
    *    If not, it reports an error.
    */
   checkFunctionDef(stmt: ast.FunctionDef | ast.FunctionValue, accept: ValidationAcceptor): void {
-    const log = enterLog('checkFunctionDef', stmt.$cstNode?.text)
+    const log = enterLog('checkFunctionDef', trimText(stmt.$cstNode?.text))
 
     if (stmt.body && stmt.returnType) {
       const retType = TypeSystem.inferType(stmt.returnType)
@@ -95,7 +95,7 @@ export class ScalaScriptValidator {
     if (ast.isObjectDef(stmt)) {
       log = enterLog('checkObjectDef', stmt.name)
     } else {
-      log = enterLog('checkObjectValue', stmt.$cstNode?.text)
+      log = enterLog('checkObjectValue', trimText(stmt.$cstNode?.text))
     }
     // todo: implement classes
     // accept("error", "Classes are currently unsupported.", {
@@ -114,11 +114,8 @@ export class ScalaScriptValidator {
    */
   checkCallChain(expr: ast.CallChain, accept: ValidationAcceptor): void {
     const log = enterLog('checkCallChain', expr.$cstNode?.text)
-    //todo
+
     // default parameter, optional parameter, rest parameter등으로 인해 파라미터의 처리가 간단하지 않다.
-    // 아울러 def에서 정의된 함수들은 아직 이름으로 함수를 찾지 못하고 있으며
-    // 어떤 def인가에 따라서도 다르기 때문에 이름으로만 찾는 것도 불가능하다.
-    // 또한 기정의된 console.log 같은 함수도 이 대상이 되는데 이것들의 파라미터도 정의되어져 있지 않다.
     if (expr.isFunction) {
       const funcName = expr.element?.$refText
       // console.log(funcName, expr.$cstNode?.text)
@@ -137,7 +134,7 @@ export class ScalaScriptValidator {
 
         if (hasRestParam) {
           // rest parameter
-          //todo 일단은 파라미터 체크를 하지 않는다.
+          //todo spread 처리 : 일단은 파라미터 체크를 하지 않는다.
           // console.log('rest parameter')
         } else {
           let errorMsg = ''
@@ -195,8 +192,8 @@ export class ScalaScriptValidator {
    */
   checkAssignment(expr: ast.Assignment, accept: ValidationAcceptor): void {
     const log = enterLog('checkAssignment', expr.assign.$type)
-    traceLog(`left : ${expr.assign.$type}, ${expr.assign.$cstNode?.text}`)
-    traceLog(`right: ${expr.value.$type}, ${expr.value.$cstNode?.text}`)
+    traceLog(`left : ${expr.assign.$type}, ${trimText(expr.assign.$cstNode?.text)}`)
+    traceLog(`right: ${expr.value.$type}, ${trimText(expr.value.$cstNode?.text)}`)
 
     const left = TypeSystem.inferType(expr.assign)
     const right = TypeSystem.inferType(expr.value)
@@ -229,12 +226,14 @@ export class ScalaScriptValidator {
    * @param unary - The unary expression to be checked.
    * @param accept - The validation acceptor to report errors.
    */
-  checkUnaryOperationAllowed(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
-    const log = enterLog('checkUnaryOperationAllowed', unary.value.$type)
+  checkUnaryExpression(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
+    const log = enterLog('checkUnaryExpression', unary.value.$type)
     if (unary.operator) {
       const item = TypeSystem.inferType(unary.value)
       if (!this.isLegalOperation(unary.operator, item)) {
-        const msg = `Cannot perform operation '${unary.operator}' on value of type '${item.toString()}'.`
+        const msg =
+          'checkUnaryExpression: Cannot perform operation ' +
+          `'${unary.operator}' on value of type '${item.toString()}'.`
         accept('error', msg, {
           node: unary,
         })
@@ -258,8 +257,8 @@ export class ScalaScriptValidator {
    * 6. If the operation is a comparison ('==' or '!='), checks if the comparison is always true or false and reports a warning if so.
    * 7. Logs the exit of the function.
    */
-  checkBinaryOperationAllowed(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
-    const log = enterLog('checkBinaryOperationAllowed', binary.operator)
+  checkBinaryExpression(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
+    const log = enterLog('checkBinaryExpression', binary.operator)
     traceLog(`expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`)
 
     const left = TypeSystem.inferType(binary.left)
@@ -267,17 +266,18 @@ export class ScalaScriptValidator {
 
     const tl = left.toString()
     const tr = right.toString()
-    traceLog(`checkBinary result: ${tl} ${binary.operator} ${tr}`)
+    traceLog(`checkBinaryExpression result: ${tl} ${binary.operator} ${tr}`)
 
     if (!this.isLegalOperation(binary.operator, left, right)) {
-      const msg = `Cannot perform operation '${binary.operator}' on values of type '${tl}' and '${tr}'.`
+      const msg = `checkBinaryExpression: Cannot perform operation '${binary.operator}' on values of type '${tl}' and '${tr}'.`
       accept('error', msg, {
         node: binary,
       })
     } else if (['==', '!='].includes(binary.operator)) {
       if (!this.isLegalOperation(binary.operator, left, right)) {
         const msg =
-          `This comparison will always return '${binary.operator === '==' ? 'false' : 'true'}' as types ` +
+          'checkBinaryExpression: This comparison will always return ' +
+          `'${binary.operator === '==' ? 'false' : 'true'}' as types ` +
           `'${tl}' and '${tr}' are not compatible.`
         accept('warning', msg, {
           node: binary,

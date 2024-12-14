@@ -50,16 +50,26 @@ Types:
 SimpleType:
   ArrayType | ObjectType | ElementType;
 
-// 해당 개체의 타입이 배열형임을 나타내기 위해 사용된다.
-// ex) var ary: number[]
+/*
+  해당 개체의 타입이 배열형임을 나타내기 위해 사용된다.
+  ex) var ary: number[]
+
+  ArrayType을 elementType=(ObjectType | ElementType) '[' ']'; 으로 정의하면
+  ElementType에 FunctionType이 포함되어져 있어 var t: () -> number[] 의 경우
+  () -> number 의 배열로 인식된다.
+*/
 ArrayType:
-  // SimpleType ({infer ArrayType.elementType=current} '[' ']')? ;
   elementType=(ObjectType | PrimitiveType | TypeChain) '[' ']';
 
-// ex) var obj: { name: string, age: number }
+/*
+  해당 개체의 타입이 배열형임을 나타내기 위해 사용된다.
+  ex) var obj: { name: string, age: number }
+
+  //todo 아래 방식이 정석인데 이 방식을 사용하면 모호성 문제가 생긴다. 어떤 차이가 있는걸까?
+  '{' elements+=ObjectTypeElement? (','? elements+=ObjectTypeElement)* '}';
+*/
 ObjectType:
   '{' elements+=ObjectTypeElement* '}';
-  // '{' elements+=ObjectTypeElement? (','? elements+=ObjectTypeElement)* '}';
 
 ObjectTypeElement:
   (Bypass | VariableDef | FunctionDef | ObjectDef) (',')?;
@@ -81,16 +91,35 @@ PrimitiveType:
 FunctionType:
   '(' Parameters? ')' FunctionReturn;
 
+/*
+  //todo TypeChain은 다음과 같은 경우를 위한 것인데 실제로 이런 경우는 transpile되면 interface안에 inferface가 정의되는 것이기 때문에 error가 된다.
+  ```
+  def Corp = {
+    def Firm = {
+      var name: string
+    }
+    var firms: Firm[]
+  }
+  ```
+  generic은 var table: Map<string, number> 와 같은 구문에서 필요하다.
+*/
 TypeChain:
   reference=[ObjectDef:Id] (generic=GenericValue)? ({infer TypeChain.previous=current} "." reference=[ObjectDef:Id] (generic=GenericValue)?)*;
 
+/*
+  def Map<K, V> = { ... } 
+  GenericDef의 Id는 [ObjectDef:Id]가 아닌 일반 Id를 사용한다.
+  Generic은 val get: (key: K) -> V 와 같이 타입을 대신하는 K, V 와 같은 이니셜을 사용하는데 이것은 ObjectDef가 아니다.
+  따라서 K, V의 reference는 ScopeProvider에서 직접 생성해 주어야 한다.
+*/
 GenericDef:
   '<' types+=Id (',' types+=Id)* '>';
 
+// new Map<string, number>()
 GenericValue:
   '<' types+=SimpleType (',' types+=SimpleType)* '>';
 
-//todo
+//todo tuple type을 지원해야 한다.
 // TupleType:
 //   '[' types+=SimpleType (',' types+=SimpleType)* ']';
 
@@ -98,8 +127,8 @@ type NamedElement =
   VariableDef
   | FunctionDef
   | ObjectDef
-  | Iterator
-  | Parameter;
+  | Parameter
+  | Iterator;
 
 //-----------------------------------------------------------------------------
 // Statements
@@ -119,13 +148,14 @@ Statement:
   | Break;
 
 /*
-  Value and Variable Declarations and Definitions
+  Variable Declarations and Definitions
   -----------------------------------------------------------------------------
   모든 변수는 다음의 규칙을 가지고 있다.
   이름 : 타입 = 값
   타입이나 값을 통해서 변수의 타입을 알수 있어야 한다.
-  VariableDef Rule 자체는 타입과 값이 모두 없을 수 있지만 둘 다 있거나 적어도 하나는 있어야 한다.
-  타입과 값은 모두 있으면 값은 명시된 타입으로 변환되며 이 변환이 실패하면 에러가 된다.
+  VariableDef Rule 자체는 타입과 값이 모두 없을 수 있지만 없으면 에러 타입이 된다.
+  일반적으로 둘 다 있거나 적어도 하나는 있어야 하며 타입과 값은 모두 있으면 명시된 타입을 우선하며
+  값만 있으면 값으로 타입을 추론한다.
 
   이전에 다중 선언문을 지원했지만 삭제하기로 했다.
   다중 선언문의 유용성에 비해 처리가 복잡해지기 시작했기 때문이다.
@@ -136,10 +166,10 @@ Statement:
 
   var, val 은 스칼라의 문법을 차용한 것으로 엄밀하게 말하면 변수의 성격을 결정하는 것이다.
   var는 재할당이 가능한 변수를, val은 한번 할당되면 다시 재할당되지 않는 변수로 지정하는 것이다.
-  하지만 스칼라스크립트는 타입스크립트의 let, const와 동일하기 때문에 스칼라의 var, val와 엄밀히는 다르다.
+  하지만 스칼라스크립트는 타입스크립트의 let, const와 동일하기 때문에 엄밀히는 스칼라의 var, val와는 다르다.
 */
 VariableDef:
-  (Annotation)? Modifier kind=('val' | 'var') TypedId ('=' value=Expression)?;
+  Annotation? Modifier kind=('val' | 'var') TypedId ('=' value=Expression)?;
 
 fragment Annotation:
   '@' annotate=Id;
@@ -153,7 +183,7 @@ fragment TypedId:
 /*
   Function Defintion
   -----------------------------------------------------------------------------
-  선언 또는 정의에서 중요한 것은 대상이다. 선언의 대상은 변수일 수도 있고 타입 자체일 수도 있다.
+  선언(또는 정의)에서 중요한 것은 대상이다. 선언의 대상은 변수일 수도 있고 타입 자체일 수도 있다.
   우리가 보통 val array: number[] 와 같이 선언하는 것은 숫자형 배열을 타입으로 가지는 array라는
   변수를 선언하는 것이며 class Person { ... } 은 Person이라는 이름을 가지는 타입을 선언하는 것이다.
   그럼 function display(msg: string) { ... } 와 같은 함수의 선언은 무엇을 선언한 것일까?
@@ -164,15 +194,15 @@ fragment TypedId:
 
   하지만 기존의 함수 정의가 필요한 경우가 딱 하나 있다.
   파생 클래스에서 부모 클래스의 함수를 오버라이드하면서 super로 부모 함수를 사용하는 경우이다.
-  이 경우의 부모 함수는 개념적으로 변수(또는 상수)일 수가 없다. 자식 클래스에서 PI를 변경하면서
+  이 경우 부모 클래스의 함수는 개념적으로 변수(또는 상수)일 수가 없다. 자식 클래스에서 PI를 변경하면서
   super.PI로 PI가 부모 클래스에서 가졌던 값을 사용한다는 것이 억지스럽기 때문이다.
   물론 이것을 우회해서 동일한 기능을 구현할 순 있지만 불편하기 때문에 스칼라스크립트에서도
   함수의 정의를 지원하기로 했다. 하지만 여전히 함수의 정의를 일반적인 것으로 보지는 않는다.
 
   스칼라스크립트는 함수형 변수 형태로 함수를 사용하는 것을 원칙으로 하고 많은 경우 타입스크립트에서도
   함수형 변수로 변환되지만 모두는 아니다. 특히 생성자와 디폴트 파라메터를 가지는 함수는 타입스크립트에서
-  람다 함수로 변환이 안되기 때문에 일반 함수로 변환된다. 하지만 이것은 스칼라스크립트가 그렇게 변환한다는
-  것이므로 스칼라스크립트 코드 자체에서는 다음과 같이 호출하면 된다.
+  함수형 변수로 처리되지 않기 때문에 스칼라스크립트는 이런 경우 타입스크립트의 일반 함수로 변환해 준다.
+  하지만 이것은 스칼라스크립트가 그렇게 변환한다는 것이므로 스칼라스크립트 코드 자체에서는 다음과 같이 호출하면 된다.
   val constructor = (msg: string)           -> void => { ... } // 생성자 함수
   val paramMethod = (msg: string = "hello") -> void => { ... } // 디폴트 파라메터가 있는 함수
 
@@ -180,13 +210,13 @@ fragment TypedId:
   함수는 파라메터와 리턴타입, 함수의 바디로 구성되고 함수를 표시할때 `(msg: string) -> void => { ... }` 와 같이
   리턴 타입은 -> 으로 표시하고 함수의 바디는 => 으로 표시한다. 함수의 리턴 타입을 -> 으로 표기하는 것은
   ScalaScript가 다른 언어와 구분되는 차이점 중에 하나이다.
-  함수형 변수의 완전한 표현은 var f:(msg: string) -> void = (msg: string) -> void => { ... } 이지만
+  함수형 변수의 완전한 표현은 var f:() -> void = () -> void => { ... } 이지만
   f 변수의 타입을 중복으로 기술할 필요가 없기 때문에 var f = FunctionValue 형태로 표시할 수 있다. 
   함수의 값에 함수 타입이 포함되는 점은 혼란의 여지가 있지만 이것이 없는 함수 바디는 그냥 block일 뿐이다.
   인수는 괄호를 사용해서 묶어야 하지만 인수가 하나인 경우에는 괄호없이 사용할 수도 있다.
 */
 FunctionValue:
-  ('(' Parameters? ')' | params+=Parameter) (FunctionReturn)? FunctionBody;
+  ('(' Parameters? ')' | params+=Parameter) FunctionReturn? FunctionBody;
 
 /*
   parameter와 argument는 다르다.
@@ -208,39 +238,52 @@ fragment FunctionBody:
 /*
   함수의 정의 자체는 값에 대한 이름 부여이고 위에서 설명하였듯이 ScalaScript에서는 이를 예외적인 경우로 본다.
   var, val, def 와 동일하게 이름 다음에 = 이 오고 그 다음에 함수값(FunctionValue)이 위치한다.
+  확장 함수를 위해 extension이 추가되어져 있지만 아직 사용되지 않는다.
+  타입스크립트와의 호환성을 위해서 함수의 Generic도 지원하고 있다.
 */
 FunctionDef:
-  (Annotation)? Modifier 'fun' (extension=[ObjectDef:Id] '.')? name=Id (generic=GenericDef)? 
-  '=' '(' Parameters? ')' (FunctionReturn)? (FunctionBody)?;
+  Annotation? Modifier 'fun' (extension=[ObjectDef:Id] '.')? name=Id (generic=GenericDef)? 
+  '=' '(' Parameters? ')' FunctionReturn? FunctionBody?;
 
+/*
+  중괄호를 이용한 블럭 지정과 들여쓰기를 이용한 블럭 지정을 모두 지원한다.
+  하지만 들여쓰기를 이용한 블럭 지정은 모든 종류의 괄호(대괄호, 중괄호, 소괄호) 내부에서는 사용할 수 없다.
+  자세한 설명은 개발 노트를 참고한다.
+*/ 
 Block:
   (isBracket?=('{' | INDENT) codes+=Code+ ('}' | DEDENT)) | codes+=Expression;
 
 /*
-  Object Definition
-  -----------------------------------------------------------------------------
-  Object는 유저가 정의하는 타입을 모두 포괄하는 단어이며 여기에는 일반적인 Class, Interface를 모두 포함한다.
-  Object는 복합타입 컨테이너로 자신을 제외한 모든 타입을 가질 수 있다.
-  예를들면 단일타입, 다른 복합타입, 배열타입등을 모두 element로 가질 수 있다. 
-
-  Object의 정의란 특정 타입에 이름을 부여하는 것이다.
-  스칼라스크립트에서 def 로 시작하는 것은 모두 타입에 대해 이름을 부여하는 것이다.
-  스칼라스크립트에서는 클래스, 오브젝트등의 사용자 정의 자료구조의 구분이 없기 때문에(모두 오브젝트라고 칭함)
-  def는 일반적으로 오브젝트의 선언인데 이것은 오브젝트 개체를 선언하는 것이 아니라 타입 자체를 선언하는 것이다.
-  예를들어 name과 age를 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
-  이 타입을 매번 이렇게 쓰기가 불편하기 때문에 이를 Person 이라는 이름으로 사용하는 것이다.
-
-  이는 함수도 마찬가지이다. 예를 들어 def EventHandler = (event: Event, param: EventParam) => EventResult 는
+  def를 이용해서 함수 타입에 이름을 부여하는 기능도 구현해야 한다
+  예를 들어 def EventHandler = (event: Event, param: EventParam) => EventResult 는
   (event: Event, param: EventParam)을 파라메터로 가지고 EventResult를 리턴하는 함수 타입을 EventHandler라는 이름으로
   지정한 것이며 var f: EventHandler 와 같이 선언하거나 f = EventHandler => { ... } 와 같이 쓰일 수 있다.
   EventHandler는 함수 타입의 이름이지 함수가 아니라는 점이 중요하다.
+*/
+//todo 기본 문법만 선언되어져 있을 뿐 아직 전혀 구현되지 않았다.
+FunctionTypeDef:
+  Annotation? Modifier 'def' name=Id (generic=GenericDef)?
+  '=' '(' Parameters? ')' FunctionReturn;
+
+/*
+  Object Definition
+  -----------------------------------------------------------------------------
+  Object는 유저가 정의하는 타입을 모두 포괄하는 단어이며 다른 언어의 Class, Interface, Object를 모두 포함하는 개념이다.
+  스칼라스크립트에서는 사용자 정의 자료구조를 별도로 구분하지 않고 모두 오브젝트라는 단일 개념으로 사용한다.
+  Object는 복합타입 컨테이너로 자신을 제외한 모든 타입(단일타입, 다른 복합타입, 배열타입등)을 가질 수 있다.
+  하지만 Object 자체는 이런 값들을 가질 수 있다는 타입이지 객체가 아니라는 점이 중요하다.
+
+  Object의 정의란 특정 타입에 이름을 부여하는 것이며 스칼라스크립트에서는 타입에 이름을 부여할때 def를 사용한다.
+  예를들어 name과 age를 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
+  이 타입을 매번 이렇게 쓰기가 불편하기 때문에 이를 def Person = { name: string, age: number } 와 같이
+  Person이라는 이름을 부여해서 사용하는 것이다.
 
   스칼라스크립트에서는 오브젝트와 클래스를 구분하지 않지만 실제로 타입스크립트로 변환할때는 구분해야 하는데
   함수나 대입문이 있거나 변수의 값을 초기화하는 경우 클래스로 변환된다.
   자세한 내용은 transpileObjectDef()를 참고
 */
 ObjectDef:
-  (Annotation)? (export?='export')?
+  Annotation? (export?='export')?
   'def' name=Id (generic=GenericDef)? ('extends' superClass=[ObjectDef:Id])?
   '=' body=ObjectType;
 
@@ -389,44 +432,32 @@ UnaryOperator infers Expression:
 
   CallChain(또는 RefCall)은 Array expression을 포함한다.
   즉 Array를 실제로 사용하는 ary[1]와 같은 구문을 function의 function call과 동일하게 취급하고 있다.
-  ArrayExpression:
-    element=[NamedElement:Id] isArray?='[' index=Expression ']';
-  ArrayExpression은 RefCall과 CallChain에 포함되어져 있으며 ary[1]과 같은 구문이
-  ary이라는 element와 [1]이라는 ArrayValue로 인식되지 않도록 위와 같이 정의되어야 한다.
+  이는 개념적으로도 더 나아보이며 ary[1]과 같은 구문이 ary이라는 element와 [1]이라는 ArrayValue로
+  인식되지 않도록 해 준다.
 
-  CallChain을 아래와 같이 정의한 이유...
-  CallChain을 정의하는 다양한 방법들이 있을 수 있는데 아래와 같이 정의하게 된 과정을 살펴보면...
-
+  CallChain은 현재 복잡하게 정의되어져 있다.
+  CallChain을 아래와 같이 보다 간략하게 정의할 수도 있는데 현재와 같이 정의하게 된 이유는...
+  ```
   CallChain infers Expression:
-    SimpleExpression ({infer CallChain.previous=current} "." CallableElements )*;
+    SimpleExpression ({infer CallChain.previous=current} "." CallableElements )* (assertion=('!'|'?'))? )*;
   fragment CallableElements:
     element=[NamedElement:Id] ( FunctionCallSignature | ArrayCallSignature )?;
-  FunctionCallSignature:
+  fragment FunctionCallSignature:
     isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')';
-  ArrayCallSignature:
+  fragment ArrayCallSignature:
     isArray?='[' index=Expression ']';
-
+  ```
   여기서 isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')'는
-  FunctionCallSignature와 동일하지만 FunctionCallSignature를 사용할 수 없다.
+  FunctionCallSignature와 동일하지만 FunctionCallSignature를 사용할 수가 없었다.
   심지어 FunctionCallSignature의 내용인 isFunction?='(' Arguments? ')'을 사용하는 것도 안된다.
 
-  [Fragment와 Ref 동시 사용시 문제점](/.prism/docs/1d29c20692a691a8fb6ba4b666d9ccef.md) 참고
+  이 부분은 [Fragment와 Ref 동시 사용시 문제점](/.prism/docs/1d29c20692a691a8fb6ba4b666d9ccef.md) 참고
 */
+//todo Langium이 버전업되면 수정되어야 한다.
 CallChain infers Expression:
   SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
   (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')?
   (assertion=('!'|'?'))? )*;
-
-// CallChain infers Expression:
-//   SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
-//   (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | ArrayCallSignature )?
-//   // ( FunctionCallSignature | ArrayCallSignature )?
-//   (assertion=('!'|'?'))? )*;
-
-// fragment FunctionCallSignature:
-//   isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')';
-// fragment ArrayCallSignature:
-//   isArray?='[' index=Expression ']';
 
 /*
   CallChain의 시작점으로 사용되는 atomic expressions
@@ -441,21 +472,15 @@ SimpleExpression infers Expression:
   | Literal;
 
 /*
-  RefCall은 reference개체의 호출, 사용을 의미하는데 이것은 일반적인 변수, 함수, 배열을 포함하고 있다.
+  RefCall은 reference개체의 호출 즉 사용을 의미하는데 이것은 일반적인 변수, 함수, 배열을 포함하고 있다.
   이것은 주로 CallChain의 시작점으로 사용되며 CallChain이 이것을 포함하는 보다 일반적인 개념이기 때문에
   주로 CallChain이 사용되며 이것이 개별적으로 사용되는 경우는 semantic token으로 색상 구별을 하기 위한
   경우가 거의 유일하다.
 
-  ScalaScript에서 정의되는 것은 당연히 정상적으로 동작을 하지만 타입스크립트에서 정의되어져 있는 것들은
-  예를들면 console.log의 console은 정의되지 않았기 때문에 에러가 된다. 그래서 타입스크립트의 라이브러리를
-  사용할때는 cross-reference를 처리하기 위해 다음과 같은 추가적인 코드가 필요하다.
-  1) Console.log 의 경우
-  @NotTrans class Console { log(arg: string): void = {} }
-  @NotTrans var console: Console
-  2) 문자열 관련 함수들의 경우
-  @NotTrans def string.repeat(count: number): string
-  @NotTrans def string.replace(searchFor: string, replaceWith: string): string
-  @NotTrans def string.replaceAll(searchFor: string, replaceWith: string): string
+  개체의 호출에서 중요한 점은 해당 개체가 ScalaScript에서 정의된 것이면 당연히 정상적으로 동작을 하지만
+  타입스크립트에서 정의되어져 있는 것들은 예를들면 console.log의 console은 정의되지 않았기 때문에 에러가 된다.
+  그래서 타입스크립트의 라이브러리를 사용할때는 cross-reference를 처리하기 위해 추가적인 코드가 필요한데
+  많이 사용되는 타입스크립트의 함수들이 scala-script-library.ts에 정의되어져 있다.
 */
 RefCall: {infer CallChain}
   element=[NamedElement:Id]
@@ -468,11 +493,12 @@ RefCall: {infer CallChain}
   this, super자체가 AstNode 상에서 없기 때문에 Could not resolve reference to NamedElement named 'this' 에러가 생긴다.
   설령 node가 있다고 해도 this, super로 reference하는 개체를 정의할 수가 없다. 즉 this, super를 reference로 처리할 수가 없다.
   따라서 현재 this, super는 그냥 keyword로 처리하고 있으며 이들을 담는 프로퍼티 이름도 element가 아닌 this로 설정되어져 있는데
-  이는 Langium이 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
+  이는 element가 CallChain에서 Reference로 사용되고 있고 Langium은 Reference와 다른 타입을 union type으로 만드는 것을 지원하지 않기 때문이다.
 
   this의 경우 ScopeProvider에서 처리하지 않고 inferTypeCallChain()에서 처리하고 있다.
-  사실 ScopeProvider에서 this.method를 찾을 때 method의 previous인 this에 대한 inferType() 호출하고
-  이때 inferTypeCallChain()에서 this에 해당하는 바로 상위의 ObjectDef를 리턴해 주고 이를 ScopeProvider가 Scope로 변환한다.
+  사실 this가 무엇인지를 찾을 때 ScopeProvider의 getScope()가 호출되는데 getScope()에서 inferTypeCallChain()을 호출해 처리한다.
+  예를들어 this.method를 찾을 때 getScope()에서 method의 previous인 this에 대한 inferType() 호출하고 이때 inferTypeCallChain()에서
+  this에 해당하는 바로 상위의 ObjectDef를 리턴해 주고 이를 ScopeProvider가 Scope로 변환한다.
 */
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
 
@@ -514,8 +540,7 @@ Assignment:
 /*
   Conditional Expressions
   ConditionClause는 if, while, do-while등에서 사용되는데 single expression 이면 괄호를 생략할 수 있다.
-  Single expression으로 취급할 수 있는 것들이 Liter, Group, FeatureCall가 있으며 이들을 이용한 연산도
-  마찬가지이다. 이 모든 것이 Logical Rule 하나에 들어가 있다.
+  Single expression으로 취급할 수 있는 것들은 여러가지가 있으나 이 모든 것이 Logical Rule 하나에 들어가 있다.
 */
 IfExpression:
   'if' ConditionClause
@@ -535,6 +560,8 @@ fragment ConditionClause:
 IfElseExpression:
   ('elif' | 'else if') ConditionClause elif=Block?;
 
+// Scala의 중위 연산자를 흉내낸 문법이다.
+// a.plus(b) 는 a plus b로 표시할 수 있다. 
 InfixExpression:
   e1=Id name=Id e2=Literal;
 
@@ -542,7 +569,7 @@ InfixExpression:
 ReturnExpression:
   'return' (value=Expression | ";");
 
-//todo NamedElement를 사용하는 것은 적합하지 않다.
+// spread의 대상은 object, variable, parameter, iterator가 가능하다.
 SpreadExpression:
   '...' spread=[NamedElement:Id];
 

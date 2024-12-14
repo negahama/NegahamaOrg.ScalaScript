@@ -22,6 +22,16 @@ else
   console.log('a != 0')
   a = 0
 
+// 중괄호 내부에서는 들여쓰기로 블럭을 지정할 수 없다.
+var f = (a: number) => {
+  if (a == 0) then
+    console.log('a == 0')
+    a = 1
+  else
+    console.log('a != 0')
+    a = 0
+}
+
 /**
 TestCase
 - 상황: def name과 동일한 이름의 변수가 존재하는 경우

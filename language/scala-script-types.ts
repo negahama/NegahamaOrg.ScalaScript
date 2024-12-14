@@ -1,6 +1,6 @@
 import { AstNode, AstUtils } from 'langium'
 import * as ast from './generated/ast.js'
-import { enterLog, exitLog, traceLog } from '../language/scala-script-util.js'
+import { enterLog, exitLog, traceLog, trimText } from '../language/scala-script-util.js'
 import { ScalaScriptCache } from './scala-script-cache.js'
 import assert from 'assert'
 import chalk from 'chalk'
@@ -178,9 +178,13 @@ export class UnionTypeDescription extends TypeDescription {
 }
 
 /**
- * Describes an array type in the ScalaScript language.
+ * Represents a type description for an array type.
  *
- * @interface ArrayTypeDescription
+ * This class extends the `TypeDescription` class and provides additional
+ * functionality specific to array types, such as storing the element type
+ * and providing methods for string representation and equality checks.
+ *
+ * @extends TypeDescription
  * @property {string} $type - The type identifier, which is always 'array'.
  * @property {TypeDescription} elementType - The description of the type of elements contained in the array.
  */
@@ -189,10 +193,24 @@ export class ArrayTypeDescription extends TypeDescription {
     super('array')
   }
 
+  /**
+   * Returns a string representation of the function signature.
+   *
+   * The string representation includes the function parameters and their types,
+   * followed by the return type of the function.
+   *
+   * @returns {string} A string in the format `(<param1>: <type1>, <param2>: <type2>, ...) -> <returnType>`.
+   */
   override toString(): string {
     return `${this.$type}<${this.elementType.toString()}>`
   }
 
+  /**
+   * Checks if this type description is equal to another type description.
+   *
+   * @param other - The other type description to compare with.
+   * @returns `true` if the other type description is an array and its element type is equal to this element type, otherwise `false`.
+   */
   override isEqual(other: TypeDescription): boolean {
     if (other.$type !== 'array') return false
     const otherArray = other as ArrayTypeDescription
@@ -220,18 +238,32 @@ export interface FunctionParameter {
 }
 
 /**
- * Describes the type information for a function.
+ * Represents a description of a function type, including its return type, parameters, and generic types.
  *
- * @interface FunctionTypeDescription
+ * @extends TypeDescription
  * @property {string} $type - The type identifier, which is always 'function'.
  * @property {TypeDescription} returnType - The description of the function's return type.
  * @property {FunctionParameter[]} parameters - The list of parameters that the function accepts.
+ * @property {GenericTypeDescription[]} generic - The list of generic infomation that the function accepts.
  */
 export class FunctionTypeDescription extends TypeDescription {
   returnType: TypeDescription
   parameters: FunctionParameter[] = []
   generic: GenericTypeDescription[] = []
 
+  /**
+   * Constructs a new instance of the class.
+   *
+   * @param node - An optional AST node which can be of type `FunctionDef`, `FunctionType`, or `FunctionValue`.
+   *
+   * Initializes the return type to `VoidTypeDescription` by default. If a return type is specified in the node,
+   * it infers the type from the return type. If no return type is specified but the node has a body, it infers
+   * the type from the body. If neither is present, it defaults to `VoidTypeDescription`.
+   *
+   * Initializes the parameters by mapping over the node's parameters and inferring their types.
+   *
+   * Initializes the generic types if the node is of type `FunctionDef`.
+   */
   constructor(node?: ast.FunctionDef | ast.FunctionType | ast.FunctionValue) {
     super('function')
     // 명시된 리턴 타입이 있으면 이를 근거로 한다.
@@ -260,11 +292,25 @@ export class FunctionTypeDescription extends TypeDescription {
     }
   }
 
+  /**
+   * Returns a string representation of the function signature.
+   *
+   * The string representation includes the function parameters and their types,
+   * followed by the return type of the function.
+   *
+   * @returns {string} A string in the format `(<param1>: <type1>, <param2>: <type2>, ...) -> <returnType>`.
+   */
   override toString(): string {
     const params = this.parameters.map(e => `${e.name}: ${e.type.toString()}`).join(', ')
     return `(${params}) -> ${this.returnType.toString()}`
   }
 
+  /**
+   * Compares this function type description with another to determine if they are equal.
+   *
+   * @param other - The other type description to compare with.
+   * @returns `true` if the other type description is a function and has the same return type and parameters; otherwise, `false`.
+   */
   override isEqual(other: TypeDescription): boolean {
     if (other.$type !== 'function') return false
     const otherFunction = other as FunctionTypeDescription
@@ -273,6 +319,24 @@ export class FunctionTypeDescription extends TypeDescription {
     return this.parameters.every((p, i) => p.type.isEqual(otherFunction.parameters[i].type))
   }
 
+  /**
+   * Checks if the current type is assignable to another type.
+   *
+   * @param other - The type to check against.
+   * @returns `true` if the current type is assignable to the other type, otherwise `false`.
+   *
+   * The method performs the following checks:
+   * - If the other type is 'any', it returns `true`.
+   * - If the other type is a union, it returns `true` if any element type in the union is equal to the current type.
+   * - If the other type is a function, it checks the return type and parameters for compatibility.
+   *   - If the return types are not assignable, it logs an error and returns `false`.
+   *   - If either function has spread parameters, it returns `true` without further checks.
+   *   - For each parameter in the current function:
+   *     - If the parameter is not nullable and has no default value, it must exist in the other function and be assignable.
+   *     - If the parameter is nullable or has a default value, it must be assignable if it exists in the other function.
+   *   - Logs errors for any mismatched parameters.
+   * - Returns `false` if none of the above conditions are met.
+   */
   override isAssignableTo(other: TypeDescription): boolean {
     if (other.$type == 'any') return true
     if (other.$type == 'union') {
@@ -335,15 +399,27 @@ export class FunctionTypeDescription extends TypeDescription {
 }
 
 /**
- * Represents a description of a class type.
+ * Represents a description of an object type in the ScalaScript language.
  *
- * @interface ClassTypeDescription
+ * This class extends the `TypeDescription` class and provides additional functionality
+ * for handling object types, including generic types and element lists.
+ *
+ * @extends TypeDescription
  * @property {string} $type - The type identifier, which is always 'object'.
  * @property {ast.ObjectDef | ast.ObjectType | ast.ObjectValue} literal - The literal representation of the class type.
+ * @property {GenericTypeDescription[]} generic - The list of generic infomation that the function accepts.
  */
 export class ObjectTypeDescription extends TypeDescription {
   generic: GenericTypeDescription[]
 
+  /**
+   * Constructs an instance of the class with the given AST node.
+   *
+   * @param node - The AST node which can be of type `ObjectDef`, `ObjectType`, or `ObjectValue`.
+   *
+   * If the node is of type `ObjectDef`, the `generic` property is populated with an array of `GenericTypeDescription` instances
+   * created from the generic types defined in the node.
+   */
   constructor(public node: ast.ObjectDef | ast.ObjectType | ast.ObjectValue) {
     super('object')
 
@@ -353,6 +429,13 @@ export class ObjectTypeDescription extends TypeDescription {
     }
   }
 
+  /**
+   * Returns a string representation of the object.
+   *
+   * @override
+   * @returns {string} If the node is an object definition, returns the name of the node.
+   *                   Otherwise, returns a string representation of the element list in the format '{ name1, name2, ... }'.
+   */
   override toString(): string {
     if (ast.isObjectDef(this.node)) return this.node.name
     else {
@@ -361,6 +444,21 @@ export class ObjectTypeDescription extends TypeDescription {
     }
   }
 
+  /**
+   * Checks if the current `TypeDescription` is equal to another `TypeDescription`.
+   *
+   * @param other - The other `TypeDescription` to compare with.
+   * @returns `true` if the types are considered equal, `false` otherwise.
+   *
+   * The comparison is based on the following criteria:
+   * - If the `other` type is not an object, returns `false`.
+   * - If both types are object definitions, their names must be the same.
+   * - Otherwise, it compares the elements of both types:
+   *   - Each element in the current type must have a corresponding element with the same name in the `other` type.
+   *   - The types of corresponding elements must also be equal.
+   *
+   * Logs differences in names and types to the console for debugging purposes.
+   */
   override isEqual(other: TypeDescription): boolean {
     if (other.$type !== 'object') return false
     const otherObject = other as ObjectTypeDescription
@@ -373,13 +471,18 @@ export class ObjectTypeDescription extends TypeDescription {
       for (let e of this.getElementList()) {
         const found = otherElements.find(o => o.name == e.name)
         if (!found) {
-          console.log(chalk.red('이름이 없음:'), e.name, e.node.$cstNode?.text)
+          console.log(chalk.red('이름이 없음:'), e.name, trimText(e.node.$cstNode?.text))
           matchAll = false
           break
         }
         // 동일한 이름이 있으면 타입도 같아야 한다.
         if (!TypeSystem.inferType(e.node).isEqual(TypeSystem.inferType(found.node))) {
-          console.log(chalk.red('타입이 다름:'), e.name, e.node.$cstNode?.text, found.node.$cstNode?.text)
+          console.log(
+            chalk.red('타입이 다름:'),
+            e.name,
+            trimText(e.node.$cstNode?.text),
+            trimText(found.node.$cstNode?.text)
+          )
           matchAll = false
           break
         }
@@ -388,6 +491,18 @@ export class ObjectTypeDescription extends TypeDescription {
     return matchAll
   }
 
+  /**
+   * Determines if the current type is assignable to another type.
+   *
+   * @param other - The type to check against.
+   * @returns `true` if the current type is assignable to the other type, otherwise `false`.
+   *
+   * The method checks the following conditions:
+   * - If the other type is 'any', it returns `true`.
+   * - If the other type is a union type, it returns `true` if any element type in the union is equal to the current type.
+   * - If the other type is an object type, it checks if both types are object definitions and if the current type is in the class chain of the other type.
+   * - If none of the above conditions are met, it returns `false`.
+   */
   override isAssignableTo(other: TypeDescription): boolean {
     if (other.$type == 'any') return true
     if (other.$type == 'union') {
@@ -405,9 +520,21 @@ export class ObjectTypeDescription extends TypeDescription {
     return false
   }
 
-  // ObjectDef, ObjectType, ObjectValue의 element들을 리턴한다.
-  // ObjectDef, ObjectType는 서로 동일하기 때문에 Bypass를 제거하고 리턴하면 되는데
-  // ObjectValue는 AssignBinding 개체이고 둘과는 다르다.
+  /**
+   * Retrieves a list of elements from the current node.
+   * The elements can be of type VariableDef, FunctionDef, ObjectDef, or AssignBinding.
+   *
+   * ObjectDef, ObjectType, ObjectValue의 element들을 리턴한다.
+   * ObjectDef, ObjectType는 서로 동일하기 때문에 Bypass를 제거하고 리턴하면 되는데
+   * ObjectValue는 AssignBinding 개체이고 둘과는 다르다.
+   *
+   * Depending on the type of the current node, it processes the elements differently:
+   * - If the node is an ObjectDef, it iterates over the body elements and adds them to the list if they are not bypassed.
+   * - If the node is an ObjectType, it iterates over the elements and adds them to the list if they are not bypassed.
+   * - If the node is an ObjectValue, it iterates over the elements and adds them to the list if both element and value are present.
+   *
+   * @returns An array of objects, each containing the name and node of the element.
+   */
   getElementList() {
     const list: { name: string; node: ast.VariableDef | ast.FunctionDef | ast.ObjectDef | ast.AssignBinding }[] = []
     if (ast.isObjectDef(this.node)) {
@@ -424,7 +551,9 @@ export class ObjectTypeDescription extends TypeDescription {
           list.push({ name: e.element, node: e })
         } else {
           //todo spread 처리
-          console.error(chalk.red('internal error in createObjectType:', e.$cstNode?.text, e.element, e.value))
+          console.error(
+            chalk.red('internal error in createObjectType:', trimText(e.$cstNode?.text), e.element, e.value)
+          )
         }
       })
     }
@@ -433,8 +562,10 @@ export class ObjectTypeDescription extends TypeDescription {
 }
 
 /**
- * Represents an error type description.
+ * Represents an error type description in the ScalaScript language.
+ * Extends the `TypeDescription` class with additional properties for error handling.
  *
+ * @extends TypeDescription
  * @property $type - A constant string with the value 'error'.
  * @property source - An optional property representing the source of the error, which is an AstNode.
  * @property message - A string containing the error message.
@@ -900,6 +1031,13 @@ export class TypeSystem {
         type = new ObjectTypeDescription(classItem)
       } else {
         console.error(chalk.red('this or super is empty in types.ts'))
+        // for debugging
+        let item: AstNode | undefined = node
+        while (item) {
+          console.log(chalk.green(trimText(`  ${item.$type}: ${item.$cstNode?.text}`)))
+          if (ast.isObjectDef(item)) break
+          item = item.$container
+        }
       }
     }
 
@@ -936,27 +1074,46 @@ export class TypeSystem {
   static inferTypeParameter(node: ast.Parameter): TypeDescription {
     const log = enterLog('inferParameter', node.name)
     // Parameter를 type이나 value로 타입을 알 수 없을 경우는 any type으로 취급한다.
+    // 하지만 Parameter를 any 타입으로 취급하면 함수 호출시 타입 체크를 할 수 없으며
+    // 해당 파라미터가 object type이면 이 파라미터를 통한 함수 호출도 타입 체크를 할 수 없다.
+    // 예를들어 f = (corp: Corp) => { corp.process() }에서 process()는 정상적으로 체크되지만
+    // corpList.forEach(corp => corp.display())에서는 corp는 any 타입이기 때문에
+    // process()가 올바른 호출인지 확인하지 못한다.
     let type: TypeDescription = new AnyTypeDescription()
     if (node.type) type = TypeSystem.inferType(node.type)
     else if (node.value) type = TypeSystem.inferType(node.value)
     else {
-      // Parameter를 any 타입으로 취급하면 함수 호출시 타입 체크를 할 수 없으며
-      // 해당 파라미터가 개체이면 이 파라미터를 통한 함수 호출도 타입 체크를 할 수 없게 된다.
-      // 예를들어 f = (date: Date) => { date.display() }에서 display()는 정상적으로 체크되지만
-      // dateList.forEach(date => date.display())에서는 display()의 ref가 정확하게 설정되지 않는다.
-      // 왜냐하면 date의 타입이 정확하지 않기 때문이다.
       // 파라미터의 타입을 추론하기 위해서는 파라미터가 사용되는 함수를 찾아서 그 함수의 타입을 참조해야 하는데
       // 함수를 찾기 위해서 Parameter의 Container를 사용한다. node.$type이 Parameter이면 node.$container.$type는
-      // FunctionDef, FunctionValue, FunctionType이 될 수 있다. 하지만 이것만으로 파라미터의 타입을 정할 수는 없다.
-      // 위의 예에서처럼 date의 타입이 무엇인지를 알기 위해서는 dateList의 타입을 알아야 한다.
-
-      const grandContainer = node.$container.$container
-      let fmt = TypeSystem.getFunctionalMethodType(grandContainer)
-      if (fmt) {
-        fmt.argType.forEach(arg => {
-          if (arg.name === node.name) type = arg.type
-        })
-      }
+      // FunctionDef, FunctionValue, FunctionType이 될 수 있고 다시 그것의 container는 함수를 호출하는 부분이 된다.
+      // 즉 다음과 같다.
+      // node                       | corp
+      // node.$container            | corp => corp.process()
+      // node.$container.$container | corpList.forEach(corp => corp.process())
+      // getFunctionalMethodType()을 사용해서 함수형 함수의 정확한 타입을 찾고 파라미터의 타입도 알수 있는데
+      // 문제는 현재 node가 함수의 몇번째 파라미터인가를 어떻게 알 수 있는가이다.
+      //todo
+      // 이 부분이 active되어지면 Log2, forEach(set.add, set) 문제가 발생한다.
+      // const grandContainer = node.$container.$container
+      // if (ast.isCallChain(grandContainer) && grandContainer.isFunction) {
+      //   let fmt = TypeSystem.getFunctionalMethodType(grandContainer)
+      //   if (fmt && fmt.argType) {
+      //     for (let idx = 0; idx < grandContainer.args.length; idx++) {
+      //       if (ast.isFunctionValue(grandContainer.args[idx]) && fmt.argType[idx]) {
+      //         const fmtLambda = fmt.argType[idx].type
+      //         if (TypeSystem.isFunctionType(fmtLambda)) {
+      //           // 둘다 람다 함수이면 람다 함수의 파라미터를 맞춰준다.
+      //           let paramIndex = node.$container.params.findIndex(param => param.name == node.name)
+      //           if (paramIndex == -1) {
+      //             console.error(chalk.red('inferParameter: parameter index not found:', node.name))
+      //           }
+      //           type = fmtLambda.parameters[paramIndex].type
+      //           break
+      //         }
+      //       }
+      //     }
+      //   }
+      // }
     }
     exitLog(log, type)
     return type
@@ -976,9 +1133,6 @@ export class TypeSystem {
   static inferTypeAssignBinding(node: ast.AssignBinding): TypeDescription {
     const log = enterLog('inferAssignBinding', node.element)
     // Assign Binding에는 value가 없을수는 없지만 없으면 nil type으로 취급한다.
-    // ObjectValue의 AssignBinding에서 element가 정의된 곳을 알려주기 위해서는 scope를 조작해야 한다.
-    // 이 부분은 다음을 참조한다. [[al=7dd47270e04fc75dddbabd68d294e2b8]]
-
     //todo 타입스크립트에서는 name과 value가 동일하면 하나만 사용할 수 있는데 스칼라스크립트에서는 아직 그렇지 않다.
     let type: TypeDescription = new NilTypeDescription()
     if (node.value) type = TypeSystem.inferType(node.value)
@@ -1184,11 +1338,7 @@ export class TypeSystem {
     const log = enterLog('inferSpreadExpr', node.$cstNode?.text)
     let type: TypeDescription = new AnyTypeDescription()
     if (node.spread && node.spread.ref) {
-      const t = TypeSystem.inferType(node.spread.ref)
-      //todo 일단은 spread가 배열에서 사용되어질 경우를 고려해서 element type을 리턴한다.
-      // console.log(chalk.red('spread type:'), node.spread.ref.name, node.spread.ref.$type, t.toString())
-      if (TypeSystem.isArrayType(t)) type = t.elementType
-      else type = t
+      type = TypeSystem.inferType(node.spread.ref)
     }
     exitLog(log, type)
     return type
@@ -1241,15 +1391,15 @@ export class TypeSystem {
    * @returns The inferred type description of the array value.
    */
   static inferTypeArrayValue(node: ast.ArrayValue): TypeDescription {
-    const log = enterLog('inferArrayValue', `item count= ${node.items.length}`)
+    const log = enterLog('inferArrayValue', `'${trimText(node.$cstNode?.text)}', item count= ${node.items.length}`)
     let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     // item이 없는 경우 즉 [] 으로 표현되는 빈 배열의 경우 any type으로 취급한다.
     if (node.items.length > 0) {
       const types: TypeDescription[] = []
       node.items.forEach(item => {
+        // 배열 안에서 spread가 사용되면 spread를 풀어서 처리해야 한다.
         if (ast.isSpreadExpression(item)) {
-          //todo ArrayValue에서의 Spread는 spread를 풀어야 한다.
-          const spreadType = TypeSystem.inferType(item.spread.ref)
+          const spreadType = TypeSystem.inferType(item)
           if (TypeSystem.isObjectType(spreadType)) types.push(new AnyTypeDescription())
           else if (TypeSystem.isArrayType(spreadType)) types.push(spreadType.elementType)
           else types.push(spreadType)
@@ -1268,7 +1418,7 @@ export class TypeSystem {
    * @returns A TypeDescription object representing the inferred type.
    */
   static inferTypeObjectValue(node: ast.ObjectValue): TypeDescription {
-    const log = enterLog('inferObjectValue', `'${node.$cstNode?.text}'`)
+    const log = enterLog('inferObjectValue', `'${trimText(node.$cstNode?.text)}'`)
     const type = new ObjectTypeDescription(node)
     exitLog(log, type)
     return type
@@ -1281,7 +1431,7 @@ export class TypeSystem {
    * @returns A `TypeDescription` representing the inferred type of the function value.
    */
   static inferTypeFunctionValue(node: ast.FunctionValue): TypeDescription {
-    const log = enterLog('inferFunctionValue', `'${node.$cstNode?.text}', '${node.$type}'`)
+    const log = enterLog('inferFunctionValue', `'${trimText(node.$cstNode?.text)}', '${node.$type}'`)
     const type = new FunctionTypeDescription(node)
     exitLog(log, type)
     return type
@@ -1351,7 +1501,7 @@ export class TypeSystem {
       return result
     }
 
-    const log = enterLog('inferBlock', node.$type, node.$cstNode?.text)
+    const log = enterLog('inferBlock', node.$type, trimText(node.$cstNode?.text))
     let type: TypeDescription = new ErrorTypeDescription('internal error', node)
     // Block이 여러 식으로 구성된 경우
     if (node.isBracket) {

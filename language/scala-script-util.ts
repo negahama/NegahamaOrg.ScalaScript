@@ -86,3 +86,18 @@ export function exitLog(log: string, type?: TypeDescription, ...optionalParams: 
   // console.timeLog(log, typeInfo, ...optionalParams)
   console.log(log, typeInfo, ...optionalParams)
 }
+
+/**
+ * Trims the input text to a specified number of lines.
+ * If the text contains more lines than the specified line count,
+ * it truncates the text and appends an ellipsis (`\n...`).
+ *
+ * @param text - The input text to be trimmed.
+ * @param lineCount - The maximum number of lines to retain. Defaults to 3.
+ * @returns The trimmed text with a maximum of `lineCount` lines, followed by an ellipsis if truncated.
+ */
+export function trimText(text: string | undefined, lineCount: number = 3): string {
+  if (!text) return ''
+  const lines = text.split('\n')
+  return lines.length > lineCount ? lines.slice(0, lineCount).join('\n') + '\n...' : text
+}

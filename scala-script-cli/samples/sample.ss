@@ -1,11 +1,11 @@
-@NotTrans val setTimeout: (callback: () -> void, time: number) -> void
-
 %%
+
 //-----------------------------------------------------------------------------
 // 변수의 선언과 정의
 //-----------------------------------------------------------------------------
+
 %%
-%%// ScalaScript는 let, const가 예약어가 아니지만 사용하면 변환될때 문제가 된다.
+%%// ScalaScript에서 let, const는 예약어가 아니지만 사용하면 변환될때 문제가 된다.
 var variable: number = 0xff
 val constant: number = 0xff
 
@@ -13,20 +13,22 @@ val constant: number = 0xff
   대입문 및 다중 대입
 */
 %%// 대입문
-var a: number = 0b1010
-var b: number = 0o12
-var c: number = 0xa
+var a: number = 0b1010  // 2진수
+var b: number = 0o12    // 8진수
+var c: number = 0xa     // 16진수
 
 %%// 다중 대입
 a = b = c = 0b11 + 0o11 + 0x11 + 11.1 + 1.1e+1
 
 %%
+
 //-----------------------------------------------------------------------------
 // 자료형 및 연산자
 //-----------------------------------------------------------------------------
+
 %%
 /**
-  기본 자료형 primitive type
+  기본 자료형(primitive type)
 */
 var s: string
 var num: number
@@ -34,10 +36,31 @@ var bool: boolean
 var $void: void
 var $nil: nil
 
+/**
+  연산자
+*/
+%%// 각종 산술 연산자
+c = (1 + 2) * 3 % 2 ** 3
+
+/**
+  문자열 관련
+*/
 %%// 모두 가능
 s = "'hello' `world`"
 s = '`hello` "world"'
 s = `'hello' "world"`
+
+%%// 문자열 접합 연산자
+s = "this " .. 'is ' .. `sample`
+
+%%// 문자열 length
+a = s.length
+
+%%// 문자열 함수들
+var list1 = s.concat(",2" .. ', 3, 4 ').trim().split(",")
+
+%%// 문자열 인덱스는 1 부터
+val included = s.includes("is", 1)
 
 /**
   배열 관련
@@ -46,33 +69,22 @@ s = `'hello' "world"`
 val array1: string[] = ['a', 'b', 'c']
 
 %%// array length
-if (array1.length > 0) s = "2"
+if (array1.length > 0) s = "array is not empty"
+
+%%// 배열 관련 함수들
+array1.push('d', 'e', 'f')
+array1.filter(e => e == 'e')
+array1.includes('f')
 
 %%// 배열의 인덱스는 1 부터
 s = array1[a + b] .. array1[1]
 
-/**
-  연산자
-*/
-%%// 각종 산술 연산자
-c = (1 + 2) * 3 % 2 ** 3
-
-%%// 문자열 접합 연산자
-s = "this " .. 'is ' .. `sample`
-
-%%// 문자열 length
-if (s.length > 0) s = "1"
-
-%%// 문자열 함수들
-var list1 = s.concat(",2" .. ', 3, 4 ').trim().split(",")
-
-%%// 문자열 인덱스는 1 부터
-val included = s.includes("is", 1)
-
 %%
+
 //-----------------------------------------------------------------------------
 // 조건문
 //-----------------------------------------------------------------------------
+
 %%
 /**
   if
@@ -121,9 +133,11 @@ val matchTest = (x: number) -> string => x match {
 }
 
 %%
+
 //-----------------------------------------------------------------------------
 // BLOCK
 //-----------------------------------------------------------------------------
+
 %%
 %%// 하나의 문으로 구성된 블럭
 if a == b then console.log('a == b')
@@ -144,9 +158,11 @@ else
   a = 0
 
 %%
+
 //-----------------------------------------------------------------------------
 // 반복문
 //-----------------------------------------------------------------------------
+
 %%
 /**
   for
@@ -200,9 +216,11 @@ for (a <- 1 to 10; b <- 1 to 10; c <-  1 to 10) {
 }
 
 %%
+
 //-----------------------------------------------------------------------------
 // 함수 정의
 //-----------------------------------------------------------------------------
+
 %%
 %%// function types and anonymous function call
 %%// 스칼라는 인수의 이름을 명시할 필요없이 인수의 타입만 열거해서 표현한다.
@@ -252,6 +270,7 @@ val timeFlies2 = (msg: string) -> void => {
   console.log("time flies like an arrow... ", msg)
 }
 
+@NotTrans val setTimeout: (callback: () -> void, time: number) -> void
 val oncePerSecond = (callback: (p:string) -> void) -> void => {
 %%//fun oncePerSecond = (callback: (p: string) -> void) -> void => {
   setTimeout(() => { callback('1초 지남!') }, 1000)
@@ -370,4 +389,3 @@ val overrideTest = new OverrideTest2()
 console.log(overrideTest.get11())
 console.log(overrideTest.get12())
 console.log(overrideTest.get32())
-
