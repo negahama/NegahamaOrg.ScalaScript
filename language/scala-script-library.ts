@@ -175,6 +175,9 @@ export const ScalaScriptBuiltinLibrary = `
   val valueOf: () -> number
 }
 
+@NotTrans export val parseFloat: (arg: any) ->number
+@NotTrans export val parseInt: (arg: any) ->number
+
 @NotTrans export def Number = {
   // 두 개의 표현 가능한 숫자 사이의 최소 간격.
   static val EPSILON: number
@@ -344,7 +347,10 @@ export const ScalaScriptBuiltinLibrary = `
   static val warn: (...args: any) -> void
 }
   
+@NotTrans export val assert: (value: any, message?: any) -> void
 @NotTrans export def assert = {
+  static val ok: (value: any, message?: any) -> void
+  static val fail: (message?: any) -> void
   static val equal: (value1: any, value2: any, message?: string) -> void
   static val notEqual: (value1: any, value2: any, message?: string) -> void
 }
@@ -411,8 +417,5 @@ export const ScalaScriptBuiltinLibrary = `
   static val appendFileSync: (filename: string, data: any, options?: string) -> void
 }
 
-@NotTrans export val parseFloat: (arg: any) ->number
-@NotTrans export val parseInt: (arg: any) ->number
 @NotTrans export val escape: (arg: string) -> string
-//@NotTrans export val assert: (value: any, message?: any) -> void
 `.trim()

@@ -1,4 +1,22 @@
-import { TypeDescription, TypeSystem } from './scala-script-types.js'
+import { AstNode, AstUtils } from 'langium'
+import * as ast from './generated/ast.js'
+import { TypeDescriptor, TypeSystem } from './scala-script-types.js'
+import chalk from 'chalk'
+
+/**
+ *
+ */
+export namespace ScalaScriptCache {
+  const cache = new Map<AstNode, TypeDescriptor>()
+
+  export function get(node: AstNode) {
+    return cache.get(node)
+  }
+
+  export function set(node: AstNode, type: TypeDescriptor) {
+    cache.set(node, type)
+  }
+}
 
 /**
  * A flag to enable or disable logging.
@@ -65,13 +83,28 @@ export function traceLog(msg: string, ...optionalParams: any[]) {
 }
 
 /**
+ * Trims the input text to a specified number of lines.
+ * If the text contains more lines than the specified line count,
+ * it truncates the text and appends an ellipsis (`\n...`).
+ *
+ * @param msg - The input text to be trimmed.
+ * @param lineCount - The maximum number of lines to retain. Defaults to 3.
+ * @returns The trimmed text with a maximum of `lineCount` lines, followed by an ellipsis if truncated.
+ */
+export function reduceLog(msg: string | undefined, lineCount: number = 3): string {
+  if (!msg) return ''
+  const lines = msg.split('\n')
+  return lines.length > lineCount ? lines.slice(0, lineCount).join('\n') + '\n...' : msg
+}
+
+/**
  * Logs a message to the console and ends the current console group if logging is enabled.
  *
  * @param log - The message to log.
  * @param type - Optional. An object describing the type of the log message.
  * @param optionalParams - Optional. Additional parameters to log.
  */
-export function exitLog(log: string, type?: TypeDescription, ...optionalParams: any[]) {
+export function exitLog(log: string, type?: TypeDescriptor, ...optionalParams: any[]) {
   if (!_enable_log_) return
   console.groupEnd()
   if (!type) {
@@ -81,23 +114,184 @@ export function exitLog(log: string, type?: TypeDescription, ...optionalParams: 
 
   let typeInfo = ''
   if (TypeSystem.isErrorType(type)) typeInfo = type.message
-  else typeInfo = `type: ${type.toString()}`
+  else typeInfo = `type: ${chalk.green(type.toString())}`
 
   // console.timeLog(log, typeInfo, ...optionalParams)
   console.log(log, typeInfo, ...optionalParams)
 }
 
 /**
- * Trims the input text to a specified number of lines.
- * If the text contains more lines than the specified line count,
- * it truncates the text and appends an ellipsis (`\n...`).
+ * An array of objects containing debug information.
+ * Each object has a `label` and `info` property.
  *
- * @param text - The input text to be trimmed.
- * @param lineCount - The maximum number of lines to retain. Defaults to 3.
- * @returns The trimmed text with a maximum of `lineCount` lines, followed by an ellipsis if truncated.
+ * @type {Array<{ label: string; info: string }>}
  */
-export function trimText(text: string | undefined, lineCount: number = 3): string {
-  if (!text) return ''
-  const lines = text.split('\n')
-  return lines.length > lineCount ? lines.slice(0, lineCount).join('\n') + '\n...' : text
+const debugInfo: { label: string; info: string }[] = []
+
+/**
+ * Gathers log information and stores it in the debugInfo array.
+ * If a log with the same label already exists, it will not be added again.
+ *
+ * @param label - The label for the log entry.
+ * @param info - The main information for the log entry. Can be undefined.
+ * @param extra - Additional information to be appended to the log entry.
+ */
+export function gatherLog(label: string, info: string | undefined, ...extra: string[]) {
+  if (!debugInfo.find(d => d.label == label))
+    debugInfo.push({ label, info: info + (extra.length > 0 ? ', ' + extra.join(', ') : '') })
+}
+
+/**
+ * Logs the function information stored in the `debugInfo` array to the console.
+ * Each entry in the `debugInfo` array is logged with its label and info.
+ * If the label contains the word 'error', it is displayed in red using `chalk`.
+ */
+export function showLogs(title?: string) {
+  // for debugging...
+  // if (title) console.log(title+':')
+  // debugInfo.forEach(d => {
+  //   const label = d.label.includes('error') ? chalk.red(d.label) : d.label
+  //   console.log(' ', label + ':', d.info)
+  // })
+}
+
+/**
+ * Clears the debug logs by resetting the length of the debugInfo array to 0.
+ */
+export function clearLogs() {
+  debugInfo.length = 0
+}
+
+/**
+ * Dumps detailed information about the given AST node to the console.
+ *
+ * @param node - The AST node to dump information for. If the node is undefined, the function returns immediately.
+ *
+ * The function logs various properties of the document associated with the node, including:
+ * - URI of the document
+ * - State of the document
+ * - Text of the document
+ * - Lexer errors in the document's parse result
+ * - Parser errors in the document's parse result
+ * - Number of references in the document
+ * - Each reference's text
+ * - Size of precomputed scopes in the document
+ * - Each precomputed scope's key and value
+ *
+ * The function uses the `chalk` library to colorize the console output for better readability.
+ */
+export function Dump(node: AstNode | undefined) {
+  if (!node) return
+  const doc = AstUtils.getDocument(node)
+  console.log(chalk.bgBlue('doc.uri:'), doc.uri)
+  console.log(chalk.bgBlue('doc.state:'), doc.state)
+  console.log(chalk.bgBlue('doc.textDocument:'), doc.textDocument)
+  console.log(chalk.bgBlue('doc.textDocument.getText():'), doc.textDocument.getText())
+  console.log(chalk.bgBlue('doc.parseResult.lexerErrors:'), doc.parseResult.lexerErrors)
+  console.log(chalk.bgBlue('doc.parseResult.parserErrors:'), doc.parseResult.parserErrors)
+  // const text = AstUtils.getDocument(node).parseResult.value.$cstNode?.text
+  // const text = (AstUtils.getDocument(stmt).parseResult.value.$cstNode as RootCstNode).fullText
+  // console.log(text)
+
+  console.log(chalk.bgBlue('doc.references.length:'), doc.references.length)
+  doc.references.forEach(ref => {
+    console.log('  doc.references:', ref.$refText)
+  })
+
+  let index = 0
+  console.log(chalk.bgBlue('doc.precomputedScopes?.size:'), doc.precomputedScopes?.size)
+  doc.precomputedScopes?.forEach((value, key) => {
+    console.log('  doc.precomputedScopes:', index++)
+    console.log(chalk.yellow('    K: ') + `'${reduceLog(key.$cstNode?.text)}'(${chalk.green(key.$type)})`)
+    console.log(chalk.yellow('    V: ') + `${value.name}(${chalk.green(value.type)})`)
+  })
+
+  // const thenKeyword = GrammarUtils.findNodeForKeyword(node.$cstNode, '=')
+  // if (thenKeyword) {
+  //   const index = thenKeyword.offset
+  //   const previousChar = text.charAt(index - 1)
+  //   if (previousChar !== ' ') {
+  //     acceptor('error', ...)
+  //   }
+  // }
+}
+
+/**
+ * Finds a variable definition or parameter with the specified name within the given AST node and its ancestors.
+ *
+ * ObjectDef의 name으로 property를 호출하면 static property만을 대상으로 해야 한다.
+ * 그런데 이때 이 name이 object name인지 variable name인지를 구분해야 한다.
+ * 즉 다음과 같은 경우를 구분해야 한다.
+ *
+ * def T = {
+ *   val name: string = "name"
+ * }
+ * val f = (T: T) => {
+ *   return T.name
+ * }
+ *
+ * 이를 구분하기 위해서는 해당 이름이 있는지 먼저 확인해야 한다.
+ *
+ * @param node - The starting AST node to search within. If undefined, the function returns undefined.
+ * @param name - The name of the variable or parameter to find. If undefined, the function returns undefined.
+ * @returns The found variable definition or parameter node, or undefined if not found.
+ */
+export function findVariableDefWithName(node: AstNode | undefined, name: string | undefined) {
+  if (!node || !name) return undefined
+  let item: AstNode | undefined = node
+  while (item) {
+    const found = AstUtils.streamContents(item).find(
+      i => (ast.isVariableDef(i) || ast.isParameter(i)) && i.name === name
+    )
+    if (found) return found
+    item = item.$container
+  }
+  return undefined
+}
+
+/**
+ * Finds a function definition with the specified name within the given AST node.
+ *
+ * @param node - The starting AST node to search within. If undefined, the function returns undefined.
+ * @param name - The name of the function to search for. If undefined, the function returns undefined.
+ * @returns The found function definition node if a match is found, otherwise undefined.
+ */
+export function findFunctionDefWithName(node: AstNode | undefined, name: string | undefined) {
+  if (!node || !name) return undefined
+  let item: AstNode | undefined = node
+  while (item) {
+    const found = AstUtils.streamContents(item).find(i => {
+      if (ast.isFunctionDef(i) && i.name === name) return true
+      if (ast.isVariableDef(i) && i.name === name && TypeSystem.isFunctionType(TypeSystem.inferType(i.value)))
+        return true
+      return false
+    })
+    if (found) {
+      if (ast.isFunctionDef(found)) {
+        return found
+      } else if (ast.isVariableDef(found)) {
+        return found.value
+      }
+    }
+    item = item.$container
+  }
+  return undefined
+}
+
+/**
+ * Finds an object definition with the specified name within the given AST node.
+ *
+ * @param node - The starting AST node to search within. If undefined, the function returns undefined.
+ * @param name - The name of the object definition to find. If undefined, the function returns undefined.
+ * @returns The found object definition node if it exists, otherwise undefined.
+ */
+export function findObjectDefWithName(node: AstNode | undefined, name: string | undefined) {
+  if (!node || !name) return undefined
+  let item: AstNode | undefined = node
+  while (item) {
+    const found = AstUtils.streamContents(item).find(i => ast.isObjectDef(i) && i.name === name)
+    if (found) return found
+    item = item.$container
+  }
+  return undefined
 }

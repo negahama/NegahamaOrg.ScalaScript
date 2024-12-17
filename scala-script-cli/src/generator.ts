@@ -88,6 +88,25 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
   } else {
     console.log(chalk.red('ERROR in Statement'))
   }
+
+  /*
+    코드 생성시 NewLine 처리는 indent등의 이유로 AstNode별로 간단하게 적용할 순 없다.
+    하지만 전혀 없으면 매우 가독성이 떨어지고 코드 품질이 나빠보이므로 최소한의 규칙만 적용한다.
+    아래의 AstNode 구문은 해당 구문 전에 newline을 추가해 주는데 모두 indent가 없을 경우이다.
+    indent가 있을 경우에는 indent + newline + 내용(내용 앞에 newline이 붙으므로)의 형태가 되어 문제가 되므로
+    세밀하게 조정해야 하지만 효과가 크지 않기 때문에 효과적인 ObjectDef, ByPass만 indent가 있는 경우에도 적용되게 하였다.
+  */
+  const newLineNode = [
+    ast.ObjectDef,
+    ast.DoStatement,
+    ast.ForStatement,
+    ast.WhileStatement,
+    ast.ThrowStatement,
+    ast.TryCatchStatement,
+    ast.Bypass,
+  ]
+
+  if (newLineNode.some(node => node === stmt.$type) && indent == 0) result = '\n' + result
   return result
 }
 
@@ -157,7 +176,7 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
   } else {
     console.log(chalk.red('ERROR in Expression:', expr))
   }
-
+  
   return result
 }
 
@@ -471,8 +490,10 @@ function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
     } else if (ast.isFunctionDef(m)) {
       result += applyIndent(indent + 1, transpileFunctionDef(m, indent + 1, true))
     } else if (ast.isObjectDef(m)) {
+      result += '\n'
       result += applyIndent(indent + 1, transpileObjectDef(m, indent + 1))
     } else if (ast.isBypass(m)) {
+      result += '\n'
       result += applyIndent(indent + 1, generateStatement(m, indent + 1))
     } else {
       console.error(chalk.red('internal error'))
@@ -1016,8 +1037,10 @@ function generateSimpleType(expr: ast.SimpleType, indent: number): string {
       } else if (ast.isFunctionDef(e)) {
         result += applyIndent(indent + 1, transpileFunctionDef(e, indent + 1, true))
       } else if (ast.isObjectDef(e)) {
+        result += '\n'
         result += applyIndent(indent + 1, transpileObjectDef(e, indent + 1))
       } else if (ast.isBypass(e)) {
+        result += '\n'
         result += applyIndent(indent + 1, generateStatement(e, indent + 1))
       } else {
         console.error(chalk.red('internal error'))
@@ -1098,6 +1121,7 @@ function generateBlock(
       else if (ast.isExpression(code)) element += generateExpression(code, indent + 1)
       else console.log(chalk.red('ERROR in Block:', code))
     }
+    if (ast.isBypass(code)) result += '\n'
     result += applyIndent(indent + 1, element + '\n')
   })
   result += applyIndent(indent, '}')

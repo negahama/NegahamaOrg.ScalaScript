@@ -8,9 +8,9 @@
       "title": "`// (isFunction?='(' Arguments? ')')? 와 같이 Arguments라는 fragment를 사용하면 Arguments를 그대로 대입한` at language\\scala-script-scope.ts#96",
       "source": {
         "file": "/language/scala-script-scope.ts",
-        "startLine": 52,
+        "startLine": 44,
         "startColumn": 0,
-        "endLine": 53,
+        "endLine": 45,
         "endColumn": 0
       },
       "notes": [

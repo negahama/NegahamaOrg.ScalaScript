@@ -289,11 +289,12 @@ ObjectDef:
 
 // ex) var obj = { name : "samuel", age : 20, ...ary }
 ObjectValue:
-  '{' elements+=(AssignBinding)* '}';
+  '{' elements+=(Binding)* '}';
 
 /*
-  AssignBinding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
-  AssignBinding은 이미 named 되어진 있는 ObjectType의 elements를 사용하기 때문에 Id 대신 [NamedElement:Id]를 사용하면 좋겠지만
+  Binding은 Id : Expression 이거나 또는 ... NamedElement 일 수 있으며 , 는 생략할 수 있다.
+  Binding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
+  Binding의 element는 ObjectType의 element 이름을 사용하기 때문에 Id 대신 [NamedElement:Id]를 사용하면 좋겠지만
   이것을 처리하려면 ScopeProvider가 매우 복잡해진다. 심지어 불가능해보인다. 예를들면 다음과 같은 코드에서
   ```
   def Trade = { var item = 'item' }
@@ -303,12 +304,12 @@ ObjectValue:
     var add = () => { this.sales.push({ trade: { item: 'item1' } }) }
   }
   ```
-  this.sales.push() 함수의 인수로 전달되는 ObjectValue(여기서는 { trade: { item: 'item1' } }) 부분)의 trade의 cross-reference를
-  설정하기 위해서는 this.sales의 타입을 찾아서 해당 인수가 Sales 타입인지를 먼저 알아내야 하고 그 다음에 어디에 있을지 모르는 
-  Sales 정의를 찾아서 trade가 Trade 타입인지를 또 알아내야 한다.
+  this.sales.push() 함수의 인수로 전달되는 ObjectValue(여기서는 { trade: { item: 'item1' } }) 부분)의
+  trade 라는 Binding의 cross-reference를 설정하기 위해서는 먼저 this.sales의 타입을 찾아서 push의 인수가
+  Sales 타입인지를 알아내야 하고 그 다음에 어디에 있을지 모르는 Sales 정의를 찾아서 trade가 Trade 타입인지를 또 알아내야 한다.
   그래서 그냥 Id를 사용하고 Validator에서 타입체크를 하는 것으로 한다.
 */
-AssignBinding: (element=Id ':' value=Expression | spread=SpreadExpression) (',')?;
+Binding: (element=Id ':' value=Expression | spread=SpreadExpression) (',')?;
 
 // 기타
 //-----------------------------------------------------------------------------

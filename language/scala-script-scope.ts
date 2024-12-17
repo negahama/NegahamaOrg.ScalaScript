@@ -2,8 +2,7 @@ import { AstNode, AstUtils, DefaultScopeProvider, MapScope, ReferenceInfo, Scope
 import * as ast from './generated/ast.js'
 import { LangiumServices } from 'langium/lsp'
 import { TypeSystem } from './scala-script-types.js'
-import { enterLog, exitLog, traceLog, trimText } from './scala-script-util.js'
-import { ScalaScriptCache } from './scala-script-cache.js'
+import { enterLog, exitLog, traceLog, reduceLog, findVariableDefWithName } from './scala-script-util.js'
 import chalk from 'chalk'
 
 /**
@@ -37,7 +36,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    *
    * Scope caching에 대해서...
    * Scope에 대한 잦은 참조가 있기 때문에 이곳에서 caching을 사용하였는데
-   * 이것은 편집시 편집 내용이 반영되지 않는 원인이 되었다.
+   * 이것은 편집시 편집 내용이 실시간으로 반영되지 않는 원인이 되어 제거하었다.
    *
    * @param context
    * @returns
@@ -49,9 +48,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     const superScope = super.getScope(context)
 
     // 현재 node의 ref를 구하는 것은 유용할 수 있지만 ref를 호출하면 그 ref의 scope를 처리하기 위해서
-    // 다시 getScope()가 호출되기 때문에 Error: Cyclic reference resolution detected 에러가 발생된다.
+    // 다시 getScope()가 호출되기 때문에 Error: Cyclic reference resolution detected 에러가 생길 수 있다.
     // const refNode = context.reference.ref
-    // console.log(`getScope: ${scopeId}, ${refNode?.$cstNode?.text}('${refNode?.$type})'`)
+    // console.log(`getScope: ${scopeId}, '${refNode?.$cstNode?.text}'(${refNode?.$type})`)
 
     // 타입의 참조는 따로 처리한다.
     if (ast.isTypeChain(context.container)) {
@@ -80,7 +79,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // }
 
     const previous = (context.container as ast.CallChain).previous
-    traceLog(`'${refText}'.previous is '${trimText(previous?.$cstNode?.text)}'(${previous?.$type})`)
+    traceLog(`'${refText}'.previous is '${reduceLog(previous?.$cstNode?.text)}'(${previous?.$type})`)
     if (!previous) {
       exitLog(scopeLog, undefined, 'Exit(NOT previous)')
       return superScope
@@ -105,13 +104,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     //     exitLog(scopeLog, undefined, 'Exit1')
     //     return scope ? scope : superScope
     //   }
-
     //   const ref = previous.element?.ref
     //   if (!ref) {
     //     console.log(`ref is undefined`)
     //     return superScope
     //   }
-
     //   //console.log(chalk.blue(ref.name, ref.$cstNode?.text))
     //   prevTypeDesc = TypeSystem.inferType(ref)
     // } else {
@@ -153,7 +150,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       }
     }
 
-    traceLog(`Finding scope: curr: ${refText}, previous: '${trimText(previous.$cstNode?.text)}'`)
+    traceLog(`Finding scope: curr: ${refText}, previous: '${reduceLog(previous.$cstNode?.text)}'`)
 
     let scope: Scope | undefined
     if (TypeSystem.isObjectType(classDesc)) {
@@ -203,7 +200,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * 7. Returns the created scope or the super scope if no specific scope is found.
    */
   scopeTypeChain(context: ReferenceInfo): Scope | void {
-    const log = enterLog('scopeTypeChain', trimText(context.container.$cstNode?.text))
+    const log = enterLog('scopeTypeChain', reduceLog(context.container.$cstNode?.text))
     const typeChain = context.container as ast.TypeChain
 
     // 해당 타입이 generic 타입인지를 확인하고 generic이면 새로운 scope를 생성해서 리턴한다.
@@ -249,8 +246,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   /**
    * 아래 함수들은 모두 동일한 메커니즘으로 동작한다.
    * 예를 들어 corp.process() 이란 구문이 있을 때 현재 값(context.reference)은 process인데
-   * 이것의 scope를 제공하기 위해서 corp를 찾는다. corp의 종류에 따라서 ObjectDef, ObjectType, any type등으로
-   * 나눠지지만 모두 corp에서 가능한 모든 이름을 Scope로 리턴한다.
+   * 이것의 scope를 제공하기 위해서 corp를 찾는다. 이 과정에서 getScope()가 다시 호출될 수도 있다.
+   * corp의 종류에 따라서 ObjectDef, ObjectType, any type등으로 나눠지지만 모두 corp에서 가능한 모든 이름을 Scope로 리턴한다.
    */
   /**
    * Retrieves the scope for a specific class within the given context.
@@ -289,7 +286,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     }
     ```
     위와 같은 코드가 있을 때 첫번째 process는 static으로 정의되어진 것이 호출되어야 한다.
-    반면 두번째와 세번째 process static이 아닌 것이 호출되어야 한다.
+    반면 두번째와 세번째 process는 static이 아닌 것이 호출되어야 한다.
     위 코드는 다음과 같이 나와야 한다.
     ```
     console.log(`scopeObjectDef: ${previous.$cstNode?.text}, staticOnly: ${staticOnly}`)
@@ -312,7 +309,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     }
 
     // 하지만 previous가 변수나 파라메터의 이름인 경우에는 static이 아닌 것으로 처리한다.
-    const variableNode = ScalaScriptCache.findVariableDefWithName(previous, previousNodeText)
+    const variableNode = findVariableDefWithName(previous, previousNodeText)
     if (variableNode) {
       staticOnly = false
     }
@@ -442,7 +439,8 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   */
   scopeAny(context: ReferenceInfo, previous: ast.Expression) {
     const log = enterLog('scopeAny', `ref text: ${previous.$cstNode?.text}, ${context.reference.$refText}`)
-    // console.log(chalk.red('scopeAny'), `ref text: ${previous.$cstNode?.text}, ${context.reference.$refText}`)
+    // for debugging...
+    // console.trace(chalk.red('scopeAny'), `ref text: ${previous.$cstNode?.text}, ${context.reference.$refText}`)
     const elements: AstNode[] = [previous]
     const s = stream(elements)
       .map(e => {
@@ -493,9 +491,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   /**
    * Retrieves the global object definition for a given name.
    *
+   * @param context - The reference information context.
    * @param name - The name of the global object definition to retrieve.
    * @param onlyStatic - A boolean indicating whether to retrieve only static definitions.
-   * @param context - The reference information context.
    * @returns The scope of the global object definition if found and exported, otherwise undefined.
    */
   private getGlobalObjectDef(context: ReferenceInfo, name: string, onlyStatic: boolean) {

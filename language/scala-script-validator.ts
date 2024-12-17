@@ -1,7 +1,7 @@
 import { type ValidationAcceptor } from 'langium'
 import * as ast from './generated/ast.js'
-import { TypeDescription, TypeSystem } from './scala-script-types.js'
-import { enterLog, exitLog, traceLog, trimText } from './scala-script-util.js'
+import { TypeDescriptor, TypeSystem } from './scala-script-types.js'
+import { enterLog, exitLog, traceLog, reduceLog } from './scala-script-util.js'
 import chalk from 'chalk'
 
 /**
@@ -22,8 +22,8 @@ export class ScalaScriptValidator {
    */
   checkVariableDef(stmt: ast.VariableDef, accept: ValidationAcceptor): void {
     const log = enterLog('checkVariableDef', `variable name: ${stmt.name}`)
-    traceLog('stmt.type :', `${stmt.type?.$type}, '${trimText(stmt.type?.$cstNode?.text)}'`)
-    traceLog('stmt.value:', `${stmt.value?.$type}, '${trimText(stmt.value?.$cstNode?.text)}'`)
+    traceLog('stmt.type :', `${stmt.type?.$type}, '${reduceLog(stmt.type?.$cstNode?.text)}'`)
+    traceLog('stmt.value:', `${stmt.value?.$type}, '${reduceLog(stmt.value?.$cstNode?.text)}'`)
 
     if (stmt.type && stmt.value) {
       const left = TypeSystem.inferType(stmt.type)
@@ -64,7 +64,7 @@ export class ScalaScriptValidator {
    *    If not, it reports an error.
    */
   checkFunctionDef(stmt: ast.FunctionDef | ast.FunctionValue, accept: ValidationAcceptor): void {
-    const log = enterLog('checkFunctionDef', trimText(stmt.$cstNode?.text))
+    const log = enterLog('checkFunctionDef', reduceLog(stmt.$cstNode?.text))
 
     if (stmt.body && stmt.returnType) {
       const retType = TypeSystem.inferType(stmt.returnType)
@@ -95,7 +95,7 @@ export class ScalaScriptValidator {
     if (ast.isObjectDef(stmt)) {
       log = enterLog('checkObjectDef', stmt.name)
     } else {
-      log = enterLog('checkObjectValue', trimText(stmt.$cstNode?.text))
+      log = enterLog('checkObjectValue', reduceLog(stmt.$cstNode?.text))
     }
     // todo: implement classes
     // accept("error", "Classes are currently unsupported.", {
@@ -118,10 +118,9 @@ export class ScalaScriptValidator {
     // default parameter, optional parameter, rest parameter등으로 인해 파라미터의 처리가 간단하지 않다.
     if (expr.isFunction) {
       const funcName = expr.element?.$refText
-      // console.log(funcName, expr.$cstNode?.text)
 
-      const type = TypeSystem.inferTypeCallChain(expr, true)
-      if (TypeSystem.isFunctionType(type)) {
+      const type = TypeSystem.getFunctionInfo(expr)
+      if (type && TypeSystem.isFunctionType(type)) {
         // 파라미터에서 반드시 필요로 하는 인수의 개수를 계산하고 현재 함수에서 제공하는 인수의 개수와 비교한다.
         let needParamNum = 0
         let hasRestParam = false
@@ -179,7 +178,13 @@ export class ScalaScriptValidator {
             }
           })
         }
+      } else {
+        // console.error(chalk.red('checkCallChain2:'), funcName, reduceLog(expr.$cstNode?.text))
       }
+    } else {
+      // 이름과 타입이 제대로 되어져 있는지 확인용으로 남겨둔다.
+      // const type = TypeSystem.inferType(expr)
+      // console.log('🚀 ~ checkCallChain: type:', expr.element?.$refText, chalk.green(type.toString()))
     }
     exitLog(log)
   }
@@ -192,8 +197,8 @@ export class ScalaScriptValidator {
    */
   checkAssignment(expr: ast.Assignment, accept: ValidationAcceptor): void {
     const log = enterLog('checkAssignment', expr.assign.$type)
-    traceLog(`left : ${expr.assign.$type}, ${trimText(expr.assign.$cstNode?.text)}`)
-    traceLog(`right: ${expr.value.$type}, ${trimText(expr.value.$cstNode?.text)}`)
+    traceLog(`left : ${expr.assign.$type}, ${reduceLog(expr.assign.$cstNode?.text)}`)
+    traceLog(`right: ${expr.value.$type}, ${reduceLog(expr.value.$cstNode?.text)}`)
 
     const left = TypeSystem.inferType(expr.assign)
     const right = TypeSystem.inferType(expr.value)
@@ -218,7 +223,10 @@ export class ScalaScriptValidator {
    * @param expr - The IfExpression node to validate.
    * @param accept - The validation acceptor to collect validation issues.
    */
-  checkIfExpression(expr: ast.IfExpression, accept: ValidationAcceptor): void {}
+  checkIfExpression(expr: ast.IfExpression, accept: ValidationAcceptor): void {
+    const log = enterLog('checkIfExpression', expr.$cstNode?.text)
+    exitLog(log)
+  }
 
   /**
    * Checks if a unary operation is allowed on a given expression.
@@ -303,7 +311,7 @@ export class ScalaScriptValidator {
    * @param right - The right-hand side type description (optional).
    * @returns `true` if the operation is legal, otherwise `false`.
    */
-  isLegalOperation(operator: string, left: TypeDescription, right?: TypeDescription): boolean {
+  isLegalOperation(operator: string, left: TypeDescriptor, right?: TypeDescriptor): boolean {
     /**
      * Determines if the given operator is legal for the provided type descriptions.
      *
@@ -329,7 +337,7 @@ export class ScalaScriptValidator {
      * - Logical operators are only legal for booleans.
      * - Unary NOT operators are legal for booleans, strings, and numbers.
      */
-    const isLegal = (operator: string, l: TypeDescription, r?: TypeDescription): boolean => {
+    const isLegal = (operator: string, l: TypeDescriptor, r?: TypeDescriptor): boolean => {
       if (TypeSystem.isAnyType(l) || (r != undefined && TypeSystem.isAnyType(r))) {
         return true
       }
