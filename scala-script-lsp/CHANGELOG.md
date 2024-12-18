@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.0 - December 19, 2024
+
+- A parameter check function was implemented
+
 ### 0.5.8 - December 10, 2024
 
 - reinforce Generic processing

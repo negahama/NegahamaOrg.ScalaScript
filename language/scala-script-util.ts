@@ -19,6 +19,56 @@ export namespace ScalaScriptCache {
 }
 
 /**
+ * The `LogGatherer` class is responsible for collecting and displaying log information.
+ * It maintains an array of debug information objects, each containing a label and info.
+ * The class provides methods to add log entries, display them, and clear the log.
+ */
+export class LogGatherer {
+  constructor(private title?: string) {}
+
+  /**
+   * An array of objects containing debug information.
+   * Each object has a `label` and `info` property.
+   *
+   * @type {Array<{ label: string; info: string }>}
+   */
+  debugInfo: { label: string; info: string }[] = []
+
+  /**
+   * Gathers log information and stores it in the debugInfo array.
+   * If a log with the same label already exists, it will not be added again.
+   *
+   * @param label - The label for the log entry.
+   * @param info - The main information for the log entry. Can be undefined.
+   * @param extra - Additional information to be appended to the log entry.
+   */
+  add(label: string, info: string | undefined, ...extra: string[]) {
+    // if (!this.debugInfo.find(d => d.label == label))
+    this.debugInfo.push({ label, info: info + (extra.length > 0 ? ', ' + extra.join(', ') : '') })
+  }
+
+  /**
+   * Logs the function information stored in the `debugInfo` array to the console.
+   * Each entry in the `debugInfo` array is logged with its label and info.
+   * If the label contains the word 'error', it is displayed in red using `chalk`.
+   */
+  show() {
+    if (this.title) console.log(this.title + ':')
+    this.debugInfo.forEach(d => {
+      const label = d.label.includes('error') ? chalk.red(d.label) : d.label
+      console.log(' ', label + ':', d.info)
+    })
+  }
+
+  /**
+   * Clears the debug logs by resetting the length of the debugInfo array to 0.
+   */
+  clear() {
+    this.debugInfo.length = 0
+  }
+}
+
+/**
  * A flag to enable or disable logging.
  *
  * When set to `true`, logging is enabled and log messages will be output.
@@ -118,48 +168,6 @@ export function exitLog(log: string, type?: TypeDescriptor, ...optionalParams: a
 
   // console.timeLog(log, typeInfo, ...optionalParams)
   console.log(log, typeInfo, ...optionalParams)
-}
-
-/**
- * An array of objects containing debug information.
- * Each object has a `label` and `info` property.
- *
- * @type {Array<{ label: string; info: string }>}
- */
-const debugInfo: { label: string; info: string }[] = []
-
-/**
- * Gathers log information and stores it in the debugInfo array.
- * If a log with the same label already exists, it will not be added again.
- *
- * @param label - The label for the log entry.
- * @param info - The main information for the log entry. Can be undefined.
- * @param extra - Additional information to be appended to the log entry.
- */
-export function gatherLog(label: string, info: string | undefined, ...extra: string[]) {
-  if (!debugInfo.find(d => d.label == label))
-    debugInfo.push({ label, info: info + (extra.length > 0 ? ', ' + extra.join(', ') : '') })
-}
-
-/**
- * Logs the function information stored in the `debugInfo` array to the console.
- * Each entry in the `debugInfo` array is logged with its label and info.
- * If the label contains the word 'error', it is displayed in red using `chalk`.
- */
-export function showLogs(title?: string) {
-  // for debugging...
-  // if (title) console.log(title+':')
-  // debugInfo.forEach(d => {
-  //   const label = d.label.includes('error') ? chalk.red(d.label) : d.label
-  //   console.log(' ', label + ':', d.info)
-  // })
-}
-
-/**
- * Clears the debug logs by resetting the length of the debugInfo array to 0.
- */
-export function clearLogs() {
-  debugInfo.length = 0
 }
 
 /**

@@ -1,15 +1,6 @@
 import { AstNode, AstUtils } from 'langium'
 import * as ast from './generated/ast.js'
-import {
-  ScalaScriptCache,
-  enterLog,
-  exitLog,
-  traceLog,
-  reduceLog,
-  gatherLog,
-  showLogs,
-  clearLogs,
-} from '../language/scala-script-util.js'
+import { ScalaScriptCache, LogGatherer, enterLog, exitLog, traceLog, reduceLog } from '../language/scala-script-util.js'
 import assert from 'assert'
 import chalk from 'chalk'
 
@@ -21,6 +12,10 @@ export class TypeDescriptor {
 
   toString(): string {
     return this.$type
+  }
+
+  showDetailInfo() {
+    console.log(this.toString())
   }
 
   isEqual(other: TypeDescriptor): boolean {
@@ -308,6 +303,23 @@ export class FunctionTypeDescriptor extends TypeDescriptor {
   }
 
   /**
+   * Displays detailed information about the current object.
+   *
+   * This method logs the string representation of the object, its return type,
+   * and its parameters to the console.
+   *
+   * @override
+   */
+  override showDetailInfo() {
+    console.log('Function:', this.toString())
+    console.log('  returnType:', chalk.green(this.returnType.toString()))
+    console.log('  parameters:')
+    this.parameters.forEach(p => {
+      console.log(`    ${p.name}: ${chalk.green(p.type.toString())}`)
+    })
+  }
+
+  /**
    * Compares this function type description with another to determine if they are equal.
    *
    * @param other - The other type description to compare with.
@@ -577,6 +589,27 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
       })
     }
     return list
+  }
+
+  /**
+   * Retrieves the type descriptor of a specified element within an object definition.
+   *
+   * @param elementName - The name of the element whose type is to be determined.
+   * @returns The type descriptor of the specified element, or `undefined`
+   *          if the element is not found or the node is not an object definition.
+   */
+  getElementType(elementName: string): TypeDescriptor | undefined {
+    let type: TypeDescriptor | undefined = undefined
+    if (ast.isObjectDef(this.node)) {
+      this.node.body.elements.forEach(e => {
+        if (!ast.isBypass(e)) {
+          if (e.name == elementName) {
+            type = TypeSystem.inferType(e)
+          }
+        }
+      })
+    }
+    return type
   }
 }
 
@@ -1087,22 +1120,20 @@ export class TypeSystem {
       const funcType = TypeSystem.getFunctionInfo(funcNode)
       if (!funcType) {
         // for debugging...
-        // console.error(
-        //   chalk.red('getFunctionInfo() is null in inferTypeParameter:'),
-        //   node.name,
-        //   chalk.green(funcNode?.$type),
-        //   reduceLog(funcNode?.$cstNode?.text)
-        // )
-      } else {
+        console.error(
+          chalk.red('getFunctionInfo() is null in inferTypeParameter:'),
+          node.name,
+          chalk.green(funcNode?.$type),
+          reduceLog(funcNode?.$cstNode?.text)
+        )
+      } else if (TypeSystem.isArrayType(funcType)) {
+        type = funcType
+      } else if (TypeSystem.isFunctionType(funcType)) {
+        // for debugging...
+        // console.log('parameter.name:', node.name, `'${reduceLog(funcNode?.$cstNode?.text)}'`)
+        // funcType.showDetailInfo()
+
         if (!ast.isBinding(funcNode)) {
-          // for debugging...
-          // console.log(
-          //   chalk.blue('NOT BINDING:'),
-          //   node.name,
-          //   chalk.green(funcNode?.$type),
-          //   `'${funcNode?.$cstNode?.text}'`,
-          //   chalk.green(funcType.toString())
-          // )
           // 현재 노드에서 CallChain까지 올라간 다음 CallChain의 args를 검사해서 파라미터의 위치를 찾는다.
           // 처음에는 노드로 찾고 람다 함수가 있으면 람다 함수의 파라미터 인덱스는 이름으로 찾는다.
           const callchain = AstUtils.getContainerOfType(node, ast.isCallChain)
@@ -1616,97 +1647,120 @@ export class TypeSystem {
    * @param node - The AST node representing the call chain.
    * @returns The inferred type description.
    */
-  static getFunctionInfo(node: AstNode | undefined): FunctionTypeDescriptor | undefined {
+  /*
+    이 함수는 함수의 파라미터와 리턴의 실제 타입을 추론하는 함수이다.
+    이 함수는 크게 다음과 같은 3가지 경우를 처리한다.
+    1) 일반 함수
+    2) 배열, Map, Set등의 generic을 가지는 함수형 메서드
+    3) Binding 되어진 람다 함수
+    
+    1) 일반 함수
+    일반 함수는 2)와 3)의 경우가 아닌 것을 의미하며 generic과 binding의 영향을 받지 않으므로 간단하다.
+    
+    2) 배열, Map, Set등의 generic을 가지는 함수형 메서드
+    예를 들어 this.corpList.find(corp => corp.name == 'name')와 같은 코드에서 corp의 타입과 find의 리턴 타입을 추론하는 것이다.
+    전달되는 node는 find이며 이것의 이전 노드인 this.corpList의 타입을 이용해서 corp, find의 타입을 추론한다.
+    Map, Set의 경우도 거의 동일하지만 generic이 K, V 등으로 다수일 수 있고 K, V에 대응하는 실제 타입을
+    new Map<string, Corp>와 같은 new Expression에서 얻는다는 것이 다르다.
+
+    Map, Set의 경우는 아래와 같이 사용되는데
+    var corpMap = new Map<string, Corp>()
+    this.corpMap.get('name')
+    this.corpMap의 타입을 추론하면 object형 타입이 된다.
+    그리고 inferTypeNewExpression()에서 generic의 정보를 저장하기 때문에 corpMap의 타입에 string, Corp가 저장되어져 있다.
+    하지만 배열은 corpList에 gereric 정보가 저장되어져 있지 않다.
+    
+    배열 자체는 generic의 정보를 가지고 있고 배열도 new Array<Corp>와 같이 사용할 수 있지만 현재는 지원하지 않는다.
+
+    3) Binding 되어진 람다 함수
+  */
+  static getFunctionInfo(node: AstNode | undefined): FunctionTypeDescriptor | AnyTypeDescriptor | undefined {
     if (!node) {
       console.error(chalk.red('getFunctionInfo: node is null'))
       return undefined
     }
 
-    clearLogs()
-    gatherLog('node.$type', chalk.green(node.$type))
-    gatherLog('node.$cstNode', reduceLog(node.$cstNode?.text))
+    const gather = new LogGatherer('getFunctionInfo')
+    gather.add('node.$type', chalk.green(node.$type))
+    gather.add('node.$cstNode', reduceLog(node.$cstNode?.text))
 
+    // 배열, Map, Set등의 generic을 가지는 함수형 메서드 처리 부분
     if (ast.isCallChain(node) && node.isFunction) {
-      const funcRef = node.element?.ref
-      if (!funcRef) {
+      const nodeRef = node.element?.ref
+      const nodeName = node.element?.$refText
+      if (!nodeRef) {
         console.error(chalk.red('getFunctionInfo: node ref is null'), node.$cstNode?.text)
         return undefined
       }
 
-      const funcName = node.element?.$refText
+      gather.add('node.ref', nodeRef.$type)
+      gather.add('node.name', nodeName)
+
+      let isProcessed = false
       let funcType: TypeDescriptor | undefined
+
+      // 처리 과정 중에 name에는 T, K, V와 같은 것들이, type에는 실제 타입이 들어온다.
+      // name은 함수형 메서드들이 선언되어진 곳에서 가져오고 실제 타입은 이전 노드나 new expression에서 가져온다.
       let generic: {
         name: string
         type: TypeDescriptor
       }[] = []
-      let isProcessed = false
-
-      gatherLog('funcName', funcName)
-      gatherLog('funcRef', funcRef.$type)
 
       if (node.previous) {
         const prevType = TypeSystem.inferType(node.previous)
 
-        gatherLog('node.previous', node.previous.$cstNode?.text)
-        gatherLog('prevType', prevType.toString())
+        gather.add('node.prev', node.previous.$cstNode?.text)
+        gather.add('prevType', prevType.toString())
 
         if (TypeSystem.isArrayType(prevType)) {
-          // this.corpList.find(corp => corp.name == 'name')와 같은 코드에서 corp의 타입과 find의 리턴 타입을 추론한다.
-          // 전달되는 node는 find이며 이것의 이전 노드인 this.corpList의 타입을 이용해서 corp, find의 타입을 추론한다.
-          // methodNames에 포함된 메서드들은 모두 배열에 관한 것이며 find는 변수나 함수로 정의되어져 있다.
-          if (ast.isVariableDef(funcRef) || ast.isFunctionDef(funcRef)) {
-            funcType = TypeSystem.inferType(funcRef)
-            // VariableDef의 container는 ObjectType이고 그 위에가 ObjectDef이다.
-            const grandContainer = funcRef?.$container?.$container
-            if (grandContainer && ast.isObjectDef(grandContainer)) {
-              let t = new AnyTypeDescriptor()
-              //todo 하나로 가정하고 있음
-              // map()인 경우에는 타입이 변경될 수 있다.
-              if (funcName != 'map') t = prevType.elementType
-              grandContainer.generic?.types.forEach(name => {
-                generic.push({ name, type: t })
-              })
-            }
+          // find는 변수나 함수로 정의되어져 있다.
+          funcType = TypeSystem.inferType(nodeRef)
+          assert.ok(ast.isVariableDef(nodeRef) || ast.isFunctionDef(nodeRef), 'it is not valid definition')
+          assert.ok(TypeSystem.isFunctionType(funcType), `'${nodeName}' is not function`)
+
+          // VariableDef의 container는 ObjectType이고 그 위에가 ObjectDef이다.
+          const grandContainer = nodeRef?.$container?.$container
+          if (grandContainer && ast.isObjectDef(grandContainer)) {
+            // array이기 때문에 generic이 하나일 것으로 가정하고 있다.
+            // Array.map()인 경우에는 타입이 변경될 수 있으므로 any type으로 처리한다.
+            let t = prevType.elementType
+            if (nodeName == 'map') t = new AnyTypeDescriptor()
+            assert(grandContainer.generic?.types.length == 1, 'generic type must be one')
+            generic.push({ name: grandContainer.generic?.types[0], type: t })
             isProcessed = true
-          } else gatherLog('error6', `'${funcName}' is array but varible and function`)
+          } else gather.add('error1', `'${nodeName}'s grandContainer is not object`)
         } else if (TypeSystem.isObjectType(prevType)) {
           if (prevType.toString() == 'Map' || prevType.toString() == 'Set') {
-            // 이 부분은 Map, Set에 대한 처리이다. 즉 다음과 같은 구문을 처리하기 위한 것이다.
-            // var corpMap = new Map<string, Corp>()
-            // this.corpMap.get('name')
-            // this.corpMap의 타입을 추론하면 object형 타입이 된다.
-            // 그리고 inferTypeNewExpression()에서 generic의 정보를 저장하기 때문에 corpMap의 타입에 string, Corp가 저장되어져 있다.
-            funcType = TypeSystem.inferType(funcRef)
-            assert.ok(ast.isVariableDef(funcRef) || ast.isFunctionDef(funcRef), 'it is not method definition')
-            assert.ok(TypeSystem.isFunctionType(funcType), 'method type is not function type')
+            funcType = TypeSystem.inferType(nodeRef)
+            assert.ok(ast.isVariableDef(nodeRef) || ast.isFunctionDef(nodeRef), 'it is not valid definition')
+            assert.ok(TypeSystem.isFunctionType(funcType), `'${nodeName}' is not function`)
 
+            // Map, Set은 prevType에 NewExpression에서 설정된 generic 정보가 있다.
             let genericIds: string[] = []
-            const grandContainer = funcRef.$container?.$container
+            const grandContainer = nodeRef.$container?.$container
             if (grandContainer && ast.isObjectDef(grandContainer)) {
               genericIds = grandContainer.generic?.types.map(name => name) ?? []
             }
             if (genericIds && prevType.generic && genericIds.length == prevType.generic.length) {
               prevType.generic.forEach((g, index) => {
-                // console.log(chalk.red('generic type:'), genericIds[index], g.type.toString())
                 generic.push({ name: genericIds[index], type: g.type })
               })
-            } else {
-              console.error(chalk.red('genericIds and prevType.generic is not matched'))
-            }
-            isProcessed = true
-          } else gatherLog('error7', `'${funcName}' is object but Map and Set`)
-        } else gatherLog('error8', 'prevType is not array or object')
+              isProcessed = true
+            } else gather.add('error2', 'genericIds and prevType.generic is not matched')
+          } else gather.add('error3', `'${nodeName}' is object but Map and Set`)
+        } else gather.add('error4', 'prevType is not array or object')
       }
 
+      // Array, Map, Set의 함수형 메서드가 아닌 일반 함수의 경우
       if (!isProcessed) {
-        const type = TypeSystem.inferType(funcRef)
+        const type = TypeSystem.inferType(nodeRef)
 
-        gatherLog('isProcessed', 'now procesing')
-        gatherLog('type', type.toString())
+        gather.add('isProcessed', 'now procesing')
+        gather.add('type', type.toString())
 
-        if (TypeSystem.isFunctionType(type)) {
+        if (TypeSystem.isFunctionType(type) || TypeSystem.isAnyType(type)) {
           funcType = type
-        } else if (TypeSystem.isObjectType(type) && funcName == 'assert') {
+        } else if (TypeSystem.isObjectType(type) && nodeName == 'assert') {
           // assert는 단독 함수로도 존재하고 ok, equal등을 가지는 오브젝트로도 존재하기 때문에 별도 처리가 필요하다.
           const type = new FunctionTypeDescriptor()
           type.changeReturnType(new VoidTypeDescriptor())
@@ -1724,29 +1778,28 @@ export class TypeSystem {
             nullable: true,
           })
           funcType = type
-        } else {
-          gatherLog('error5', `'${funcName}'s type: ${chalk.green(type.toString())}`)
-        }
+        } else gather.add('error5', `'${nodeName}'s type: ${chalk.green(type.toString())}`)
       }
 
+      // 인수 t에 Generic이 있으면 t가 실제 어떤 타입이어야 하는지를 g를 통해 판단한다.
       const replace = (
         t: TypeDescriptor,
-        n: {
+        g: {
           name: string
           type: TypeDescriptor
         }[]
       ) => {
         if (TypeSystem.isGenericType(t)) {
-          const g = n.find(e => e.name == t.name)
-          return g?.type || new AnyTypeDescriptor()
+          const m = g.find(e => e.name == t.name)
+          return m?.type || new AnyTypeDescriptor()
         } else if (TypeSystem.isArrayType(t)) {
-          if (TypeSystem.isGenericType(t.elementType)) return new ArrayTypeDescriptor(n[0].type)
+          if (TypeSystem.isGenericType(t.elementType)) return new ArrayTypeDescriptor(g[0].type)
           else return new ArrayTypeDescriptor(t.elementType)
         } else if (TypeSystem.isFunctionType(t)) {
           const desc = new FunctionTypeDescriptor()
-          desc.changeReturnType(replace(t.returnType, n))
+          desc.changeReturnType(replace(t.returnType, g))
           t.parameters.forEach(p => {
-            const type = replace(p.type, n)
+            const type = replace(p.type, g)
             desc.addParameterType({
               name: p.name,
               type,
@@ -1759,74 +1812,77 @@ export class TypeSystem {
         } else return t
       }
 
-      if (funcType && TypeSystem.isFunctionType(funcType)) {
-        const newType = new FunctionTypeDescriptor()
-        newType.changeReturnType(replace(funcType.returnType, generic))
-        funcType.parameters.forEach(p => {
-          const type = replace(p.type, generic)
-          newType.addParameterType({
-            name: p.name,
-            type,
-            spread: p.spread,
-            nullable: p.nullable,
-            defaultValue: p.defaultValue,
-          })
-        })
-        return newType
-      }
-    } else if (ast.isBinding(node)) {
-      // if (!ast.isFunctionValue(node.value)) {
-      //   //todo Binding 내부에 binding이 포함될 수 있다.
-      //   console.log(chalk.red('  checkBinding, Binding 내부에 binding'))
-      //   return undefined
-      // }
-
-      const object = AstUtils.getContainerOfType(node, ast.isObjectValue)
-      const container = object?.$container
-      if (ast.isVariableDef(container)) {
-        const containerType = TypeSystem.inferType(container)
-        gatherLog('container.$type', container.$type)
-        gatherLog('containerType', containerType.toString())
-
-        if (TypeSystem.isObjectType(containerType)) {
-          let propType = new AnyTypeDescriptor()
-          const objectNode = containerType.node
-          if (ast.isObjectDef(objectNode)) {
-            gatherLog('objectNode', objectNode.$type)
-            const allMembers = objectNode.body.elements
-            const removedBypass = allMembers.filter(e => !ast.isBypass(e))
-            removedBypass.forEach(e => {
-              if (ast.isVariableDef(e) || ast.isFunctionDef(e) || ast.isObjectDef(e)) {
-                if (e.name == node.element) {
-                  propType = TypeSystem.inferType(e)
-                  gatherLog('found', e.name, e.$type, propType.toString())
-                }
-              }
-            })
-          }
-
-          gatherLog('propType', propType.toString())
-          if (TypeSystem.isFunctionType(propType)) {
-            // console.log('  getFunctionInfo, propType:', propType.toString())
-            // propType.parameters.forEach(p => {
-            //   console.log(chalk.blue('    parameter:'), p.name, p.type.toString())
-            // })
-            return propType
-          } else gatherLog('error4', 'propType is not function type')
-        } else gatherLog('error3', 'containerType is not object type')
-      } else if (ast.isBinding(container)) {
-        const recur = this.getFunctionInfo(container)
-        if (!recur) {
-          gatherLog('error2', 'recursive is invalid')
-          showLogs('getFunctionInfo')
+      // 어떤 경우이든지 funcType에 추론된 함수의 타입이 저장되는데 generic이 있으면 실제 타입으로 변환해 준다.
+      if (funcType) {
+        if (TypeSystem.isAnyType(funcType)) {
+          return funcType
+        } else if (TypeSystem.isFunctionType(funcType)) {
+          const newType = replace(funcType, generic)
+          if (TypeSystem.isFunctionType(newType)) {
+            gather.add('newType', newType.toString())
+            return newType
+          } else gather.add('error6', 'newType is not function type')
         }
-        return recur
       }
-      gatherLog('error1', 'container is invalid')
+      gather.add('error7', 'funcType must be any or function type')
     }
+    // Binding 되어진 람다 함수 처리 부분
+    else if (ast.isBinding(node)) {
+      // Binding 내부에 Binding이 포함될 수 있다.
+      // 따라서 findBindingRootDef()는 중첩된 Binding을 따라가면서 Binding이 정의된 definition을 찾는다.
+      // 간단히 아래와 같이 한번만 Binding되어진 경우는 비교적 간단하다.
+      // var prompt: ChainPrompt = {
+      //   prompt: (options) => { return options }
+      // }
+      // 이 경우는 인수로 전달되는 node는 prompt: (options) => { return options } 으로
+      // options의 타입을 추론하기 위해서는 inferTypeParameter()에서 options의 $container.$container인
+      // (여기서는 FunctionValue의 container인 Binding임)을 이 함수에 전달하고 다시 그것의 container가
+      // 변수 선언인 경우이다.
+      // 하지만 다음과 같이 상위 노드가 또 다른 Binding인 경우에는
+      // nextChain: {
+      //   prompt: (options) => { return options }
+      // }
+      // node에서 시작해서 VariableDef가 나올때까지 node의 타입이 무엇인지를 검사해야 한다.
+      // 상위 노드로 가면 node는 달라질 수 있다. 즉 위에서 처음 시작은 prompt이지만
+      // prompt를 포함하는 상위 binding의 이름이 nextChain이면
+      // 다음번 찾기는 nextChain으로 찾는다는 의미이다.
+      const findBindingRootDef = (node: AstNode): TypeDescriptor | undefined => {
+        const property = ast.isBinding(node) ? node.element : ''
+        if (!property) {
+          console.error(chalk.red('findBindingRootDef: property is null'))
+          return undefined
+        }
 
-    gatherLog('error0', 'node is invalid')
-    showLogs('getFunctionInfo')
+        const object = AstUtils.getContainerOfType(node, ast.isObjectValue)
+        if (object && object.$container) {
+          if (ast.isVariableDef(object.$container)) {
+            const container = object.$container
+            const containerType = TypeSystem.inferType(container)
+            gather.add('fd.container.$type', container.$type)
+            gather.add('fd.container.type', containerType.toString())
+            // 해당 Binding이 소속된 ObjectDef를 찾아서 해당 항목의 타입을 찾아야 한다.
+            if (TypeSystem.isObjectType(containerType)) {
+              return containerType.getElementType(property)
+            }
+          } else if (ast.isBinding(object.$container)) {
+            const result = findBindingRootDef(object.$container)
+            if (result && TypeSystem.isObjectType(result)) {
+              return result.getElementType(property)
+            } else gather.add('error10', 'find-bind is not valid')
+          } else gather.add('error11', 'container is not valid')
+        } else gather.add('error12', 'object is not found')
+        return undefined
+      }
+
+      const propType = findBindingRootDef(node)
+      gather.add('propType', propType?.toString())
+      if (propType && TypeSystem.isFunctionType(propType)) {
+        // propType.showDetailInfo()
+        return propType
+      } else gather.add('error8', 'propType is not function type')
+    } else gather.add('error9', 'node is invalid')
+
+    gather.show()
     return undefined
   }
 }
