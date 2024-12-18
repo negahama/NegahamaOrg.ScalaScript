@@ -19,7 +19,7 @@
           "category": "Todo",
           "importance": "Medium",
           "createdAt": "2024-11-29T17:22:49.854Z",
-          "content": "빌트인 라이브러리를 처리하기 하는 방법이 이거 말고는 없나? 그리고 readfile의 url을 다수의 파일로 분산시키는 것은? "
+          "content": "빌트인 라이브러리를 처리하는 방법이 이거 말고는 없나? 그리고 readfile의 url을 다수의 파일로 분산시키는 것은? "
         }
       ]
     }
