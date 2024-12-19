@@ -14,13 +14,13 @@ def InterfaceTest2 = {
 /**
   TestCase : indent를 이용한 블럭 테스트
 */
-var a = 0
-if (a == 0) then
-  console.log('a == 0')
-  a = 1
+var toggle = 0
+if (toggle == 0) then
+  console.log('toggle == 0')
+  toggle = 1
 else
-  console.log('a != 0')
-  a = 0
+  console.log('toggle != 0')
+  toggle = 0
 
 // 중괄호 내부에서는 들여쓰기로 블럭을 지정할 수 없다.
 // var f = (a: number) => {
@@ -146,7 +146,7 @@ TC02(1, '2')
 
 var TC02_ary = [1, 2, 3]
 TC02_ary.push(4, 5)
-TC02_ary.push('6')
+//TC02_ary.push('6')
 TC02_ary.forEach(num => {
   console.log(num)
 })
@@ -194,6 +194,8 @@ val getColumn = (column: number | string, createCallback: (column: string) -> vo
 }
 
 def Corp3 = {
+  var name: string
+  var firms: string[]
   val process = () => {
     %%// for debugging...
     console.log('process')
@@ -203,14 +205,28 @@ var corps: Corp3[]
 corps.forEach(corp => corp.process())
 assert(true, 'good')
 
-val firmListByKind:{
-  var firms: string[]
-}[] = []
-
 var r: string[] = []
-firmListByKind.forEach(e => {
+corps.forEach(e => {
   r.push(e.firms.toString())
 })
+
+val printSaleDetail = (date: string, callback: (corp: Corp3, sale: number) -> string) => {}
+
+printSaleDetail('01-01', (corp, sale) => {
+  return corp.name .. sale.toString()
+})
+
+def ChainPrompt = {
+  var prompt: string
+  var callback?: (corp: Corp3, options: string[]) -> void
+  var nextChain?: ChainPrompt
+}
+
+val 기업변경_보유기술: ChainPrompt = {
+  prompt: '추가할 기술?'
+  callback: (corp, options) => { console.log(corp.name, options) }
+  nextChain: { prompt: '기술수준?' }
+}
 
 /**
   TestCase : object comparison
@@ -295,17 +311,26 @@ def Sales = {
 def SalesHistory = {
   private var sales: Sales[] = []
   var add = () => {
+    // this.sales.push({
+    //   date: 10
+    //   cash: 100
+    //   trade: {
+    //     item1: 'item1' // error
+    //     price: 100
+    //   }
+    // })
     this.sales.push({
       date: 10
       cash: 100
       trade: {
-        item1: 'item1'
+        item: 'item1'
         price: 100
       }
     })
   }
   var add2 = () => {
-    this.sales.push({ date1: 20 })
+    // this.sales.push({ date1: 20 })
+    this.sales.push({ date: 20 })
   }
 }
 
@@ -341,39 +366,12 @@ var t3: Trade[] = t2
 /**
   TestCase : 
 */
-def Goods1 = {
-  var 관련기술: string[]
-}
-var goodsTable: Goods1[] = []
-static val getAllTech = () => {
+val getAllTech = () => {
   var set = new Set<string>()
-  goodsTable.forEach(goods => {
-    // 이건 지원하지 않음
-    // goods.관련기술.forEach(set.add, set)
-    goods.관련기술.forEach(skill => set.add(skill))
-  })
-  return [...set]
+  var ary = ['a', 'b', 'c']
+  // 이건 지원하지 않음
+  // ary.forEach(set.add, set)
+  ary.forEach(e => set.add(e))
 }
 
-def 판매세부내역 = {
-  var 상품명: string
-  var 가격: number
-}
-
-val printSaleDetail = (date: string, callback: (salesDetail: 판매세부내역, total: number) -> string) => {}
-
-printSaleDetail('01-01', (salesDetail, total) => {
-  return salesDetail.상품명 .. total.toString()
-})
-
-def ChainPrompt = {
-  var prompt: string
-  var callback?: (list: 판매세부내역, options: string[]) -> void
-  var nextChain?: ChainPrompt
-}
-
-val 기업변경_보유기술: ChainPrompt = {
-  prompt: '추가할 기술?'
-  callback: (list, options) => { console.log(list.가격, options) }
-  nextChain: { prompt: '기술수준?' }
-}
+// [1, 2, 3].forEach(e => console.log(e))

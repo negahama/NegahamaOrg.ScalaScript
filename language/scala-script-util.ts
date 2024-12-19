@@ -112,9 +112,16 @@ export function enableLog(enable: boolean) {
  * @returns A string representing the unique signature of the log entry.
  */
 export function enterLog(procKind: string, ...optionalParams: any[]): string {
+  const applyColor = (text: string): string =>{
+    if (text.toLowerCase().includes('infer')) return chalk.cyan(text)
+    if (text.toLowerCase().includes('check')) return chalk.blue(text)
+    if (text.toLowerCase().includes('scope')) return chalk.magentaBright(text)
+    return text
+  }
+
   if (!_enable_log_) return ''
   _sig_number_ += 1
-  const signature = `|${_sig_number_}| ${procKind}:`
+  const signature = `|${_sig_number_}| ${applyColor(procKind)}:`
   console.log(`>${signature}`, ...optionalParams)
   // console.time(`<${signature}`)
   console.group()

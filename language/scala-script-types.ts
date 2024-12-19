@@ -1679,6 +1679,7 @@ export class TypeSystem {
       console.error(chalk.red('getFunctionInfo: node is null'))
       return undefined
     }
+    const log = enterLog('getFunctionInfo', `'${node.$cstNode?.text}'`)
 
     const gather = new LogGatherer('getFunctionInfo')
     gather.add('node.$type', chalk.green(node.$type))
@@ -1690,6 +1691,7 @@ export class TypeSystem {
       const nodeName = node.element?.$refText
       if (!nodeRef) {
         console.error(chalk.red('getFunctionInfo: node ref is null'), node.$cstNode?.text)
+        exitLog(log)
         return undefined
       }
 
@@ -1815,11 +1817,14 @@ export class TypeSystem {
       // 어떤 경우이든지 funcType에 추론된 함수의 타입이 저장되는데 generic이 있으면 실제 타입으로 변환해 준다.
       if (funcType) {
         if (TypeSystem.isAnyType(funcType)) {
+          gather.add('funcType', funcType.toString())
+          exitLog(log, funcType)
           return funcType
         } else if (TypeSystem.isFunctionType(funcType)) {
           const newType = replace(funcType, generic)
           if (TypeSystem.isFunctionType(newType)) {
             gather.add('newType', newType.toString())
+            exitLog(log, newType)
             return newType
           } else gather.add('error6', 'newType is not function type')
         }
@@ -1883,6 +1888,7 @@ export class TypeSystem {
     } else gather.add('error9', 'node is invalid')
 
     gather.show()
+    exitLog(log)
     return undefined
   }
 }

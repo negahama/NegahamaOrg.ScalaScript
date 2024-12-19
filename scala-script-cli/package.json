@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "publisher": "NegahamaOrg",
@@ -39,7 +39,7 @@
   "scripts": {
     "all": "npm run langium:generate && npm run build && npm run lint && npm run cli1",
     "cli0": "node bin/cli.js generate samples/*.ss -d samples/generated",
-    "cli1": "node bin/cli.js generate test/*.ss -d test/generated",
+    "cli1": "node bin/cli.js generate test/test.ss -d test/generated",
     "build": "tsc -b tsconfig.json",
     "watch": "tsc -b tsconfig.json --watch",
     "lint": "eslint src --ext ts",

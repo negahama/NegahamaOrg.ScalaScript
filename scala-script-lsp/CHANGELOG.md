@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.1 - December 19, 2024
+
+- checking rest parameter was implemented
+
 ### 0.6.0 - December 19, 2024
 
 - A parameter check function was implemented

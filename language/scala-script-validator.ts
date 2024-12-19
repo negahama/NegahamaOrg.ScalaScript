@@ -1,6 +1,6 @@
 import { type ValidationAcceptor } from 'langium'
 import * as ast from './generated/ast.js'
-import { TypeDescriptor, TypeSystem } from './scala-script-types.js'
+import { FunctionParameter, TypeDescriptor, TypeSystem } from './scala-script-types.js'
 import { enterLog, exitLog, traceLog, reduceLog } from './scala-script-util.js'
 import chalk from 'chalk'
 
@@ -120,22 +120,57 @@ export class ScalaScriptValidator {
       const funcName = expr.element?.$refText
 
       const type = TypeSystem.getFunctionInfo(expr)
-      if (type && TypeSystem.isFunctionType(type)) {
+      if (!type) {
+        console.error(chalk.red('checkCallChain:'), funcName, reduceLog(expr.$cstNode?.text))
+      } else if (TypeSystem.isFunctionType(type)) {
         // 파라미터에서 반드시 필요로 하는 인수의 개수를 계산하고 현재 함수에서 제공하는 인수의 개수와 비교한다.
+        // rest parameter는 반드시 마지막에 있어야 하고 한개만 존재할 수 있으므로 이것도 확인한다.
         let needParamNum = 0
         let hasRestParam = false
+        let hasRestError = false
         type.parameters.forEach((param, index) => {
           // nullable인 경우나 default value가 있는 경우는 꼭 필요한 인수에서 제외한다.
           if (!(param.nullable || param.defaultValue)) needParamNum++
-          if (param.spread) hasRestParam = true
+          if (param.spread) {
+            // 이 조건으로 마지막에 있어야 하는 것과 한개만 존재해야 하는 것이 모두 검사된다.
+            if (index !== type.parameters.length - 1) {
+              const errorMsg = 'internal error: rest parameter must be the last parameter'
+              accept('error', errorMsg, {
+                node: expr,
+                property: 'args',
+              })
+              hasRestError = true
+            }
+            hasRestParam = true
+          }
         })
+        if (hasRestError) {
+          exitLog(log)
+          return
+        }
+
+        // argument의 타입을 검사하고 문제가 있으면 에러 메시지를 리턴한다.
+        const checkArg = (index: number, arg: ast.Expression, param: FunctionParameter) => {
+          const argType = TypeSystem.inferType(arg)
+          const match = argType.isAssignableTo(param.type)
+
+          traceLog(`🚀 index: ${index}, match:`, match)
+          traceLog(`🚀   arg: '${reduceLog(arg.$cstNode?.text)}', ${chalk.green(argType.toString())}`)
+          traceLog(`🚀   prm: '${param.name}', ${chalk.green(param.type.toString())}`)
+
+          if (!match) {
+            return (
+              `checkCallChain: Function '${funcName}'s` +
+              ` parameter '${argType.toString()}' must to be '${param.type.toString()}'.`
+            )
+          }
+          return ''
+        }
+
         const paramCount = type.parameters.length
 
-        if (hasRestParam) {
-          // rest parameter
-          //todo spread 처리 : 일단은 파라미터 체크를 하지 않는다.
-          // console.log('rest parameter')
-        } else {
+        // rest parameter가 없으면 파라미터의 개수를 체크해 준다.
+        if (!hasRestParam) {
           let errorMsg = ''
           // 최소한의 인수는 있어야 한다.
           if (expr.args.length < needParamNum) {
@@ -154,32 +189,38 @@ export class ScalaScriptValidator {
             exitLog(log)
             return
           }
+        }
 
-          expr.args.forEach((arg, index) => {
-            if (index < paramCount) {
-              const argType = TypeSystem.inferType(arg)
-              const paramType = type.parameters[index].type
-              const match = argType.isAssignableTo(paramType)
-
-              // console.log('🚀 ~ arg:', index, arg.$cstNode?.text, argType.$type, argType.toString())
-              // console.log('🚀 ~ prm:', index, type.parameters[index].name, paramType.$type, paramType.toString())
-              // console.log('🚀 ~ match:', match)
-
-              if (!match) {
-                const msg =
-                  `checkCallChain: Function '${funcName}'s` +
-                  ` parameter '${paramType.toString()}' is mismatch with '${argType.toString()}'.`
-                accept('error', msg, {
+        // rest parameter가 있을 경우에는 인수의 갯수는 체크하지 않지만 타입 체크는 한다.
+        expr.args.forEach((arg, index) => {
+          if (index < paramCount) {
+            const errorMsg = checkArg(index, arg, type.parameters[index])
+            if (errorMsg) {
+              accept('error', errorMsg, {
+                node: arg,
+              })
+            }
+          } else {
+            // rest parameter가 있을 경우에는 나머지 인수들을 모두 rest parameter의 타입과 비교한다.
+            if (hasRestParam) {
+              const errorMsg = checkArg(index, arg, type.parameters[paramCount - 1])
+              if (errorMsg) {
+                accept('error', errorMsg, {
                   node: arg,
                 })
               }
             } else {
-              console.log('🚀 ~ no: too many args')
+              const errorMsg = `checkCallChain: Function '${funcName}' has too many arguments.`
+              accept('error', errorMsg, {
+                node: arg,
+              })
             }
-          })
-        }
+          }
+        })
+      } else if (TypeSystem.isAnyType(type)) {
+        // do nothing
       } else {
-        // console.error(chalk.red('checkCallChain2:'), funcName, reduceLog(expr.$cstNode?.text))
+        console.error(chalk.red('internal error'))
       }
     } else {
       // 이름과 타입이 제대로 되어져 있는지 확인용으로 남겨둔다.
