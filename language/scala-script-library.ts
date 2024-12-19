@@ -83,7 +83,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 주어진 인덱스에 있는 배열의 항목을 반환합니다. 마지막 항목부터 셀 수 있는 음의 정수를 허용합니다.
   val at: (index: number) -> T
   // 다른 배열 및/또는 값과 결합된 호출 배열인 새 배열을 반환합니다.
-  val concat: (...value: T[]) -> T[]
+  val concat: (...value: any[]) -> T[]
   // 배열 내의 배열 요소 시퀀스를 복사하고 변경된 배열을 반환합니다.
   val copyWithin: (target: number, start: number, end?: number) -> T[]
   // 호출 배열의 모든 요소가 테스트 함수를 만족하면 true를 반환합니다.
@@ -119,7 +119,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 배열에서 마지막 요소를 제거하고 해당 요소를 반환합니다.
   val pop: () -> T
   // 배열 끝에 하나 이상의 요소를 추가하고, 배열의 새 length를 반환합니다.
-  val push: (...element: T) -> number
+  val push: (...element: T[]) -> number
   // 배열의 각 요소(왼쪽에서 오른쪽으로)에 대해 사용자가 제공한 "리듀서" 콜백 함수를 실행하여 하나의 값으로 줄입니다.
   val reduce: (callbackFn: (arg: T, index?: number) -> T) -> T
   // 배열의 각 요소(오른쪽에서 왼쪽으로)에 대해 사용자가 제공한 "리듀서" 콜백 함수를 실행하여 하나의 값으로 줄입니다.
@@ -135,7 +135,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 배열의 요소를 제자리 정렬하고 배열을 반환합니다.
   val sort: (callbackFn: (arg1: T, arg2: T) -> number) -> T[]
   // 배열에서 요소를 추가 및/또는 제거합니다.
-  val splice: (start: number, deleteCount?: number, ...item: T) -> T[]
+  val splice: (start: number, deleteCount?: number, ...item: T[]) -> T[]
   // 호출 배열과 그 요소를 나타내는 문자열을 반환합니다.
   val toString: () -> string
   // 배열 앞쪽에 하나 이상의 요소를 추가하고, 배열의 새 length를 반환합니다.
@@ -310,7 +310,7 @@ export const ScalaScriptBuiltinLibrary = `
 
 @NotTrans export def console = {
   // 첫 번째 매개변수가 false인 경우 메시지와 스택 추적을 출력합니다.
-  static val assert: (...args: any) -> void
+  static val assert: (...args: any[]) -> void
   // 콘솔의 내용을 지웁니다.
   static val clear: () -> void
   // 주어진 레이블로 메서드를 호출한 횟수를 출력합니다.
@@ -318,9 +318,9 @@ export const ScalaScriptBuiltinLibrary = `
   // 주어진 라벨의 횟수를 초기화합니다.
   static val countReset: (label?: string) -> void
   // debug 중요도로 메시지를 출력합니다.
-  static val debug: (...args: any) -> void
+  static val debug: (...args: any[]) -> void
   // 오류 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  static val error: (...args: any) -> void
+  static val error: (...args: any[]) -> void
   // 새로운 인라인 그룹을 생성해, 이후 모든 출력을 한 단계 들여씁니다. 그룹을 나오려면 groupEnd()를 호출하세요.
   static val group: (label?: string) -> void
   // 새로운 인라인 그룹을 생성해, 이후 모든 출력을 한 단계 들여씁니다. 그러나 group()과 달리, groupCollapsed()로 생성한 그룹은 처음에 접혀 있습니다. 그룹을 나오려면 groupEnd()를 호출하세요.
@@ -328,9 +328,9 @@ export const ScalaScriptBuiltinLibrary = `
   // 현재 인라인 그룹을 나옵니다.
   static val groupEnd: (label?: string) -> void
   // 정보 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  static val info: (...args: any) -> void
+  static val info: (...args: any[]) -> void
   // 일반 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  static val log: (...args: any) -> void
+  static val log: (...args: any[]) -> void
   // 브라우저의 내장 프로파일러(Firefox 성능 측정 도구 등)를 실행합니다. 선택 사항으로 프로파일에 이름을 붙일 수 있습니다.
   static val profile: (profileName: string) -> void
   // 프로파일러를 멈춥니다. 프로파일 결과는 브라우저의 성능 측정 도구(Firefox 성능 측정 도구 등)에서 확인할 수 있습니다.
@@ -342,9 +342,9 @@ export const ScalaScriptBuiltinLibrary = `
   // 지정한 타이머를 멈추고, 소요시간을 출력합니다.
   static val timeEnd: (label?: string) -> void
   // 스택 추적을 출력합니다.
-  static val trace: (...args: any) -> void
+  static val trace: (...args: any[]) -> void
   // 경고 메시지를 출력합니다. 추가 매개변수와 함께 문자열 치환을 사용할 수 있습니다.
-  static val warn: (...args: any) -> void
+  static val warn: (...args: any[]) -> void
 }
   
 @NotTrans export val assert: (value: any, message?: any) -> void

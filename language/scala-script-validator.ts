@@ -112,6 +112,26 @@ export class ScalaScriptValidator {
    * @param accept - The validation acceptor to collect validation results.
    * @returns void
    */
+  /*
+    스칼라스크립트는 타입스크립트와 마찬가지로 rest parameter의 타입을 배열 형태로 쓴다.
+    타입스크립트에 정의된 많은 rest parameter를 가지는 함수의 정의는 아래의 push()의 정의와 비슷하다.
+    push(...items: T[]): number;
+
+    그리고 [1].push([2,3]) 와 같은 구문은 number[]를 number에 할당할 수 없다고 나온다.
+    또한 rest parameter를 사용할 경우에도 예를들어 아래와 같이 rest parameter를 배열로 표시하지 않으면 에러가 된다.
+    f(msg: string, ...optionalParams: number) { ... }
+
+    즉 items의 각 항목은 T 이고 ...items 가 T[] 이라는 것으로 생각된다.
+
+    하지만 any[] 대신 any는 사용가능한데 이는 any자체가 배열을 포함하기 때문으로 보인다.
+    여튼 타입스크립트는 rest parameter를 T[] 로 표현하고 스칼라스크립트도 마찬가지이지만
+    items의 각 항목은 T의 배열이 아니라 T 이기 때문에 이를 고려해야 한다.
+
+    스칼라스크립트에서 rest parameter의 처리에서 한가지지 예외가 있는데 그것은 concat()의 처리이다.
+    concat은 T와 T[] 모두를 취할 수 있는데 스칼라스크립트는 아직 배열의 배열형이나 union의 배열형을
+    지원하지 않기 때문에 이를 표현할 방법이 없다. generic의 union도 아직 지원하지 않는다
+    그래서 concat은 any[]형으로 되어져 있다.
+  */
   checkCallChain(expr: ast.CallChain, accept: ValidationAcceptor): void {
     const log = enterLog('checkCallChain', expr.$cstNode?.text)
 
@@ -125,6 +145,7 @@ export class ScalaScriptValidator {
       } else if (TypeSystem.isFunctionType(type)) {
         // 파라미터에서 반드시 필요로 하는 인수의 개수를 계산하고 현재 함수에서 제공하는 인수의 개수와 비교한다.
         // rest parameter는 반드시 마지막에 있어야 하고 한개만 존재할 수 있으므로 이것도 확인한다.
+        // rest parameter는 위의 설명처럼 배열형이이야 하며 실제 사용시에는 element type을 쓴다.
         let needParamNum = 0
         let hasRestParam = false
         let hasRestError = false
@@ -132,16 +153,24 @@ export class ScalaScriptValidator {
           // nullable인 경우나 default value가 있는 경우는 꼭 필요한 인수에서 제외한다.
           if (!(param.nullable || param.defaultValue)) needParamNum++
           if (param.spread) {
+            hasRestParam = true
             // 이 조건으로 마지막에 있어야 하는 것과 한개만 존재해야 하는 것이 모두 검사된다.
             if (index !== type.parameters.length - 1) {
-              const errorMsg = 'internal error: rest parameter must be the last parameter'
+              const errorMsg = 'rest parameter must be the last parameter'
               accept('error', errorMsg, {
                 node: expr,
                 property: 'args',
               })
               hasRestError = true
             }
-            hasRestParam = true
+            if (!TypeSystem.isArrayType(param.type)) {
+              const errorMsg = 'rest parameter must be array type'
+              accept('error', errorMsg, {
+                node: expr,
+                property: 'args',
+              })
+              hasRestError = true
+            }
           }
         })
         if (hasRestError) {
@@ -152,16 +181,22 @@ export class ScalaScriptValidator {
         // argument의 타입을 검사하고 문제가 있으면 에러 메시지를 리턴한다.
         const checkArg = (index: number, arg: ast.Expression, param: FunctionParameter) => {
           const argType = TypeSystem.inferType(arg)
-          const match = argType.isAssignableTo(param.type)
+          let paramType = param.type
+          if (param.spread) {
+            if (TypeSystem.isArrayType(param.type)) {
+              paramType = param.type.elementType
+            }
+          }
+          const match = argType.isAssignableTo(paramType)
 
           traceLog(`🚀 index: ${index}, match:`, match)
           traceLog(`🚀   arg: '${reduceLog(arg.$cstNode?.text)}', ${chalk.green(argType.toString())}`)
-          traceLog(`🚀   prm: '${param.name}', ${chalk.green(param.type.toString())}`)
+          traceLog(`🚀   prm: '${param.name}', ${chalk.green(paramType.toString())}`)
 
           if (!match) {
             return (
               `checkCallChain: Function '${funcName}'s` +
-              ` parameter '${argType.toString()}' must to be '${param.type.toString()}'.`
+              ` parameter '${argType.toString()}' must to be '${paramType.toString()}'.`
             )
           }
           return ''
