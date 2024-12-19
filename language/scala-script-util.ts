@@ -111,8 +111,19 @@ export function enableLog(enable: boolean) {
  * @param optionalParams - Additional optional parameters to log.
  * @returns A string representing the unique signature of the log entry.
  */
-export function enterLog(procKind: string, ...optionalParams: any[]): string {
-  const applyColor = (text: string): string =>{
+/*
+  파라미터 ...optionalParams의 타입을 any[]에서 any로 변경하였다.
+  개념적으로는 any가 맞는 것 같은데 타입스크립트의 대부분의 정의는 아래와 같이 배열형이다.
+  push(...items: T[]): number;
+
+  그래서 처음에는 ...items가 T의 배열형이라고 생각했지만 (정확하지는 않지만) T 배열형의 rest parameter 형태로 보는 것이 맞을 것 같다.
+  즉 여러 개의 T 배열형을 가질 수 있는 것인데 T 형을 그대로 쓸 수 있는 것은 자동으로 형변환이 되기 때문이 아닐까 싶다.
+  그럼 문제가 아래와 같이 concat을 정의한 것이 이상하다는 것이다.
+  concat(...items: ConcatArray<T>[]): T[];
+  concat(...items: (T | ConcatArray<T>)[]): T[];
+*/
+export function enterLog(procKind: string, ...optionalParams: any): string {
+  const applyColor = (text: string): string => {
     if (text.toLowerCase().includes('infer')) return chalk.cyan(text)
     if (text.toLowerCase().includes('check')) return chalk.blue(text)
     if (text.toLowerCase().includes('scope')) return chalk.magentaBright(text)
@@ -122,6 +133,8 @@ export function enterLog(procKind: string, ...optionalParams: any[]): string {
   if (!_enable_log_) return ''
   _sig_number_ += 1
   const signature = `|${_sig_number_}| ${applyColor(procKind)}:`
+  // 여기서 ...optionalParams 이 아닌 optionalParams을 사용하면 값이 [] 안에 표시된다.
+  // 즉 배열의 형태로 표시되는데 배열로 처리되면 값들을 구분하는 comma와 대괄호로 인해 보기 좋은 경우도 많다.
   console.log(`>${signature}`, ...optionalParams)
   // console.time(`<${signature}`)
   console.group()
@@ -134,7 +147,7 @@ export function enterLog(procKind: string, ...optionalParams: any[]): string {
  * @param msg - The message to log.
  * @param optionalParams - Additional parameters to log.
  */
-export function traceLog(msg: string, ...optionalParams: any[]) {
+export function traceLog(msg: string, ...optionalParams: any) {
   if (!_enable_log_) return
   console.log(msg, ...optionalParams)
 }
@@ -161,7 +174,7 @@ export function reduceLog(msg: string | undefined, lineCount: number = 3): strin
  * @param type - Optional. An object describing the type of the log message.
  * @param optionalParams - Optional. Additional parameters to log.
  */
-export function exitLog(log: string, type?: TypeDescriptor, ...optionalParams: any[]) {
+export function exitLog(log: string, type?: TypeDescriptor, ...optionalParams: any) {
   if (!_enable_log_) return
   console.groupEnd()
   if (!type) {

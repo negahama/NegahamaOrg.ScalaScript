@@ -83,7 +83,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 주어진 인덱스에 있는 배열의 항목을 반환합니다. 마지막 항목부터 셀 수 있는 음의 정수를 허용합니다.
   val at: (index: number) -> T
   // 다른 배열 및/또는 값과 결합된 호출 배열인 새 배열을 반환합니다.
-  val concat: (...value: T) -> T[]
+  val concat: (...value: T[]) -> T[]
   // 배열 내의 배열 요소 시퀀스를 복사하고 변경된 배열을 반환합니다.
   val copyWithin: (target: number, start: number, end?: number) -> T[]
   // 호출 배열의 모든 요소가 테스트 함수를 만족하면 true를 반환합니다.
