@@ -536,11 +536,11 @@ function transpileForStatement(stmt: ast.ForStatement, indent: number): string {
       const e2 = generateExpression(iter.e2, indent)
       let mark = iter.to == 'to' ? '<=' : '<'
       let step = `${name}++`
-      if (iter.step) {
-        if (iter.step >= 0) step = `${name} += ${iter.step}`
-        if (iter.step < 0) {
+      if (iter.stepValue) {
+        if (iter.stepValue >= 0) step = `${name} += ${iter.stepValue}`
+        if (iter.stepValue < 0) {
           mark = iter.to == 'to' ? '>=' : '>'
-          step = `${name} -= ${-iter.step}`
+          step = `${name} -= ${-iter.stepValue}`
         }
       }
       const text = `for (let ${name} = ${e1}; ${name} ${mark} ${e2}; ${step}) `

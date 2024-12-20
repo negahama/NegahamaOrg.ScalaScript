@@ -8,9 +8,9 @@
       "title": "`const reference = (nodeElem as GenericAstNode)[assignment.feature]` at scala-script-lsp\\src\\language\\scala-script-module.ts#142",
       "source": {
         "file": "/scala-script-lsp/src/language/scala-script-module.ts",
-        "startLine": 183,
+        "startLine": 185,
         "startColumn": 0,
-        "endLine": 183,
+        "endLine": 185,
         "endColumn": 74
       },
       "notes": [
@@ -35,9 +35,9 @@
       "title": "`override findDeclaration(sourceCstNode: CstNode): AstNode | undefined {` at scala-script-lsp\\src\\language\\scala-script-module.ts#128",
       "source": {
         "file": "/scala-script-lsp/src/language/scala-script-module.ts",
-        "startLine": 155,
+        "startLine": 157,
         "startColumn": 0,
-        "endLine": 155,
+        "endLine": 157,
         "endColumn": 73
       },
       "notes": [

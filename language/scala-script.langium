@@ -324,9 +324,10 @@ ForStatement:
 
 Iterator: ForOf | ForTo;
 
-// to=Id 대신 to=('to' | 'until')을 사용해야 하지만 to, until이 keyword로 사용되는 것을 막기 위해서 이렇게 한다.
 ForOf: name=Id '<-' of=Expression;
-ForTo: name=Id '<-' e1=Expression to=Id e2=Expression ('step' step=IntegerLiteral2)?;
+// 이것을 parser단계에서 처리되게 다음과 같이 할 수 있지만 그렇게 하면 to, until, step이 키워드로 설정되기 때문에 이 이름을 변수로 사용할 수 없다.
+// ForTo: name=Id '<-' e1=Expression to=('to' | 'until') e2=Expression ('step' stepValue=IntegerLiteral2)?;
+ForTo: name=Id '<-' e1=Expression to=Id e2=Expression (step=Id stepValue=IntegerLiteral2)?;
 
 // step은 마이너스를 포함한 정수값만을 가질 수 있다.
 IntegerLiteral2 returns number:

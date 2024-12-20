@@ -1,3 +1,7 @@
+%%
+import assert from 'assert'
+%%
+
 /**
   TestCase : interface 테스트
 */
@@ -24,12 +28,12 @@ else
 
 // 중괄호 내부에서는 들여쓰기로 블럭을 지정할 수 없다.
 // var f = (a: number) => {
-//   if (a == 0) then
-//     console.log('a == 0')
-//     a = 1
+//   if (toggle == 0) then
+//     console.log('toggle == 0')
+//     toggle = 1
 //   else
-//     console.log('a != 0')
-//     a = 0
+//     console.log('toggle != 0')
+//     toggle = 0
 // }
 
 /**
@@ -52,25 +56,33 @@ def Corp1 = {
 Corp1.process2()
 
 // static 함수 호출이 가능?
+// 타입스크립트에서 static 함수는 클래스명으로만 호출 가능하다.
+// 따라서 corp1.process2()는 타입스크립트에서 에러이다.
 var corp1 = new Corp1()
 corp1.process1()
 corp1.process2()
 
+// 클래스명과 동일한 변수명 사용시
 val f = (Corp1: Corp1) => {
   Corp1.process1()
-  Corp1.process2()
+  Corp1.process2() // 이것도 타입스크립트에서는 에러이다.
 }
 
 // OjectType
 val result: {
-  var 누적매출: number
-  var 누적매입: number
+  var 수입: number
+  var 지출: number
 } = {
-  누적매출: 0
-  누적매입: 0
+  수입: 0
+  지출: 0
 }
+// result = {
+//   수입: 0
+//   지출: '0'
+// }
 
-result.누적매출 += 1
+result.수입 += 1
+// result.지출 += '1'
 
 /**
   TestCase
@@ -88,12 +100,16 @@ def Dept1 = {
   var index: number
   var name: string
 }
+
+%%// array test
 var deptArray: Dept1[] = []
 var deptList2 = deptArray.filter(dept => dept.name != 'myDeptName')
 var deptList3 = deptList2.filter(dept => dept.name == '판매')
 var deptList4 = deptArray.find(dept => dept.name != 'myDeptName')
 
+%%// map test
 var deptTable = new Map<string, Dept1>()
+// Map.get()은 undefined를 반환할 수 있으므로 아래 코드는 타입스크립트에서는 에러가 된다.
 var deptList5 = if (deptTable.get('myDeptName').name.trim()) then deptTable.get('myDeptName') else []
 
 val getDept = (deptName: string) -> Dept1 | nil => {
@@ -146,7 +162,7 @@ TC02(1, '2')
 
 var TC02_ary = [1, 2, 3]
 TC02_ary.push(4, 5)
-//TC02_ary.push('6')
+// TC02_ary.push('6')
 TC02_ary.forEach(num => {
   console.log(num)
 })
@@ -201,7 +217,8 @@ def Corp3 = {
     console.log('process')
   }
 }
-var corps: Corp3[]
+
+var corps: Corp3[] = []
 corps.forEach(corp => corp.process())
 assert(true, 'good')
 
@@ -216,13 +233,16 @@ printSaleDetail('01-01', (corp, sale) => {
   return corp.name .. sale.toString()
 })
 
+/**
+  TestCase : infer parameter test... Binding에 Binding이 포함된 경우
+*/
 def ChainPrompt = {
   var prompt: string
   var callback?: (corp: Corp3, options: string[]) -> void
   var nextChain?: ChainPrompt
 }
 
-val 기업변경_보유기술: ChainPrompt = {
+val 보유기술: ChainPrompt = {
   prompt: '추가할 기술?'
   callback: (corp, options) => { console.log(corp.name, options) }
   nextChain: { prompt: '기술수준?' }
@@ -231,24 +251,25 @@ val 기업변경_보유기술: ChainPrompt = {
 /**
   TestCase : object comparison
 */
+// interface가 아니라 class로 생성되게끔 name에 값을 추가해 준다.
 def TC04_1 = {
-  var name: string
+  var name: string = ''
   var extra: string
 }
 
 // TC04_1과 동일한 element를 가지고 있지만 이름이 다른 object
 def TC04_2 = {
-  var name: string
+  var name: string = ''
   var extra: string
 }
 
 // TC04_1보다 element가 작은 object
 def TC04_3 = {
-  var name: string
+  var name: string = ''
 }
 
 def TC04_4 = {
-  var name: string
+  var name: string = ''
   var kind?: string
   var extra1?: number
   var extra2?: string
@@ -264,18 +285,24 @@ val TC04 = () => {
 
   // 같은 object는 문제될 것이 없다.
   t1 = t1_other
-  if (t1 == t1_other) then 'equal' else 'not equal'
+  var result = if (t1 == t1_other) then 'equal' else 'not equal'
 
   // def로 정의된 object는 이름으로만 판단한다.
   // 즉 elements가 모두 같아도 이름이 다르면 다른 object로 인식하고
   // 반대로 이름이 같으면 elements가 다르더라도 같은 object로 인식한다.
   // t2 = t1
-  // if (t2 == t1) then 'equal' else 'not equal'
+  // result = if (t2 == t1) then 'equal' else 'not equal'
 
   // def로 정의되지 않은 object는 이름과 타입이 모두 같아야 같다
   var t10: { var name: string, var extra: string }
   var t11: { var name: string, var extra: string }
   var t12: { var name: string, var extra: number }
+
+  %%
+  // 스칼라스크립트에서는 타입만 검사하기 때문에 아래 코드가 문제가 안되지만
+  // 타입스크립트에서는 동등 연산자는 타입과 값을 모두 검사하는데
+  // 아래 코드는 값이 할당되어지지 않은 상태라 에러가 된다.
+  %%
   t10 == t11
   // t10 == t12
 
@@ -328,6 +355,8 @@ def SalesHistory = {
       }
     })
   }
+
+  %%// 타입스크립트에서 아래 코드는 필수 프로퍼티가 모두 존재하지 않기 때문에 에러가 된다.
   var add2 = () => {
     // this.sales.push({ date1: 20 })
     this.sales.push({ date: 20 })
@@ -374,4 +403,5 @@ val getAllTech = () => {
   ary.forEach(e => set.add(e))
 }
 
+// 아직 지원하지 않음.
 // [1, 2, 3].forEach(e => console.log(e))

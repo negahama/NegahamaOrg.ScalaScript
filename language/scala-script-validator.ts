@@ -106,6 +106,58 @@ export class ScalaScriptValidator {
   }
 
   /**
+   * Validates a ForStatement node in the AST.
+   *
+   * @param stmt - The ForStatement node to be validated.
+   * @param accept - The ValidationAcceptor used to report validation issues.
+   */
+  checkForStatement(stmt: ast.ForStatement, accept: ValidationAcceptor): void {
+    const log = enterLog('checkForStatement', stmt.$cstNode?.text)
+    stmt.iterators.forEach(iterator => {
+      if (ast.isForOf(iterator)) {
+      } else if (ast.isForTo(iterator)) {
+        if (!(iterator.to == 'to' || iterator.to == 'until')) {
+          const msg = `checkForStatement: '${iterator.to}' is not valid. For-statement can only use 'to' or 'until'.`
+          accept('error', msg, {
+            node: iterator,
+            property: 'to',
+          })
+        } else {
+          const checkNumberType = (e: ast.Expression, property: 'e1' | 'e2') => {
+            let type = TypeSystem.inferType(e)
+            if (!TypeSystem.isNumberType(type)) {
+              const msg =
+                'checkForStatement: For-statement allow the number type for expression. ' +
+                `Type '${type.toString()}' is not assignable to number.`
+              accept('error', msg, {
+                node: iterator,
+                property,
+              })
+            }
+          }
+
+          checkNumberType(iterator.e1, 'e1')
+          checkNumberType(iterator.e2, 'e2')
+        }
+
+        // stepValue가 있으면 `step`이 존재해야 하고 그렇지 않으면 아무것도 없어야 한다.
+        let stepValueError = false
+        if (!iterator.stepValue && iterator.step) stepValueError = true
+        else if (iterator.stepValue && iterator.step != 'step') stepValueError = true
+        if (stepValueError) {
+          const msg = `checkForStatement: For-statement allow for step clause to be only 'step integer'.`
+          accept('error', msg, {
+            node: iterator,
+          })
+        }
+      } else {
+        console.error(chalk.red('internal error'))
+      }
+    })
+    exitLog(log)
+  }
+
+  /**
    * Validates a call chain expression.
    *
    * @param expr - The call chain expression to validate.

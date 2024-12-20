@@ -1207,8 +1207,13 @@ export class TypeSystem {
    */
   static inferTypeForTo(node: ast.ForTo): TypeDescriptor {
     const log = enterLog('inferTypeForTo', node.name)
-    let type = TypeSystem.inferType(node.e1)
-    if (TypeSystem.isArrayType(type)) type = type.elementType
+    let e1 = TypeSystem.inferType(node.e1)
+    let e2 = TypeSystem.inferType(node.e1)
+    if (TypeSystem.isNumberType(e1) && TypeSystem.isNumberType(e2)) {
+      exitLog(log, e1)
+      return e1
+    }
+    const type = new ErrorTypeDescriptor('ForTo loop must have number types', node)
     exitLog(log, type)
     return type
   }
