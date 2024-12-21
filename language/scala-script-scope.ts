@@ -1,7 +1,7 @@
 import { AstNode, AstUtils, DefaultScopeProvider, MapScope, ReferenceInfo, Scope, stream, StreamScope } from 'langium'
 import * as ast from './generated/ast.js'
 import { LangiumServices } from 'langium/lsp'
-import { TypeSystem } from './scala-script-types.js'
+import { ClassTypeDescriptor, ObjectTypeDescriptor, TypeSystem } from './scala-script-types.js'
 import { enterLog, exitLog, traceLog, reduceLog, findVariableDefWithName } from './scala-script-util.js'
 import chalk from 'chalk'
 
@@ -68,10 +68,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // this, super가 [NamedElement:'this'] 인 경우에 호출된다.
     // 지금처럼 keyword 인 경우에는 ref 처리가 되지 않아서 여기가 호출되지 않는다.
     // if (refText === 'this' || refText === 'super') {
-    //   const objectDef = AstUtils.getContainerOfType(context.container, ast.isObjectDef)
-    //   if (objectDef) {
+    //   const classDef = AstUtils.getContainerOfType(context.container, ast.isClassDef)
+    //   if (classDef) {
     //     traceLog('this or super')
-    //     return this.scopeObjectDef(context, undefined, objectDef)
+    //     return this.scopeClass(context, undefined, classDef)
     //   } else {
     //     console.error(chalk.red('this or super is empty in scopes.ts'))
     //     return EMPTY_SCOPE
@@ -99,7 +99,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // if (ast.isCallChain(previous)) {
     //   if (!previous.element || previous.$cstNode?.text == 'this' || previous.$cstNode?.text == 'super') {
     //     let scope: Scope | undefined
-    //     const classItem = AstUtils.getContainerOfType(context.container, ast.isObjectDef)
+    //     const classItem = AstUtils.getContainerOfType(context.container, ast.isClassDef)
     //     if (classItem) scope = this.createScopeForNodes(classItem?.body.elements)
     //     exitLog(scopeLog, undefined, 'Exit1')
     //     return scope ? scope : superScope
@@ -121,14 +121,19 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // union type이면 포함된 타입중에 class, string, ... 등이 있는지 확인하고 있으면 이를 추론 타입으로 사용한다.
     //todo Union type을 이렇게 처리하는 것은 좋지 못하다...
     let classDesc = prevTypeDesc
+    let objectDesc = prevTypeDesc
     let stringDesc = prevTypeDesc
     let numberDesc = prevTypeDesc
     let arrayDesc = prevTypeDesc
     let anyDesc = prevTypeDesc
     if (TypeSystem.isUnionType(prevTypeDesc)) {
       for (const t of prevTypeDesc.elementTypes) {
-        if (TypeSystem.isObjectType(t)) {
+        if (TypeSystem.isClassType(t)) {
           classDesc = t
+          break
+        }
+        if (TypeSystem.isObjectType(t)) {
+          objectDesc = t
           break
         }
         if (TypeSystem.isStringType(t)) {
@@ -153,14 +158,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     traceLog(`Finding scope: curr: ${refText}, previous: '${reduceLog(previous.$cstNode?.text)}'`)
 
     let scope: Scope | undefined
-    if (TypeSystem.isObjectType(classDesc)) {
-      if (ast.isObjectDef(classDesc.node)) {
-        scope = this.scopeObjectDef(context, previous, classDesc.node)
-      } else if (ast.isObjectType(classDesc.node)) {
-        scope = this.scopeObjectType(context, classDesc.node)
-      } else {
-        console.error(chalk.red('internal error in classDesc:', classDesc))
-      }
+    if (TypeSystem.isClassType(classDesc)) {
+      scope = this.scopeClass(context, previous, classDesc)
+    } else if (TypeSystem.isObjectType(objectDesc)) {
+      scope = this.scopeObjectType(context, objectDesc)
     } else if (TypeSystem.isStringType(stringDesc)) {
       scope = this.scopeString(context)
     } else if (TypeSystem.isNumberType(numberDesc)) {
@@ -209,7 +210,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // generic의 추가로 TypeChain에서 superScope로 처리되지 않는 즉 reference가 없는 경우가 생긴다.
     // generic의 Id로 예를들어 T, K, V 등이 사용될때 이것과 동일한 이름의 오브젝트가 존재하는 경우에도 문제가 된다.
     // generic과 관련된 자세한 내용은 scala-script.langium의 generic을 참고한다.
-    const container = AstUtils.getContainerOfType(typeChain, ast.isObjectDef)
+    const container = AstUtils.getContainerOfType(typeChain, ast.isClassDef)
     if (container && container.generic?.types.includes(context.reference.$refText)) {
       const s = this.descriptions.createDescription(typeChain, context.reference.$refText)
       const scope = new MapScope([s])
@@ -229,14 +230,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
 
     //todo 타입인데...
     // 클래스이면 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
-    if (TypeSystem.isObjectType(prevTypeDesc)) {
+    if (TypeSystem.isClassType(prevTypeDesc)) {
       traceLog(`FIND Class: ${previous.$type}, ${prevTypeDesc.node?.$type}`)
       console.log(`FIND Class: ${previous.$type}, ${prevTypeDesc.node?.$type}`)
-      if (!ast.isObjectType(prevTypeDesc.node)) {
-        console.error(chalk.red('internal error: prevTypeDesc is not object type:', prevTypeDesc.node.$type))
-        return
-      }
-      const removedBypass = prevTypeDesc.node.elements.filter(e => !ast.isBypass(e))
+      const removedBypass = prevTypeDesc.node.body.elements.filter(e => !ast.isBypass(e))
       const scope = this.createScopeForNodes(removedBypass)
       exitLog(log, prevTypeDesc, 'Exit6')
       return scope
@@ -247,21 +244,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * 아래 함수들은 모두 동일한 메커니즘으로 동작한다.
    * 예를 들어 corp.process() 이란 구문이 있을 때 현재 값(context.reference)은 process인데
    * 이것의 scope를 제공하기 위해서 corp를 찾는다. 이 과정에서 getScope()가 다시 호출될 수도 있다.
-   * corp의 종류에 따라서 ObjectDef, ObjectType, any type등으로 나눠지지만 모두 corp에서 가능한 모든 이름을 Scope로 리턴한다.
-   */
-  /**
-   * Retrieves the scope for a specific class within the given context.
-   *
-   * @param context - The reference information context.
-   * @param previous - The previous AST expression.
-   * @param object - An optional object definition to use for creating the scope.
-   * @returns The scope associated with the specified class.
-   *
-   * This method first checks if the scope is cached locally. If not, it attempts to create the scope
-   * by examining the class chain and filtering out bypass elements. If the class is found in the global
-   * scope and is exported, it caches and returns the scope. If an object definition is provided, it creates
-   * and caches the scope locally. If none of these conditions are met, it logs an error and returns the
-   * default scope from the superclass.
+   * corp의 종류에 따라서 ClassDef, ObjectType, any type등으로 나눠지지만 모두 corp에서 가능한 모든 이름을 Scope로 리턴한다.
    */
   /*
     이 함수는 previous의 추론 타입이 object이고 ref의 astNode가 ObjectDef인 경우에 호출된다.
@@ -298,13 +281,26 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     scopeObjectDef: Corp, staticOnly: false
     ``` 
   */
-  scopeObjectDef(context: ReferenceInfo, previous: ast.Expression, object: ast.ObjectDef) {
-    const log = enterLog('scopeObjectDef', context.reference.$refText, previous?.$cstNode?.text, object.name)
+  /**
+   * Handles the scoping of a class within the given context.
+   *
+   * @param context - The reference information for the current context.
+   * @param previous - The previous AST expression.
+   * @param type - The descriptor for the class type.
+   * @returns The scope of the class, either global or newly created with options.
+   *
+   * This function determines whether the class should be treated as static based on the name of the previous node and the class name.
+   * If the previous node is a variable or parameter, it is not treated as static.
+   * It then attempts to get the global class scope or creates a new scope with the specified options.
+   */
+  scopeClass(context: ReferenceInfo, previous: ast.Expression, type: ClassTypeDescriptor) {
+    const log = enterLog('scopeClass', context.reference.$refText, previous?.$cstNode?.text, type.node.name)
 
-    // previous와 object의 이름이 동일하면 일단 static으로 처리한다.
+    // previous와 class의 이름이 동일하면 일단 static으로 처리한다.
     let staticOnly = false
+    const className = type.node.name
     const previousNodeText = previous?.$cstNode?.text
-    if (previousNodeText && previousNodeText === object.name) {
+    if (previousNodeText && previousNodeText === className) {
       staticOnly = true
     }
 
@@ -314,10 +310,10 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       staticOnly = false
     }
 
-    // getGlobalObjectDef()는 전역적인 ObjectDef만을 대상으로 하기 때문에
-    // object.name 대신 context.reference.$refText를 사용하면 안된다.
-    let scope = this.getGlobalObjectDef(context, object.name, staticOnly)
-    if (!scope) scope = this.createScopeWithOption(object, { staticOnly })
+    // getGlobalClass()는 전역적인 ClassDef만을 대상으로 하기 때문에
+    // className 대신 context.reference.$refText를 사용하면 안된다.
+    let scope = this.getGlobalClass(context, className, staticOnly)
+    if (!scope) scope = this.createScopeWithOption(type.node, { staticOnly })
 
     // 여러가지 이유로 여기서 제공하는 scope를 매우 정밀하게 하고 싶었다.
     // 예를들면 this.sales.push()에서 push의 scope는 def $array$가 아니라 push() 함수 자체로 한정하고 싶었다.
@@ -331,6 +327,19 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     return scope
   }
 
+  /*
+    이 함수는 previous의 추론 타입이 object이고 ref의 astNode가 ObjectType인 아래와 같은 경우에 호출된다.
+    ```
+    val result: {
+      var 매출: number
+      var 매입: number
+    } = {
+      매출: 0
+      매입: 0
+    }
+    result.매출 += 1
+    ```
+  */
   /**
    * Constructs a scope object for a given context and object type.
    *
@@ -341,24 +350,17 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @param type - The object type for which the scope is being constructed.
    * @returns The constructed scope object.
    */
-  /*
-    이 함수는 previous의 추론 타입이 object이고 ref의 astNode가 ObjectType인 아래와 같은 경우에 호출된다.
-    ```
-    val result: {
-      var 누적매출: number
-      var 누적매입: number
-    } = {
-      누적매출: 0
-      누적매입: 0
-    }
-    result.누적매출 += 1
-    ```
-  */
-  scopeObjectType(context: ReferenceInfo, type: ast.ObjectType) {
-    const log = enterLog('scopeObjectType', type.$cstNode?.text)
+  scopeObjectType(context: ReferenceInfo, type: ObjectTypeDescriptor) {
+    const log = enterLog('scopeObjectType', type.node.$cstNode?.text)
 
-    // 클래스이면 해당 클래스와 이 클래스의 모든 부모 클래스의 모든 멤버들을 스코프로 구성해서 리턴한다.
-    const removedBypass = type.elements.filter(e => !ast.isBypass(e))
+    // 이 함수는 ObjectValue만을 대상으로 한다.
+    if (ast.isObjectValue(type.node)) {
+      console.log(chalk.red('scopeObjectType: internal error, ObjectValue'))
+      exitLog(log)
+      return undefined
+    }
+
+    const removedBypass = type.node.elements.filter(e => !ast.isBypass(e))
     const scope = this.createScopeForNodes(removedBypass)
     exitLog(log)
     return scope
@@ -376,7 +378,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   scopeString(context: ReferenceInfo) {
     const log = enterLog('scopeString')
-    const scope = this.getGlobalObjectDef(context, '$string$', false)
+    const scope = this.getGlobalClass(context, '$string$', false)
     exitLog(log)
     return scope
   }
@@ -389,7 +391,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   scopeNumber(context: ReferenceInfo) {
     const log = enterLog('scopeNumber')
-    const scope = this.getGlobalObjectDef(context, '$number$', false)
+    const scope = this.getGlobalClass(context, '$number$', false)
     exitLog(log)
     return scope
   }
@@ -402,23 +404,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    */
   scopeArray(context: ReferenceInfo) {
     const log = enterLog('scopeArray', context.reference.$refText)
-    const scope = this.getGlobalObjectDef(context, '$array$', false)
+    const scope = this.getGlobalClass(context, '$array$', false)
     exitLog(log)
     return scope
   }
 
-  /**
-   * Creates a scope for any type based on the provided context and previous expression.
-   *
-   * 이 코드는 DefaultScopeProvider의 createScopeForNodes()와 거의 동일하다.
-   * 차이점은 원래 코드는 이름이 없으면 undefined를 리턴하지만 여기서는 이름이 없으면 이름을 생성해서 리턴한다.
-   * 이는 expr이 any type이기 때문에 member 검사를 하지 않고 무조건 멤버가 있다고 보고 처리하는 것이다.
-   * 이것 자체는 문제가 안되는데 이름이 있는 경우에는 문제가 될 수 있다.
-   *
-   * @param context - The reference information used to create the scope.
-   * @param previous - The previous AST expression used as a starting point.
-   * @returns A new scope containing the descriptions of the elements.
-   */
   /*
     아래와 같은 구문에서 any type이 발생한다.
     ```
@@ -437,6 +427,18 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     문제는 이름이 있는 경우이다. 발생한 적이 없는 것 같긴 한데 이름이 있는 경우에는 corp를 넘기고 그렇지 않은 경우
     process를 넘기는 것 자체가 잘못되어져 있고 이름이 있을 경우 process를 다시 확인하는 코드도 없어 보인다.
   */
+  /**
+   * Creates a scope for any type based on the provided context and previous expression.
+   *
+   * 이 코드는 DefaultScopeProvider의 createScopeForNodes()와 거의 동일하다.
+   * 차이점은 원래 코드는 이름이 없으면 undefined를 리턴하지만 여기서는 이름이 없으면 이름을 생성해서 리턴한다.
+   * 이는 expr이 any type이기 때문에 member 검사를 하지 않고 무조건 멤버가 있다고 보고 처리하는 것이다.
+   * 이것 자체는 문제가 안되는데 이름이 있는 경우에는 문제가 될 수 있다.
+   *
+   * @param context - The reference information used to create the scope.
+   * @param previous - The previous AST expression used as a starting point.
+   * @returns A new scope containing the descriptions of the elements.
+   */
   scopeAny(context: ReferenceInfo, previous: ast.Expression) {
     const log = enterLog('scopeAny', `ref text: ${previous.$cstNode?.text}, ${context.reference.$refText}`)
     // for debugging...
@@ -460,23 +462,23 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   /**
    * Creates a scope for the given object definition.
    *
-   * @param obj - The object definition for which the scope is to be created.
+   * @param clazz - The object definition for which the scope is to be created.
    * @param options - Optional parameters to customize the scope creation.
    * @param options.staticOnly - If true, only static members will be included in the scope.
    * @returns The created scope for the given object definition.
    */
   private createScopeWithOption(
-    obj: ast.ObjectDef,
+    clazz: ast.ClassDef,
     options: {
       staticOnly: boolean
     }
   ) {
-    const allMembers = TypeSystem.getClassChain(obj).flatMap(e => e.body.elements)
+    const allMembers = TypeSystem.getClassChain(clazz).flatMap(e => e.body.elements)
     const removedBypass = allMembers.filter(e => !ast.isBypass(e))
     // for debugging...
     // removedBypass.forEach(e => {
-    //   if (ast.isVariableDef(e) || ast.isFunctionDef(e) || ast.isObjectDef(e)) {
-    //     console.log('  getScopeForObjectDef:', e.name)
+    //   if (ast.isVariableDef(e) || ast.isFunctionDef(e) || ast.isClassDef(e)) {
+    //     console.log('  createScopeWithOption:', e.name)
     //   }
     // })
 
@@ -496,11 +498,11 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @param onlyStatic - A boolean indicating whether to retrieve only static definitions.
    * @returns The scope of the global object definition if found and exported, otherwise undefined.
    */
-  private getGlobalObjectDef(context: ReferenceInfo, name: string, onlyStatic: boolean) {
-    const global = this.getGlobalScope('ObjectDef', context)
+  private getGlobalClass(context: ReferenceInfo, name: string, onlyStatic: boolean) {
+    const global = this.getGlobalScope('ClassDef', context)
     const sc = global.getElement(name)
     if (sc) {
-      const node = sc.node as ast.ObjectDef
+      const node = sc.node as ast.ClassDef
       // 비록 Langium의 GlobalScope에는 존재하더라도 export되어진 것이 아니라면 사용하지 않는다.
       if (node.export) {
         return this.createScopeWithOption(node, { staticOnly: onlyStatic })

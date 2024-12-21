@@ -28,13 +28,11 @@ export class ScalaScriptValidator {
     if (stmt.type && stmt.value) {
       const left = TypeSystem.inferType(stmt.type)
       const right = TypeSystem.inferType(stmt.value)
+      traceLog(`checkVariableDef result: ${left.toString()} = ${right.toString()}`)
 
-      const tl = left.toString()
-      const tr = right.toString()
-      traceLog(`checkVariableDef result: ${tl} = ${tr}`)
-
-      if (!right.isAssignableTo(left)) {
-        const msg = `checkVariableDef: Type '${tr}' is not assignable to type '${tl}'.`
+      const errors = right.checkAssignableTo(left)
+      if (errors.length) {
+        const msg = `checkVariableDef: ${errors.join(', ')}`
         accept('error', msg, {
           node: stmt,
           property: 'value',
@@ -90,10 +88,10 @@ export class ScalaScriptValidator {
    * @param stmt - The class declaration object to be checked.
    * @param accept - The validation acceptor to report validation issues.
    */
-  checkObjectDef(stmt: ast.ObjectDef | ast.ObjectValue, accept: ValidationAcceptor): void {
+  checkClassDef(stmt: ast.ClassDef | ast.ObjectValue, accept: ValidationAcceptor): void {
     let log: string
-    if (ast.isObjectDef(stmt)) {
-      log = enterLog('checkObjectDef', stmt.name)
+    if (ast.isClassDef(stmt)) {
+      log = enterLog('checkClassDef', stmt.name)
     } else {
       log = enterLog('checkObjectValue', reduceLog(stmt.$cstNode?.text))
     }
@@ -151,7 +149,7 @@ export class ScalaScriptValidator {
           })
         }
       } else {
-        console.error(chalk.red('internal error'))
+        console.error(chalk.red('internal error in checkForStatement'))
       }
     })
     exitLog(log)
@@ -239,13 +237,13 @@ export class ScalaScriptValidator {
               paramType = param.type.elementType
             }
           }
-          const match = argType.isAssignableTo(paramType)
+          const errors = argType.checkAssignableTo(paramType)
 
-          traceLog(`🚀 index: ${index}, match:`, match)
+          traceLog(`🚀 index: ${index}, match:`, errors)
           traceLog(`🚀   arg: '${reduceLog(arg.$cstNode?.text)}', ${chalk.green(argType.toString())}`)
           traceLog(`🚀   prm: '${param.name}', ${chalk.green(paramType.toString())}`)
 
-          if (!match) {
+          if (errors.length) {
             return (
               `checkCallChain: Function '${funcName}'s` +
               ` parameter '${argType.toString()}' must to be '${paramType.toString()}'.`
@@ -307,7 +305,7 @@ export class ScalaScriptValidator {
       } else if (TypeSystem.isAnyType(type)) {
         // do nothing
       } else {
-        console.error(chalk.red('internal error'))
+        console.error(chalk.red('internal error in checkCallChain'))
       }
     } else {
       // 이름과 타입이 제대로 되어져 있는지 확인용으로 남겨둔다.
@@ -475,7 +473,7 @@ export class ScalaScriptValidator {
       // 그렇다고 해도 숫자형과 boolean형만 가능하다.
       if (operator === '..') {
         if (!r) {
-          console.error(chalk.red('internal error'))
+          console.error(chalk.red('internal error in string concatenation'))
           return false
         }
 
@@ -492,7 +490,7 @@ export class ScalaScriptValidator {
       // - 한 대상의 타입이 nil 타입인 경우 - 모든 타입은 nil 인지를 검사할 수 있다.
       else if (['==', '!='].includes(operator)) {
         if (!r) {
-          console.error(chalk.red('internal error'))
+          console.error(chalk.red('internal error in equality check'))
           return false
         }
 
@@ -515,7 +513,7 @@ export class ScalaScriptValidator {
       // string 간의 비교도 가능한 것으로 한다.
       else if (['**', '*', '/', '%', '<', '<=', '>', '>='].includes(operator)) {
         if (!r) {
-          console.error(chalk.red('internal error'))
+          console.error(chalk.red('internal error in arithmetic or comparison operator'))
           return false
         }
 
@@ -533,7 +531,7 @@ export class ScalaScriptValidator {
       // 모두 이항 연산자이며 boolean 타입과 관련된 연산자이다
       else if (['and', 'or', '&&', '||'].includes(operator)) {
         if (!r) {
-          console.error(chalk.red('internal error'))
+          console.error(chalk.red('internal error in logical operator'))
           return false
         }
 

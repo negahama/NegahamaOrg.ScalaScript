@@ -308,7 +308,7 @@ export function findObjectDefWithName(node: AstNode | undefined, name: string | 
   if (!node || !name) return undefined
   let item: AstNode | undefined = node
   while (item) {
-    const found = AstUtils.streamContents(item).find(i => ast.isObjectDef(i) && i.name === name)
+    const found = AstUtils.streamContents(item).find(i => ast.isClassDef(i) && i.name === name)
     if (found) return found
     item = item.$container
   }

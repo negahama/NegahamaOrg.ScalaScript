@@ -26,9 +26,12 @@ Code: Statement | Expression;
   ArrayValue    | Expression | [ 1, 2, 3 ]
 
   오브젝트
-  ObjectDef     | Definition | def Person = { var name: string, var age: number }
+  ObjectDef     | X          | 오브젝트 자체를 정의하지는 않는다.
   ObjectType    | Type       | { var name: string, var age: number }
   ObjectValue   | Expression | { name: "samuel", age: 20 }
+
+  Class
+  Class Def     | Definition | def Person = { var name: string, var age: number }
 */
 
 //-----------------------------------------------------------------------------
@@ -62,7 +65,7 @@ ArrayType:
   elementType=(ObjectType | PrimitiveType | TypeChain) '[' ']';
 
 /*
-  해당 개체의 타입이 배열형임을 나타내기 위해 사용된다.
+  해당 개체의 타입이 Object형임을 나타내기 위해 사용된다.
   ex) var obj: { name: string, age: number }
 
   //todo 아래 방식이 정석인데 이 방식을 사용하면 모호성 문제가 생긴다. 어떤 차이가 있는걸까?
@@ -72,7 +75,10 @@ ObjectType:
   '{' elements+=ObjectTypeElement* '}';
 
 ObjectTypeElement:
-  (Bypass | VariableDef | FunctionDef | ObjectDef) (',')?;
+  (Bypass | Property) (',')?;
+
+Property:
+  name=Id ':' type=Types;
 
 // 하나의 항목만을 가지는 타입들
 ElementType:
@@ -104,12 +110,12 @@ FunctionType:
   generic은 var table: Map<string, number> 와 같은 구문에서 필요하다.
 */
 TypeChain:
-  reference=[ObjectDef:Id] (generic=GenericValue)? ({infer TypeChain.previous=current} "." reference=[ObjectDef:Id] (generic=GenericValue)?)*;
+  reference=[ClassDef:Id] (generic=GenericValue)? ({infer TypeChain.previous=current} "." reference=[ClassDef:Id] (generic=GenericValue)?)*;
 
 /*
   def Map<K, V> = { ... } 
-  GenericDef의 Id는 [ObjectDef:Id]가 아닌 일반 Id를 사용한다.
-  Generic은 val get: (key: K) -> V 와 같이 타입을 대신하는 K, V 와 같은 이니셜을 사용하는데 이것은 ObjectDef가 아니다.
+  GenericDef의 Id는 [ClassDef:Id]가 아닌 일반 Id를 사용한다.
+  Generic은 val get: (key: K) -> V 와 같이 타입을 대신하는 K, V 와 같은 이니셜을 사용하는데 이것은 ClassDef가 아니다.
   따라서 K, V의 reference는 ScopeProvider에서 직접 생성해 주어야 한다.
 */
 GenericDef:
@@ -119,15 +125,13 @@ GenericDef:
 GenericValue:
   '<' types+=SimpleType (',' types+=SimpleType)* '>';
 
-//todo tuple type을 지원해야 한다.
-// TupleType:
-//   '[' types+=SimpleType (',' types+=SimpleType)* ']';
 
 type NamedElement =
   VariableDef
   | FunctionDef
-  | ObjectDef
+  | ClassDef
   | Parameter
+  | Property
   | Iterator;
 
 //-----------------------------------------------------------------------------
@@ -138,7 +142,7 @@ Statement:
   Bypass
   | VariableDef
   | FunctionDef
-  | ObjectDef
+  | ClassDef
   | DoStatement
   | ForStatement
   | WhileStatement
@@ -242,7 +246,7 @@ fragment FunctionBody:
   타입스크립트와의 호환성을 위해서 함수의 Generic도 지원하고 있다.
 */
 FunctionDef:
-  Annotation? Modifier 'fun' (extension=[ObjectDef:Id] '.')? name=Id (generic=GenericDef)? 
+  Annotation? Modifier 'fun' (extension=[ClassDef:Id] '.')? name=Id (generic=GenericDef)? 
   '=' '(' Parameters? ')' FunctionReturn? FunctionBody?;
 
 /*
@@ -282,34 +286,16 @@ FunctionTypeDef:
   함수나 대입문이 있거나 변수의 값을 초기화하는 경우 클래스로 변환된다.
   자세한 내용은 transpileObjectDef()를 참고
 */
-ObjectDef:
+ClassDef:
   Annotation? (export?='export')?
-  'def' name=Id (generic=GenericDef)? ('extends' superClass=[ObjectDef:Id])?
-  '=' body=ObjectType;
+  'def' name=Id (generic=GenericDef)? ('extends' superClass=[ClassDef:Id])?
+  '=' body=ClassBody;
 
-// ex) var obj = { name : "samuel", age : 20, ...ary }
-ObjectValue:
-  '{' elements+=(Binding)* '}';
+ClassBody:
+  '{' elements+=ClassBodyElement* '}';
 
-/*
-  Binding은 Id : Expression 이거나 또는 ... NamedElement 일 수 있으며 , 는 생략할 수 있다.
-  Binding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
-  Binding의 element는 ObjectType의 element 이름을 사용하기 때문에 Id 대신 [NamedElement:Id]를 사용하면 좋겠지만
-  이것을 처리하려면 ScopeProvider가 매우 복잡해진다. 심지어 불가능해보인다. 예를들면 다음과 같은 코드에서
-  ```
-  def Trade = { var item = 'item' }
-  def Sales = { var trade: Trade }
-  def SalesHistory = {
-    private var sales: Sales[] = []
-    var add = () => { this.sales.push({ trade: { item: 'item1' } }) }
-  }
-  ```
-  this.sales.push() 함수의 인수로 전달되는 ObjectValue(여기서는 { trade: { item: 'item1' } }) 부분)의
-  trade 라는 Binding의 cross-reference를 설정하기 위해서는 먼저 this.sales의 타입을 찾아서 push의 인수가
-  Sales 타입인지를 알아내야 하고 그 다음에 어디에 있을지 모르는 Sales 정의를 찾아서 trade가 Trade 타입인지를 또 알아내야 한다.
-  그래서 그냥 Id를 사용하고 Validator에서 타입체크를 하는 것으로 한다.
-*/
-Binding: (element=Id ':' value=Expression | spread=SpreadExpression) (',')?;
+ClassBodyElement:
+  (Bypass | VariableDef | FunctionDef | ClassDef) (',')?;
 
 // 기타
 //-----------------------------------------------------------------------------
@@ -372,7 +358,6 @@ Expression:
   | SpreadExpression
   | FunctionValue
   | ObjectValue
-  | ArrayValue
   ;
 
 // Binary Operators
@@ -471,6 +456,7 @@ SimpleExpression infers Expression:
   | ThisOrSuper
   | GroupExpression
   | NewExpression
+  | ArrayValue
   | Literal;
 
 /*
@@ -510,7 +496,7 @@ GroupExpression:
 
 // new expression
 NewExpression:
-  'new' class=[ObjectDef:Id] (generic=GenericValue)? '(' (args+=Expression (',' args+=Expression)*)? ')';
+  'new' class=[ClassDef:Id] (generic=GenericValue)? '(' (args+=Expression (',' args+=Expression)*)? ')';
 
 /*
   Literals
@@ -521,6 +507,34 @@ NewExpression:
 */
 Literal:
   value=( 'any' | 'nil' | 'void' | 'true' | 'false' | FloatingPointLiteral | IntegerLiteral | StringLiteral | RegExStringLiteral );
+
+// ex) ary = [ 1, 2, 3 ], [], [ 1, ...ary ]
+ArrayValue:
+  '[' items+=Expression? (',' items+=Expression )* ']';
+
+// ex) var obj = { name : "samuel", age : 20, ...ary }
+ObjectValue:
+  '{' elements+=(Binding)* '}';
+
+/*
+  Binding은 Id : Expression 이거나 또는 ... NamedElement 일 수 있으며 , 는 생략할 수 있다.
+  Binding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
+  Binding의 element는 Property의 name을 사용하기 때문에 Id 대신 [Property:Id]를 사용하면 좋겠지만
+  이것을 처리하려면 ScopeProvider가 매우 복잡해진다. 심지어 불가능해보인다. 예를들면 다음과 같은 코드에서
+  ```
+  def Trade = { item = 'item' }
+  def Sales = { trade: Trade }
+  def SalesHistory = {
+    private var sales: Sales[] = []
+    var add = () => { this.sales.push({ trade: { item: 'item1' } }) }
+  }
+  ```
+  this.sales.push() 함수의 인수로 전달되는 ObjectValue(여기서는 { trade: { item: 'item1' } }) 부분)의
+  trade 라는 Binding의 cross-reference를 설정하기 위해서는 먼저 this.sales의 타입을 찾아서 push의 인수가
+  Sales 타입인지를 알아내야 하고 그 다음에 어디에 있을지 모르는 Sales 정의를 찾아서 trade가 Trade 타입인지를 또 알아내야 한다.
+  그래서 그냥 Id를 사용하고 Validator에서 타입체크를 하는 것으로 한다.
+*/
+Binding: (element=Id ':' value=Expression | spread=SpreadExpression) (',')?;
 
 // 이 규칙이 UnaryExpression과 독립적인 것은 연산 우선 순위가 다르기 때문이다.
 LogicalNot:
@@ -574,10 +588,6 @@ ReturnExpression:
 // spread의 대상은 object, variable, parameter, iterator가 가능하다.
 SpreadExpression:
   '...' spread=[NamedElement:Id];
-
-// ex) ary = [ 1, 2, 3 ], [], [ 1, ...ary ]
-ArrayValue:
-  '[' items+=Expression? (',' items+=Expression )* ']';
 
 //-----------------------------------------------------------------------------
 // terminal & literal

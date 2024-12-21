@@ -22,13 +22,25 @@ export class TypeDescriptor {
     return this.$type === other.$type
   }
 
+  // this를 other에 assignment할 수 있는지를 판단한다.
+  // assignment 여부에만 관심이 있으면 이 함수를 사용한다.
+  // 그러면 이 함수에서 직접 checkAssignableTo를 호출하고 그 결과를 boolean으로 리턴해 준다.
+  // 하지만 이유도 처리해야 하는 경우라면 checkAssignableTo를 직접 호출해야 한다.
   isAssignableTo(other: TypeDescriptor): boolean {
-    if (this.$type == 'any' || other.$type == 'any') return true
+    const errors = this.checkAssignableTo(other)
+    if (errors.length == 0) return true
+    return false
+  }
+
+  checkAssignableTo(other: TypeDescriptor): string[] {
+    if (this.$type == 'any' || other.$type == 'any') return []
     if (other.$type == 'union') {
       const union = other as UnionTypeDescriptor
-      if (union.elementTypes.some(e => this.isAssignableTo(e))) return true
+      if (union.elementTypes.some(e => this.isAssignableTo(e))) return []
+      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
     }
-    return this.isEqual(other)
+    if (this.isEqual(other)) return []
+    return [`Type ${this.toString()} is not equal ${other.toString()}`]
   }
 }
 
@@ -46,8 +58,8 @@ export class AnyTypeDescriptor extends TypeDescriptor {
     return true
   }
 
-  override isAssignableTo(other: TypeDescriptor): boolean {
-    return true
+  override checkAssignableTo(other: TypeDescriptor): string[] {
+    return []
   }
 }
 
@@ -164,15 +176,19 @@ export class UnionTypeDescriptor extends TypeDescriptor {
    * var u: string | number
    * if (typeof u == 'number') n = u else s = u
    */
-  override isAssignableTo(other: TypeDescriptor): boolean {
-    if (other.$type == 'any') return true
+  override checkAssignableTo(other: TypeDescriptor): string[] {
+    const errors: string[] = []
+    if (other.$type == 'any') return []
     if (other.$type == 'union') {
       const union = other as UnionTypeDescriptor
-      if (this.elementTypes.some(e => union.isContain(e))) return true
+      // this.elementType 중에 하나라도 other에 포함되어 있으면 assignable이다.
+      if (this.elementTypes.some(e => union.isContain(e))) return []
+      else errors.push(`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`)
     } else {
-      if (this.elementTypes.some(e => e.isEqual(other))) return true
+      if (this.elementTypes.some(e => e.isEqual(other))) return []
+      else errors.push(`Type ${this.toString()} is not equal ${other.toString()}`)
     }
-    return false
+    return errors
   }
 
   isContain(type: TypeDescriptor): boolean {
@@ -218,6 +234,32 @@ export class ArrayTypeDescriptor extends TypeDescriptor {
     if (other.$type !== 'array') return false
     const otherArray = other as ArrayTypeDescriptor
     return this.elementType.isEqual(otherArray.elementType)
+  }
+
+  /**
+   * Determines if the current type is assignable to another type.
+   *
+   * @param other - The type to check against.
+   * @returns `true` if the current type is assignable to the other type, otherwise `false`.
+   *
+   * The method checks the following conditions:
+   * - If the other type is 'any', it returns `true`.
+   * - If the other type is a union type, it returns `true` if any element type in the union is equal to the current type.
+   * - If the other type is an object type, it checks if both types are object definitions and if the current type is in the class chain of the other type.
+   * - If none of the above conditions are met, it returns `false`.
+   */
+  override checkAssignableTo(other: TypeDescriptor): string[] {
+    if (other.$type == 'any') return []
+    if (other.$type == 'union') {
+      const union = other as UnionTypeDescriptor
+      if (union.elementTypes.some(e => e.isEqual(this))) return []
+      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
+    }
+    if (other.$type == 'array') {
+      const otherArray = other as ArrayTypeDescriptor
+      return this.elementType.checkAssignableTo(otherArray.elementType)
+    }
+    return [`Type ${this.toString()} can not be compared with ${other.toString()}`]
   }
 }
 
@@ -281,7 +323,7 @@ export class FunctionTypeDescriptor extends TypeDescriptor {
       defaultValue: e.value,
     }))
 
-    // ObjectDef, FunctionDef에서 정의되어진 것들은 디폴트로 AnyTypeDescritption을 가지고 있다가
+    // ClassDef, FunctionDef에서 정의되어진 것들은 디폴트로 AnyTypeDescritption을 가지고 있다가
     // NewExpression에서 실제 타입으로 대체된다.
     this.generic = []
     if (ast.isFunctionDef(node)) {
@@ -351,25 +393,27 @@ export class FunctionTypeDescriptor extends TypeDescriptor {
    *   - Logs errors for any mismatched parameters.
    * - Returns `false` if none of the above conditions are met.
    */
-  override isAssignableTo(other: TypeDescriptor): boolean {
-    if (other.$type == 'any') return true
+  override checkAssignableTo(other: TypeDescriptor): string[] {
+    if (other.$type == 'any') return []
     if (other.$type == 'union') {
       const union = other as UnionTypeDescriptor
-      if (union.elementTypes.some(e => e.isEqual(this))) return true
+      if (union.elementTypes.some(e => e.isEqual(this))) return []
+      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
     }
     if (other.$type == 'function') {
       const otherFunction = other as FunctionTypeDescriptor
-      if (!this.returnType.isAssignableTo(otherFunction.returnType)) {
+      const result = this.returnType.checkAssignableTo(otherFunction.returnType)
+      if (result.length > 0) {
         console.log(
           chalk.red('returnType is not assignable:'),
           this.returnType.toString(),
           otherFunction.returnType.toString()
         )
-        return false
+        return result
       }
       if (this.parameters.find(p => p.spread) || otherFunction.parameters.find(p => p.spread)) {
         // spread가 있으면 타입 체크를 하지 않는다.
-        return true
+        return []
       }
 
       const getOtherParam = (index: number) => {
@@ -377,38 +421,40 @@ export class FunctionTypeDescriptor extends TypeDescriptor {
         return otherFunction.parameters[index].type
       }
 
-      let matchAll = true
+      const errors: string[] = []
       this.parameters.forEach((p, i) => {
         // nullable이나 defaultValue가 없는 파라미터는 다른 함수에서도 존재해야 한다.
         if (!(p.nullable || p.defaultValue)) {
           const otherParam = getOtherParam(i)
           if (!otherParam) {
-            console.log(chalk.red('otherParam is not exist:'), i)
-            matchAll = false
+            console.log(chalk.red('otherParam does not exist:'), i)
+            errors.push('otherParam does not exist')
           } else {
-            if (!p.type.isAssignableTo(otherParam)) {
+            const result = p.type.checkAssignableTo(otherParam)
+            if (result.length > 0) {
               console.log(chalk.red('parameter type is not assignable:'), p.type.toString(), otherParam.toString())
-              matchAll = false
+              errors.concat(result)
             }
           }
         } else {
           // 다른 함수에서 이 파라미터가 없어도 되지만 있다면 타입이 같아야 한다.
           const otherParam = getOtherParam(i)
           if (otherParam) {
-            if (!p.type.isAssignableTo(otherParam)) {
+            const result = p.type.checkAssignableTo(otherParam)
+            if (result.length > 0) {
               console.log(
                 chalk.red('nullable or defaultValue parameter type is not assignable:'),
                 p.type.toString(),
                 otherParam.toString()
               )
-              matchAll = false
+              errors.concat(result)
             }
           }
         }
       })
-      return matchAll
+      return errors
     }
-    return false
+    return [`function can not be assignable to ${other.toString()}`]
   }
 
   /**
@@ -441,27 +487,16 @@ export class FunctionTypeDescriptor extends TypeDescriptor {
  *
  * @extends TypeDescriptor
  * @property {string} $type - The type identifier, which is always 'object'.
- * @property {ast.ObjectDef | ast.ObjectType | ast.ObjectValue} node - The literal representation of the object type.
- * @property {GenericTypeDescription[]} generic - The list of generic infomation that the function accepts.
+ * @property {ast.ObjectType | ast.ObjectValue} node - The literal representation of the object type.
  */
 export class ObjectTypeDescriptor extends TypeDescriptor {
-  generic: GenericTypeDescriptor[]
-
   /**
-   * Constructs an instance of the class with the given AST node.
+   * Constructs an instance of the object with the given AST node.
    *
-   * @param node - The AST node which can be of type `ObjectDef`, `ObjectType`, or `ObjectValue`.
-   *
-   * If the node is of type `ObjectDef`, the `generic` property is populated with an array of
-   * `GenericTypeDescription` instances created from the generic types defined in the node.
+   * @param node - The AST node which can be of type `ObjectType`, or `ObjectValue`.
    */
-  constructor(public node: ast.ObjectDef | ast.ObjectType | ast.ObjectValue) {
+  constructor(public node: ast.ObjectType | ast.ObjectValue) {
     super('object')
-
-    this.generic = []
-    if (ast.isObjectDef(node)) {
-      this.generic = node.generic?.types.map(name => new GenericTypeDescriptor(name)) ?? []
-    }
   }
 
   /**
@@ -472,11 +507,8 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
    *                   Otherwise, returns a string representation of the element list in the format '{ name1, name2, ... }'.
    */
   override toString(): string {
-    if (ast.isObjectDef(this.node)) return this.node.name
-    else {
-      const names = this.getElementList().map(e => e.name)
-      return '{ ' + names.join(', ') + ' }'
-    }
+    const names = this.getElementList().map(e => e.name)
+    return '{ ' + names.join(', ') + ' }'
   }
 
   /**
@@ -497,26 +529,21 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
   override isEqual(other: TypeDescriptor): boolean {
     if (other.$type !== 'object') return false
     const otherObject = other as ObjectTypeDescriptor
-    if (ast.isObjectDef(this.node) && ast.isObjectDef(otherObject.node)) {
-      //todo 이름만 같으면 같다고 할 수 있을까?
-      if (this.node.name !== otherObject.node.name) return false
-    } else {
-      const otherElements = otherObject.getElementList()
-      for (let e of this.getElementList()) {
-        const found = otherElements.find(o => o.name == e.name)
-        if (!found) {
-          console.log(chalk.red('이름이 없음:'), e.name, reduceLog(e.node.$cstNode?.text))
-          return false
-        }
-        // 동일한 이름이 있으면 타입도 같아야 한다.
-        const t1 = TypeSystem.inferType(e.node)
-        const t2 = TypeSystem.inferType(found.node)
-        if (!t1.isEqual(t2)) {
-          console.log(chalk.red('타입이 다름:'), e.name)
-          console.log('  t1:', chalk.green(t1.toString()), reduceLog(e.node.$cstNode?.text))
-          console.log('  t2:', chalk.green(t2.toString()), reduceLog(found.node.$cstNode?.text))
-          return false
-        }
+    const otherElements = otherObject.getElementList()
+    for (let e of this.getElementList()) {
+      const found = otherElements.find(o => o.name == e.name)
+      if (!found) {
+        console.log(chalk.red('이름이 없음:'), e.name, reduceLog(e.node.$cstNode?.text))
+        return false
+      }
+      // 동일한 이름이 있으면 타입도 같아야 한다.
+      const t1 = TypeSystem.inferType(e.node)
+      const t2 = TypeSystem.inferType(found.node)
+      if (!t1.isEqual(t2)) {
+        console.log(chalk.red('타입이 다름:'), e.name)
+        console.log('  t1:', chalk.green(t1.toString()), reduceLog(e.node.$cstNode?.text))
+        console.log('  t2:', chalk.green(t2.toString()), reduceLog(found.node.$cstNode?.text))
+        return false
       }
     }
     return true
@@ -534,45 +561,68 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
    * - If the other type is an object type, it checks if both types are object definitions and if the current type is in the class chain of the other type.
    * - If none of the above conditions are met, it returns `false`.
    */
-  override isAssignableTo(other: TypeDescriptor): boolean {
-    if (other.$type == 'any') return true
+  override checkAssignableTo(other: TypeDescriptor): string[] {
+    if (other.$type == 'any') return []
     if (other.$type == 'union') {
       const union = other as UnionTypeDescriptor
-      if (union.elementTypes.some(e => e.isEqual(this))) return true
+      if (union.elementTypes.some(e => e.isEqual(this))) return []
+      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
     }
+
     if (other.$type == 'object') {
       const otherObject = other as ObjectTypeDescriptor
-      if (ast.isObjectDef(this.node) && ast.isObjectDef(otherObject.node)) {
-        // 동일하거나 상속관계인 경우(자식이 부모 클래스에)만 assignable이다.
-        return TypeSystem.getClassChain(this.node).includes(otherObject.node)
+      const errors: string[] = []
+      const otherElements = otherObject.getElementList()
+      for (let e of this.getElementList()) {
+        const found = otherElements.find(o => o.name == e.name)
+        if (!found) {
+          errors.push(`Element '${e.name}' does not exist in type '${otherObject.toString()}'`)
+          break
+        }
+        // 동일한 이름이 있으면 타입도 같아야 한다.
+        const t1 = TypeSystem.inferType(e.node)
+        const t2 = TypeSystem.inferType(found.node)
+        if (!t1.isAssignableTo(t2)) {
+          errors.push(`Element '${e.name}'s types are different(${t1.toString()}, ${t2.toString()})`)
+        }
       }
-      return this.isEqual(other)
+      return errors
     }
-    return false
+
+    // ObjectValue는 Class에 assignable이 가능하다.
+    if (other.$type == 'class') {
+      const otherClass = other as ClassTypeDescriptor
+      const errors: string[] = []
+      const otherElements = otherClass.getElementList()
+      for (let e of this.getElementList()) {
+        const found = otherElements.find(o => o.name == e.name)
+        if (!found) {
+          errors.push(`Element '${e.name}' does not exist in type '${otherClass.toString()}'`)
+          break
+        }
+        // 동일한 이름이 있으면 타입도 같아야 한다.
+        const t1 = TypeSystem.inferType(e.node)
+        const t2 = TypeSystem.inferType(found.node)
+        if (!t1.isAssignableTo(t2)) {
+          errors.push(`Element '${e.name}'s types are different(${t1.toString()}, ${t2.toString()})`)
+        }
+      }
+      return errors
+    }
+    return [`Type ${this.toString()} can not be compared with ${other.toString()}`]
   }
 
   /**
    * Retrieves a list of elements from the current node.
-   * The elements can be of type VariableDef, FunctionDef, ObjectDef, or Binding.
-   *
-   * ObjectDef, ObjectType, ObjectValue의 element들을 리턴한다.
-   * ObjectDef, ObjectType는 서로 동일하기 때문에 Bypass를 제거하고 리턴하면 되는데
-   * ObjectValue는 Binding 개체이고 둘과는 다르다.
-   *
-   * Depending on the type of the current node, it processes the elements differently:
-   * - If the node is an ObjectDef, it iterates over the body elements and adds them to the list if they are not bypassed.
-   * - If the node is an ObjectType, it iterates over the elements and adds them to the list if they are not bypassed.
-   * - If the node is an ObjectValue, it iterates over the elements and adds them to the list if both element and value are present.
    *
    * @returns An array of objects, each containing the name and node of the element.
    */
   getElementList() {
-    const list: { name: string; node: ast.VariableDef | ast.FunctionDef | ast.ObjectDef | ast.Binding }[] = []
-    if (ast.isObjectDef(this.node)) {
-      this.node.body.elements.forEach(e => {
-        if (!ast.isBypass(e)) list.push({ name: e.name, node: e })
-      })
-    } else if (ast.isObjectType(this.node)) {
+    const list: {
+      name: string
+      node: ast.Property | ast.Binding
+    }[] = []
+    if (ast.isObjectType(this.node)) {
       this.node.elements.forEach(e => {
         if (!ast.isBypass(e)) list.push({ name: e.name, node: e })
       })
@@ -590,6 +640,119 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
     }
     return list
   }
+}
+
+/**
+ * Represents a description of an class type in the ScalaScript language.
+ *
+ * This class extends the `TypeDescription` class and provides additional functionality
+ * for handling class types, including generic types and element lists.
+ *
+ * @extends TypeDescriptor
+ * @property {string} $type - The type identifier, which is always 'class'.
+ * @property {ast.ClassDef} node - The literal representation of the class type.
+ */
+export class ClassTypeDescriptor extends TypeDescriptor {
+  generic: GenericTypeDescriptor[]
+
+  /**
+   * Constructs an instance of the class with the given AST node.
+   *
+   * @param node - The AST node which can be of type `ClassDef`.
+   *
+   * If the node is of type `ClassDef`, the `generic` property is populated with an array of
+   * `GenericTypeDescription` instances created from the generic types defined in the node.
+   */
+  constructor(public node: ast.ClassDef) {
+    super('class')
+
+    this.generic = []
+    if (ast.isClassDef(node)) {
+      this.generic = node.generic?.types.map(name => new GenericTypeDescriptor(name)) ?? []
+    }
+  }
+
+  /**
+   * Returns a string representation of the class.
+   *
+   * @override
+   * @returns {string} returns the name of the class.
+   */
+  override toString(): string {
+    return this.node.name
+  }
+
+  /**
+   * Checks if the current `TypeDescription` is equal to another `TypeDescription`.
+   *
+   * @param other - The other `TypeDescription` to compare with.
+   * @returns `true` if the types are considered equal, `false` otherwise.
+   *
+   * The comparison is based on the following criteria:
+   * - If the `other` type is not an class, returns `false`.
+   * - If both types are class definitions, their names must be the same.
+   * - Otherwise, it compares the elements of both types:
+   *   - Each element in the current type must have a corresponding element with the same name in the `other` type.
+   *   - The types of corresponding elements must also be equal.
+   *
+   * Logs differences in names and types to the console for debugging purposes.
+   */
+  override isEqual(other: TypeDescriptor): boolean {
+    if (other.$type !== 'class') return false
+    const otherClass = other as ClassTypeDescriptor
+    if (ast.isClassDef(this.node) && ast.isClassDef(otherClass.node)) {
+      //todo 이름만 같으면 같다고 할 수 있을까?
+      if (this.node.name !== otherClass.node.name) return false
+    }
+    return true
+  }
+
+  /**
+   * Determines if the current type is assignable to another type.
+   *
+   * @param other - The type to check against.
+   * @returns `true` if the current type is assignable to the other type, otherwise `false`.
+   *
+   * The method checks the following conditions:
+   * - If the other type is 'any', it returns `true`.
+   * - If the other type is a union type, it returns `true` if any element type in the union is equal to the current type.
+   * - If the other type is an object type, it checks if both types are object definitions and if the current type is in the class chain of the other type.
+   * - If none of the above conditions are met, it returns `false`.
+   */
+  override checkAssignableTo(other: TypeDescriptor): string[] {
+    if (other.$type == 'any') return []
+    if (other.$type == 'union') {
+      const union = other as UnionTypeDescriptor
+      if (union.elementTypes.some(e => e.isEqual(this))) return []
+      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
+    }
+
+    if (other.$type == 'class') {
+      const otherClass = other as ClassTypeDescriptor
+      if (ast.isClassDef(this.node) && ast.isClassDef(otherClass.node)) {
+        // 동일하거나 상속관계인 경우(자식이 부모 클래스에)만 assignable이다.
+        if (TypeSystem.getClassChain(this.node).includes(otherClass.node)) return []
+        else return [`Object ${otherClass.toString()} is not super class of ${this.toString()} in class chain`]
+      }
+    }
+    return [`Type ${this.toString()} can not be compared with ${other.toString()}`]
+  }
+
+  /**
+   * Retrieves a list of elements from the current node.
+   *
+   * @returns An array of objects, each containing the name and node of the element.
+   */
+  getElementList() {
+    const list: {
+      name: string
+      node: ast.VariableDef | ast.FunctionDef | ast.ClassDef
+    }[] = []
+    this.node.body.elements.forEach(e => {
+      if (!ast.isBypass(e)) list.push({ name: e.name, node: e })
+    })
+    return list
+  }
 
   /**
    * Retrieves the type descriptor of a specified element within an object definition.
@@ -600,15 +763,13 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
    */
   getElementType(elementName: string): TypeDescriptor | undefined {
     let type: TypeDescriptor | undefined = undefined
-    if (ast.isObjectDef(this.node)) {
-      this.node.body.elements.forEach(e => {
-        if (!ast.isBypass(e)) {
-          if (e.name == elementName) {
-            type = TypeSystem.inferType(e)
-          }
+    this.node.body.elements.forEach(e => {
+      if (!ast.isBypass(e)) {
+        if (e.name == elementName) {
+          type = TypeSystem.inferType(e)
         }
-      })
-    }
+      }
+    })
     return type
   }
 }
@@ -766,6 +927,16 @@ export class TypeSystem {
   }
 
   /**
+   * Determines if the given `TypeDescription` item is of type `ClassTypeDescription`.
+   *
+   * @param item - The `TypeDescription` item to check.
+   * @returns A boolean indicating whether the item is a `ClassTypeDescription`.
+   */
+  static isClassType(item: TypeDescriptor): item is ClassTypeDescriptor {
+    return item.$type === 'class'
+  }
+
+  /**
    * Determines if the given type description is an error type.
    *
    * @param item - The type description to check.
@@ -822,12 +993,14 @@ export class TypeSystem {
       type = TypeSystem.inferTypeVariableDef(node)
     } else if (ast.isFunctionDef(node)) {
       type = TypeSystem.inferTypeFunctionDef(node)
-    } else if (ast.isObjectDef(node)) {
-      type = TypeSystem.inferTypeObjectDef(node)
+    } else if (ast.isClassDef(node)) {
+      type = TypeSystem.inferTypeClassDef(node)
     } else if (ast.isCallChain(node)) {
       type = TypeSystem.inferTypeCallChain(node)
     } else if (ast.isParameter(node)) {
       type = TypeSystem.inferTypeParameter(node)
+    } else if (ast.isProperty(node)) {
+      type = TypeSystem.inferTypeProperty(node)
     } else if (ast.isBinding(node)) {
       type = TypeSystem.inferTypeBinding(node)
     } else if (ast.isForOf(node)) {
@@ -948,13 +1121,13 @@ export class TypeSystem {
         traceLog('Type is reference')
         if (node.reference.ref) {
           const ref = node.reference.ref
-          if (ast.isObjectDef(ref)) {
-            type = new ObjectTypeDescriptor(ref)
+          if (ast.isClassDef(ref)) {
+            type = new ClassTypeDescriptor(ref)
           }
         }
         if (TypeSystem.isErrorType(type)) {
           // type 중에 ref가 없는 것은 Generic일 가능성이 있다.
-          const container = AstUtils.getContainerOfType(node, ast.isObjectDef)
+          const container = AstUtils.getContainerOfType(node, ast.isClassDef)
           if (container && container.generic?.types.includes(node.reference.$refText)) {
             type = new GenericTypeDescriptor(node.reference.$refText)
           } else console.error(chalk.red('node.reference.ref is not valid:', node.reference.$refText))
@@ -999,9 +1172,9 @@ export class TypeSystem {
    * @param node - The AST node representing the object definition.
    * @returns The inferred type description for the object.
    */
-  static inferTypeObjectDef(node: ast.ObjectDef): TypeDescriptor {
-    const log = enterLog('inferTypeObjectDef', node.name)
-    const type = new ObjectTypeDescriptor(node)
+  static inferTypeClassDef(node: ast.ClassDef): TypeDescriptor {
+    const log = enterLog('inferTypeClassDef', node.name)
+    const type = new ClassTypeDescriptor(node)
     exitLog(log, type)
     return type
   }
@@ -1061,11 +1234,11 @@ export class TypeSystem {
     // this, super인 경우
     else if (node.$cstNode?.text == 'this' || node.$cstNode?.text == 'super') {
       let foundClass = false
-      const classItem = AstUtils.getContainerOfType(node, ast.isObjectDef)
+      const classItem = AstUtils.getContainerOfType(node, ast.isClassDef)
       if (classItem) {
         if (node.$cstNode?.text == 'this') {
           traceLog(`'this' refers ${classItem.name}`)
-          type = new ObjectTypeDescriptor(classItem)
+          type = new ClassTypeDescriptor(classItem)
           foundClass = true
         } else if (node.$cstNode?.text == 'super') {
           // super는 현재 클래스의 부모 클래스를 찾는다.
@@ -1074,10 +1247,10 @@ export class TypeSystem {
           if (classChain.length > 0) {
             const superClass = classChain[0]
             traceLog(`'super' refers ${superClass.name}`)
-            type = new ObjectTypeDescriptor(superClass)
+            type = new ClassTypeDescriptor(superClass)
             foundClass = true
-            console.log(`'super' refers ${superClass.name}`)
-            classChain.forEach(c => console.log(`  - ${c.name}`))
+            // console.log(`'super' refers ${superClass.name}`)
+            // classChain.forEach(c => console.log(`  - ${c.name}`))
           }
         }
       }
@@ -1088,7 +1261,7 @@ export class TypeSystem {
         let item: AstNode | undefined = node
         while (item) {
           console.log(chalk.green(reduceLog(`  ${item.$type}: ${item.$cstNode?.text}`)))
-          if (ast.isObjectDef(item)) break
+          if (ast.isClassDef(item)) break
           item = item.$container
         }
       }
@@ -1174,6 +1347,19 @@ export class TypeSystem {
         }
       }
     }
+    exitLog(log, type)
+    return type
+  }
+
+  /**
+   * Infers the type of a given property node.
+   *
+   * @param node - The AST property node for which the type needs to be inferred.
+   * @returns The inferred type descriptor for the given property node.
+   */
+  static inferTypeProperty(node: ast.Property): TypeDescriptor {
+    const log = enterLog('inferTypeProperty', node.name)
+    const type = TypeSystem.inferType(node.type)
     exitLog(log, type)
     return type
   }
@@ -1417,11 +1603,11 @@ export class TypeSystem {
   static inferTypeNewExpression(node: ast.NewExpression): TypeDescriptor {
     const log = enterLog('inferTypeNewExpression', node.class.$refText)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
-    if (node.class.ref) type = new ObjectTypeDescriptor(node.class.ref)
+    if (node.class.ref) type = new ClassTypeDescriptor(node.class.ref)
 
     // new Array<number>()와 같은 경우에는 ArrayTypeDescription으로 변경해 준다.
     // generic이 있으면 generic의 타입을 element type으로 사용하고 없으면 any type으로 처리한다.
-    if (TypeSystem.isObjectType(type) && node.class.$refText === 'Array') {
+    if (TypeSystem.isClassType(type) && node.class.$refText === 'Array') {
       if (node.generic) {
         assert(node.generic.types.length === 1, 'Array type must have one generic type')
         const t = TypeSystem.inferType(node.generic.types[0])
@@ -1432,8 +1618,8 @@ export class TypeSystem {
     }
 
     // 생성시 generic정보가 있으면 오브젝트의 타입에 이를 추가한다.
-    // new Set<string>(), new Set<number>()와 같은 경우에도 ObjectTypeDescription은 동일하지 않기 때문에 상관없다.
-    if (node.generic && TypeSystem.isObjectType(type)) {
+    // new Set<string>(), new Set<number>()와 같은 경우에도 ClassTypeDescription은 동일하지 않기 때문에 상관없다.
+    if (node.generic && TypeSystem.isClassType(type)) {
       type.generic = node.generic.types.map((g, index) => {
         const t = TypeSystem.inferType(g)
         return new GenericTypeDescriptor(index.toString(), t)
@@ -1464,7 +1650,7 @@ export class TypeSystem {
         // 배열 안에서 spread가 사용되면 spread를 풀어서 처리해야 한다.
         if (ast.isSpreadExpression(item)) {
           const spreadType = TypeSystem.inferType(item)
-          if (TypeSystem.isObjectType(spreadType)) types.push(new AnyTypeDescriptor())
+          if (TypeSystem.isClassType(spreadType)) types.push(new AnyTypeDescriptor())
           else if (TypeSystem.isArrayType(spreadType)) types.push(spreadType.elementType)
           else types.push(spreadType)
         } else types.push(TypeSystem.inferType(item))
@@ -1596,12 +1782,12 @@ export class TypeSystem {
    * Retrieves the chain of superclasses for a given class item.
    *
    * @param classItem - The class item for which to retrieve the superclass chain.
-   * @returns An array of `ast.ObjectDef` representing the chain of superclasses,
+   * @returns An array of `ast.ClassDef` representing the chain of superclasses,
    *          starting from the given class item and following the `superClass` references.
    */
-  static getClassChain(classItem: ast.ObjectDef): ast.ObjectDef[] {
-    const set = new Set<ast.ObjectDef>()
-    let value: ast.ObjectDef | undefined = classItem
+  static getClassChain(classItem: ast.ClassDef): ast.ClassDef[] {
+    const set = new Set<ast.ClassDef>()
+    let value: ast.ClassDef | undefined = classItem
     while (value && !set.has(value)) {
       set.add(value)
       value = value.superClass?.ref
@@ -1741,9 +1927,9 @@ export class TypeSystem {
           assert.ok(ast.isVariableDef(nodeRef) || ast.isFunctionDef(nodeRef), 'it is not valid definition')
           assert.ok(TypeSystem.isFunctionType(funcType), `'${nodeName}' is not function`)
 
-          // VariableDef의 container는 ObjectType이고 그 위에가 ObjectDef이다.
+          // VariableDef의 container는 ClassBody이고 그 위에가 ClassDef이다.
           const grandContainer = nodeRef?.$container?.$container
-          if (grandContainer && ast.isObjectDef(grandContainer)) {
+          if (grandContainer && ast.isClassDef(grandContainer)) {
             // array이기 때문에 generic이 하나일 것으로 가정하고 있다.
             // Array.map()인 경우에는 타입이 변경될 수 있으므로 any type으로 처리한다.
             let t = prevType.elementType
@@ -1752,7 +1938,7 @@ export class TypeSystem {
             generic.push({ name: grandContainer.generic?.types[0], type: t })
             isProcessed = true
           } else gather.add('error1', `'${nodeName}'s grandContainer is not object`)
-        } else if (TypeSystem.isObjectType(prevType)) {
+        } else if (TypeSystem.isClassType(prevType)) {
           if (prevType.toString() == 'Map' || prevType.toString() == 'Set') {
             funcType = TypeSystem.inferType(nodeRef)
             assert.ok(ast.isVariableDef(nodeRef) || ast.isFunctionDef(nodeRef), 'it is not valid definition')
@@ -1761,7 +1947,7 @@ export class TypeSystem {
             // Map, Set은 prevType에 NewExpression에서 설정된 generic 정보가 있다.
             let genericIds: string[] = []
             const grandContainer = nodeRef.$container?.$container
-            if (grandContainer && ast.isObjectDef(grandContainer)) {
+            if (grandContainer && ast.isClassDef(grandContainer)) {
               genericIds = grandContainer.generic?.types.map(name => name) ?? []
             }
             if (genericIds && prevType.generic && genericIds.length == prevType.generic.length) {
@@ -1783,7 +1969,7 @@ export class TypeSystem {
 
         if (TypeSystem.isFunctionType(type) || TypeSystem.isAnyType(type)) {
           funcType = type
-        } else if (TypeSystem.isObjectType(type) && nodeName == 'assert') {
+        } else if (TypeSystem.isClassType(type) && nodeName == 'assert') {
           // assert는 단독 함수로도 존재하고 ok, equal등을 가지는 오브젝트로도 존재하기 때문에 별도 처리가 필요하다.
           const type = new FunctionTypeDescriptor()
           type.changeReturnType(new VoidTypeDescriptor())
@@ -1886,13 +2072,13 @@ export class TypeSystem {
             const containerType = TypeSystem.inferType(container)
             gather.add('fd.container.$type', container.$type)
             gather.add('fd.container.type', containerType.toString())
-            // 해당 Binding이 소속된 ObjectDef를 찾아서 해당 항목의 타입을 찾아야 한다.
-            if (TypeSystem.isObjectType(containerType)) {
+            // 해당 Binding이 소속된 ClassDef를 찾아서 해당 항목의 타입을 찾아야 한다.
+            if (TypeSystem.isClassType(containerType)) {
               return containerType.getElementType(property)
             }
           } else if (ast.isBinding(object.$container)) {
             const result = findBindingRootDef(object.$container)
-            if (result && TypeSystem.isObjectType(result)) {
+            if (result && TypeSystem.isClassType(result)) {
               return result.getElementType(property)
             } else gather.add('error10', 'find-bind is not valid')
           } else gather.add('error11', 'container is not valid')

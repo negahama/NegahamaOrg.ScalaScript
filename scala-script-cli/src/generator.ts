@@ -67,8 +67,8 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
     result += transpileVariableDef(stmt, indent)
   } else if (ast.isFunctionDef(stmt)) {
     result += transpileFunctionDef(stmt, indent)
-  } else if (ast.isObjectDef(stmt)) {
-    result += transpileObjectDef(stmt, indent)
+  } else if (ast.isClassDef(stmt)) {
+    result += transpileClassDef(stmt, indent)
   } else if (ast.isDoStatement(stmt)) {
     result += transpileDoStatement(stmt, indent)
   } else if (ast.isForStatement(stmt)) {
@@ -94,10 +94,10 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
     하지만 전혀 없으면 매우 가독성이 떨어지고 코드 품질이 나빠보이므로 최소한의 규칙만 적용한다.
     아래의 AstNode 구문은 해당 구문 전에 newline을 추가해 주는데 모두 indent가 없을 경우이다.
     indent가 있을 경우에는 indent + newline + 내용(내용 앞에 newline이 붙으므로)의 형태가 되어 문제가 되므로
-    세밀하게 조정해야 하지만 효과가 크지 않기 때문에 효과적인 ObjectDef, ByPass만 indent가 있는 경우에도 적용되게 하였다.
+    세밀하게 조정해야 하지만 효과가 크지 않기 때문에 효과적인 ClassDef, ByPass만 indent가 있는 경우에도 적용되게 하였다.
   */
   const newLineNode = [
-    ast.ObjectDef,
+    ast.ClassDef,
     ast.DoStatement,
     ast.ForStatement,
     ast.WhileStatement,
@@ -281,13 +281,13 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
     isFunction = true
   }
 
-  const currClass = AstUtils.getContainerOfType(stmt, ast.isObjectDef)
+  const currClass = AstUtils.getContainerOfType(stmt, ast.isClassDef)
   if (currClass && currClass.superClass) {
     // 부모 클래스가 있는 경우 부모 클래스를 찾는다.
     const superClass = currClass.superClass.ref
-    if (superClass && ast.isObjectDef(superClass) && superClass.name == currClass.superClass.$refText) {
+    if (superClass && ast.isClassDef(superClass) && superClass.name == currClass.superClass.$refText) {
       // 부모 클래스에서 동일한 이름이 쓰이고 있는지를 확인한다.
-      let foundName: ast.FunctionDef | ast.VariableDef | ast.ObjectDef | undefined
+      let foundName: ast.FunctionDef | ast.VariableDef | ast.ClassDef | undefined
       // bypass는 name이 없으므로 제외하고 나머지 중에서 동일한 이름을 찾는다.
       // 하지만 아래에서 결국 ast.VariableDef인 경우만 처리하고 나머지는 에러로 처리한다.
       superClass.body.elements.forEach(e => {
@@ -388,13 +388,13 @@ function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMeth
   let isOverride = false
 
   // 내가 파생 클래스이면 부모 클래스를 찾아서 동일한 이름이 쓰이고 있는지를 확인한다.
-  const currClass = AstUtils.getContainerOfType(stmt, ast.isObjectDef)
+  const currClass = AstUtils.getContainerOfType(stmt, ast.isClassDef)
   if (currClass && currClass.superClass) {
     // 부모 클래스가 있는 경우 부모 클래스를 찾는다.
     const superClass = currClass.superClass.ref
-    if (superClass && ast.isObjectDef(superClass) && superClass.name == currClass.superClass.$refText) {
+    if (superClass && ast.isClassDef(superClass) && superClass.name == currClass.superClass.$refText) {
       // 부모 클래스에서 동일한 이름이 쓰이고 있는지를 확인한다.
-      let foundName: ast.FunctionDef | ast.VariableDef | ast.ObjectDef | undefined
+      let foundName: ast.FunctionDef | ast.VariableDef | ast.ClassDef | undefined
       // bypass는 name이 없으므로 제외하고 나머지 중에서 동일한 이름을 찾는다.
       // 하지만 아래에서 결국 ast.FunctionDef인 경우만 처리하고 나머지는 에러로 처리한다.
       superClass.body.elements.forEach(e => {
@@ -461,7 +461,7 @@ function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMeth
  * It handles variable definitions, function definitions, nested object definitions, and bypass statements.
  * If an unknown element type is encountered, it logs an internal error.
  */
-function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
+function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
   let result = ''
   if (stmt.annotate == 'NotTrans') return result
   if (stmt.export) result += 'export '
@@ -489,14 +489,14 @@ function transpileObjectDef(stmt: ast.ObjectDef, indent: number): string {
       result += applyIndent(indent + 1, transpileVariableDef(m, indent + 1, true))
     } else if (ast.isFunctionDef(m)) {
       result += applyIndent(indent + 1, transpileFunctionDef(m, indent + 1, true))
-    } else if (ast.isObjectDef(m)) {
+    } else if (ast.isClassDef(m)) {
       result += '\n'
-      result += applyIndent(indent + 1, transpileObjectDef(m, indent + 1))
+      result += applyIndent(indent + 1, transpileClassDef(m, indent + 1))
     } else if (ast.isBypass(m)) {
       result += '\n'
       result += applyIndent(indent + 1, generateStatement(m, indent + 1))
     } else {
-      console.error(chalk.red('internal error'))
+      console.error(chalk.red('internal error in transpileObjectDef'))
     }
     result += '\n'
   })
@@ -1019,6 +1019,17 @@ function generateTypes(expr: ast.Types | undefined, indent: number): string {
 }
 
 /**
+ * Generates a string representation of a property with its type.
+ *
+ * @param expr - The property expression containing the name and type.
+ * @param indent - The indentation level for formatting the output.
+ * @returns A string representing the property with its type.
+ */
+function generateProperty(expr: ast.Property, indent: number): string {
+  return `${expr.name}: ${generateTypes(expr.type, indent)}`
+}
+
+/**
  * Transpiles a given SimpleType AST node into its corresponding string representation.
  *
  * @param expr - The SimpleType AST node to transpile.
@@ -1032,18 +1043,13 @@ function generateSimpleType(expr: ast.SimpleType, indent: number): string {
   } else if (ast.isObjectType(expr)) {
     result += '{\n'
     expr.elements.forEach(e => {
-      if (ast.isVariableDef(e)) {
-        result += applyIndent(indent + 1, transpileVariableDef(e, indent + 1, true))
-      } else if (ast.isFunctionDef(e)) {
-        result += applyIndent(indent + 1, transpileFunctionDef(e, indent + 1, true))
-      } else if (ast.isObjectDef(e)) {
-        result += '\n'
-        result += applyIndent(indent + 1, transpileObjectDef(e, indent + 1))
+      if (ast.isProperty(e)) {
+        result += applyIndent(indent + 1, generateProperty(e, indent + 1))
       } else if (ast.isBypass(e)) {
         result += '\n'
         result += applyIndent(indent + 1, generateStatement(e, indent + 1))
       } else {
-        console.error(chalk.red('internal error'))
+        console.error(chalk.red('internal error in generateSimpleType'), expr.$cstNode?.text)
       }
       result += '\n'
     })
@@ -1062,7 +1068,7 @@ function generateSimpleType(expr: ast.SimpleType, indent: number): string {
       else result += expr.type
     } else if (ast.isTypeChain(expr)) {
       result += generateTypeChain(expr, indent)
-    } else result += 'internal error'
+    } else result += 'internal error in generateSimpleType(elementType)'
   }
   return result
 }
@@ -1220,7 +1226,7 @@ function generateFunction(param: GenerateFunctionParams): string {
         p += arg.type ? `: ${generateTypes(arg.type, param.indent)}` : ''
         p += arg.value ? ` = ${generateExpression(arg.value, param.indent)}` : ''
         return p
-      } else return 'internal error'
+      } else return 'internal error in generateFunction'
     })
     .join(', ')
 

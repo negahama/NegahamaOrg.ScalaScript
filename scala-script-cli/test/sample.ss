@@ -321,6 +321,9 @@ val generateBypassElement = (bypass: string[]) -> string => {
   return result
 }
 
+/**
+  오브젝트 정의 및 사용 관련 예
+*/
 def Work = {
   var name: string
   var kind: string
@@ -350,35 +353,3 @@ somebody.name = "Jessica"
 somebody.work = alba
 somebody.calc(3, { amount: 10 })
 
-/**
- *
- */
-def OverrideTest = {
-  fun get11 = () -> number => { return 1 }
-  fun get12 = () -> number => { return 1 }
-  val get21 = () -> number => { return 2 }
-  val get22 = () -> number => { return 2 }
-  var get31 = () -> number => { return 3 }
-  var get32 = () -> number => { return 3 }
-}
-
-def OverrideTest2 extends OverrideTest = {
-  fun get11 = () -> number => { return super.get11() + 10 }
-  fun get12 = () -> number => { return 10 }
-  // 스칼라스크립트는 부모 클래스에서 val로 선언된 메소드는 자식 클래스에서 재정의 할 수 없다.
-  val get21 = () -> number => { return super.get21() + 20 }
-  val get22 = () -> number => { return 20 }
-  // 부모 클래스에서 프로퍼티(함수형 변수)인 것은 자식 클래스에서 재정의할 수 있다.
-  // 하지만 이것은 함수가 아니므로 super 사용이 안된다. super가 사용가능하려면 함수이어야 하는데 자식 클래스에서
-  // get31을 함수로 바꿔도 안된다. 이때는 get31이란 이름이 프로퍼티에서 함수로 바뀌는건데 타입스크립트에서 허락되지 않음
-  // 즉 super를 사용하려면 부모 클래스에서 fun으로 정의해야 한다.
-  // 사실 부모 클래스의 get31을 내부적으로 함수로 바꿔주면 궂이 fun을 사용하지 않고 구현할 수 있다.
-  // 하지만 이 경우 변수인 get31을 super.get31이라고 쓸 수 있는 것 자체가 모순이 된다.
-  var get31 = () -> number => { return super.get31() + 30 }
-  var get32 = () -> number => { return 30 }
-}
-
-val overrideTest = new OverrideTest2()
-console.log(overrideTest.get11())
-console.log(overrideTest.get12())
-console.log(overrideTest.get32())

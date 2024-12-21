@@ -128,7 +128,7 @@ export function createScalaScriptServices(context: DefaultSharedModuleContext): 
  * @param services - The ScalaScript services that provide validation functionality.
  *
  * The function sets up a series of validation checks for different AST (Abstract Syntax Tree) types
- * such as VariableDef, FunctionDef, ObjectDef, Assignment, FunctionValue, UnaryExpression, and BinaryExpression.
+ * such as VariableDef, FunctionDef, ClassDef, Assignment, FunctionValue, UnaryExpression, and BinaryExpression.
  * These checks are then registered with the validation registry using the provided validator.
  */
 export function registerValidationChecks(services: ScalaScriptServices) {
@@ -137,9 +137,9 @@ export function registerValidationChecks(services: ScalaScriptServices) {
   const checks: ValidationChecks<ScalaScriptAstType> = {
     VariableDef: validator.checkVariableDef,
     FunctionDef: validator.checkFunctionDef,
+    ClassDef: validator.checkClassDef,
     FunctionValue: validator.checkFunctionDef,
-    ObjectDef: validator.checkObjectDef,
-    ObjectValue: validator.checkObjectDef,
+    ObjectValue: validator.checkClassDef,
     ForStatement: validator.checkForStatement,
     CallChain: validator.checkCallChain,
     Assignment: validator.checkAssignment,
