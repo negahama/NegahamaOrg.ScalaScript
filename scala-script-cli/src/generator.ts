@@ -176,7 +176,7 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
   } else {
     console.log(chalk.red('ERROR in Expression:', expr))
   }
-  
+
   return result
 }
 
@@ -493,8 +493,7 @@ function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
       result += '\n'
       result += applyIndent(indent + 1, transpileClassDef(m, indent + 1))
     } else if (ast.isBypass(m)) {
-      result += '\n'
-      result += applyIndent(indent + 1, generateStatement(m, indent + 1))
+      result += generateStatement(m, indent + 1)
     } else {
       console.error(chalk.red('internal error in transpileObjectDef'))
     }
@@ -623,7 +622,14 @@ function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number)
 function transpileBypass(stmt: ast.Bypass, indent: number): string {
   let result = ''
   if (stmt.bypass) {
-    result += stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', '')
+    // line comment는 indent를 적용하고 newline을 추가하지 않는다.
+    // block comment는 indent를 적용하지 않는 대신 newline을 추가한다.
+    // 하지만 /** ... */ 형태의 block comment는 처음 라인은 indent를 적용해야 한다.
+    if (stmt.bypass.startsWith('%%//')) {
+      result += applyIndent(indent, stmt.bypass.replace('%%', ''))
+    } else if (stmt.bypass.startsWith('%%/**')) {
+      result += '\n' + applyIndent(indent, stmt.bypass.replaceAll('%%', ''))
+    } else result += '\n' + stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', '')
   }
   return result
 }
@@ -1046,8 +1052,7 @@ function generateSimpleType(expr: ast.SimpleType, indent: number): string {
       if (ast.isProperty(e)) {
         result += applyIndent(indent + 1, generateProperty(e, indent + 1))
       } else if (ast.isBypass(e)) {
-        result += '\n'
-        result += applyIndent(indent + 1, generateStatement(e, indent + 1))
+        result += generateStatement(e, indent + 1)
       } else {
         console.error(chalk.red('internal error in generateSimpleType'), expr.$cstNode?.text)
       }
@@ -1127,8 +1132,12 @@ function generateBlock(
       else if (ast.isExpression(code)) element += generateExpression(code, indent + 1)
       else console.log(chalk.red('ERROR in Block:', code))
     }
-    if (ast.isBypass(code)) result += '\n'
-    result += applyIndent(indent + 1, element + '\n')
+    // bypass는 indent를 적용하지 않는다.
+    if (ast.isBypass(code)) {
+      result += element + '\n'
+    } else {
+      result += applyIndent(indent + 1, element + '\n')
+    }
   })
   result += applyIndent(indent, '}')
   return result
