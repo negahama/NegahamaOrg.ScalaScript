@@ -801,8 +801,6 @@ export class TypeSystem {
 
     const existing = ScalaScriptCache.get(node)
     if (existing) {
-      // for debugging...
-      // if (TypeSystem.isErrorType(existing)) console.trace(existing.toString())
       exitLog(log, existing, 'Exit(node is cached)')
       return existing
     }
@@ -873,9 +871,9 @@ export class TypeSystem {
     }
 
     // for debugging...
-    // if (TypeSystem.isErrorType(type)) {
-    //   console.error(chalk.red('inferType Error:'), `${type.toString()}, '${node.$cstNode?.text}'`)
-    // }
+    if (TypeSystem.isErrorType(type)) {
+      console.error(chalk.red('inferType Error:'), `${type.toString()}, '${node.$cstNode?.text}'`)
+    }
 
     ScalaScriptCache.set(node, type)
     exitLog(log, type)
@@ -1062,11 +1060,29 @@ export class TypeSystem {
 
     // this, super인 경우
     else if (node.$cstNode?.text == 'this' || node.$cstNode?.text == 'super') {
+      let foundClass = false
       const classItem = AstUtils.getContainerOfType(node, ast.isObjectDef)
       if (classItem) {
-        traceLog(`'this' refers ${classItem.name}`)
-        type = new ObjectTypeDescriptor(classItem)
-      } else {
+        if (node.$cstNode?.text == 'this') {
+          traceLog(`'this' refers ${classItem.name}`)
+          type = new ObjectTypeDescriptor(classItem)
+          foundClass = true
+        } else if (node.$cstNode?.text == 'super') {
+          // super는 현재 클래스의 부모 클래스를 찾는다.
+          //todo 문제는 조부모 클래스인데... 일단은 부모만 사용한다.
+          const classChain = TypeSystem.getClassChain(classItem).filter(c => c != classItem)
+          if (classChain.length > 0) {
+            const superClass = classChain[0]
+            traceLog(`'super' refers ${superClass.name}`)
+            type = new ObjectTypeDescriptor(superClass)
+            foundClass = true
+            console.log(`'super' refers ${superClass.name}`)
+            classChain.forEach(c => console.log(`  - ${c.name}`))
+          }
+        }
+      }
+
+      if (!foundClass) {
         console.error(chalk.red('this or super is empty in types.ts'))
         // for debugging...
         let item: AstNode | undefined = node

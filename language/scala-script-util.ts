@@ -10,6 +10,8 @@ export namespace ScalaScriptCache {
   const cache = new Map<AstNode, TypeDescriptor>()
 
   export function get(node: AstNode) {
+    // for debugging...
+    // if (TypeSystem.isErrorType(existing)) console.trace(existing.toString())
     return cache.get(node)
   }
 
