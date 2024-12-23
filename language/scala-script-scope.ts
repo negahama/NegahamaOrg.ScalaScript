@@ -240,14 +240,14 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     } else console.error(chalk.red('internal error in typechain:', prevTypeDesc))
   }
 
-  /**
-   * 아래 함수들은 모두 동일한 메커니즘으로 동작한다.
-   * 예를 들어 corp.process() 이란 구문이 있을 때 현재 값(context.reference)은 process인데
-   * 이것의 scope를 제공하기 위해서 corp를 찾는다. 이 과정에서 getScope()가 다시 호출될 수도 있다.
-   * corp의 종류에 따라서 ClassDef, ObjectType, any type등으로 나눠지지만 모두 corp에서 가능한 모든 이름을 Scope로 리턴한다.
-   */
   /*
-    이 함수는 previous의 추론 타입이 object이고 ref의 astNode가 ObjectDef인 경우에 호출된다.
+    아래 함수들은 모두 동일한 메커니즘으로 동작한다.
+    예를 들어 corp.process() 이란 구문이 있을 때 현재 값(context.reference)은 process인데
+    이것의 scope를 제공하기 위해서 corp를 찾는다. 이 과정에서 getScope()가 다시 호출될 수도 있다.
+    corp의 종류에 따라서 ClassDef, ObjectType, any type등으로 나눠지지만 모두 corp에서 가능한 모든 이름을 Scope로 리턴한다.
+  */
+  /*  
+    이 함수는 previous의 추론 타입이 class이고 ref의 astNode가 ClassDef인 경우에 호출된다.
     ```
     def Corp = {
       var name: string
@@ -272,13 +272,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     반면 두번째와 세번째 process는 static이 아닌 것이 호출되어야 한다.
     위 코드는 다음과 같이 나와야 한다.
     ```
-    console.log(`scopeObjectDef: ${previous.$cstNode?.text}, staticOnly: ${staticOnly}`)
+    console.log(`scopeClass: ${previous.$cstNode?.text}, staticOnly: ${staticOnly}`)
 
-    scopeObjectDef: console, staticOnly: true
-    scopeObjectDef: console, staticOnly: true
-    scopeObjectDef: Corp, staticOnly: true
-    scopeObjectDef: corp, staticOnly: false
-    scopeObjectDef: Corp, staticOnly: false
+    scopeClass: console, staticOnly: true
+    scopeClass: console, staticOnly: true
+    scopeClass: Corp, staticOnly: true
+    scopeClass: corp, staticOnly: false
+    scopeClass: Corp, staticOnly: false
     ``` 
   */
   /**
@@ -331,13 +331,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     이 함수는 previous의 추론 타입이 object이고 ref의 astNode가 ObjectType인 아래와 같은 경우에 호출된다.
     ```
     val result: {
-      var 매출: number
-      var 매입: number
+      revenue: number
+      expenditure: number
     } = {
-      매출: 0
-      매입: 0
+      revenue: 0
+      expenditure: 0
     }
-    result.매출 += 1
+    result.revenue += 1
     ```
   */
   /**
@@ -410,22 +410,18 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   }
 
   /*
-    아래와 같은 구문에서 any type이 발생한다.
-    ```
-    def Corp = {
-      val process = () => {
-        console.log('process')
-      }
-    }
-    var corps: Corp[]
-    corps.forEach(corp => corp.process())
-    ```
-    forEach에서 corp는 아직 타입을 추론하지 못하기 때문에 any로 처리되는데 inferTypeParameter에서 처리하고 있다.
-    그런데 현재 이 코드는 process를 확인하려고 getScope에 들어왔다가 previous인 corp가 any type이어서
-    corp를 expr로 가지고 들어온 상황인데 corp가 있으면 있는 걸 사용하고 없으면 corp를 생성하는 것이 아니라
-    context.reference.$refText인 process를 생성해서 리턴한다. 즉 corp에 process가 있는지의 여부를 검사하지 않는다.
+    스칼라스크립트는 아직 몇몇 경우에 any type을 사용한다.
+    JSON.parse()과 같이 타입스크립트에서도 any type을 리턴하는 함수들도 있지만 아직 완벽하게 처리되지 않은 몇몇 부분에서
+    any type을 사용함으로써 타입 검사를 회피하고 있다. any type을 사용하는 경우는 scala-script-library.ts를 참고한다.
+
+    이 함수에서 주의할 것은 이름이 있는지 확인하는 대상이 previous라는 것이다.
+    예를들어 corp.process()에서 process의 scope를 검사할때 corp가 any type이면
+    previous인 corp의 이름이 있으면 있는 걸 사용하고 없으면 corp라는 이름을 생성하는 것이 아니라
+    context.reference.$refText인 process라는 이름을 생성해서 리턴한다.
+    즉 corp에 process가 있는지의 여부를 검사하지 않는다.
+
     문제는 이름이 있는 경우이다. 발생한 적이 없는 것 같긴 한데 이름이 있는 경우에는 corp를 넘기고 그렇지 않은 경우
-    process를 넘기는 것 자체가 잘못되어져 있고 이름이 있을 경우 process를 다시 확인하는 코드도 없어 보인다.
+    process를 넘기는 것 자체가 잘못되어져 있고 이름이 있을 경우 process를 다시 확인하는 코드도 없어 문제가 될 수 있다.
   */
   /**
    * Creates a scope for any type based on the provided context and previous expression.

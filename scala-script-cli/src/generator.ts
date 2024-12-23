@@ -300,7 +300,7 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
       if (foundName) {
         if (ast.isVariableDef(foundName)) {
           if (foundName.kind == 'val') {
-            isError.push(`'${stmt.name}' is a function constant in ${superClass.name}`)
+            isError.push(`'${stmt.name}' is a function constant in class '${superClass.name}'`)
           } else if (foundName.kind == 'var') {
             isOverride = true
             // 함수형 변수로 변환하는데 몇가지 경우에는 함수로 변환한다.
@@ -315,7 +315,7 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
             const callchain = AstUtils.streamAllContents(stmt.value.body).filter(ast.isThisOrSuper)
             callchain.forEach(cc => {
               if (cc.this == 'super') {
-                isError.push(`'${stmt.name}' is not allowed to call super`)
+                isError.push(`'${stmt.name}' is not allowed to call 'super'`)
               }
             })
           }

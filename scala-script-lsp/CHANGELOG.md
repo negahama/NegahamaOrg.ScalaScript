@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.3 - December 23, 2024
+
+- seperate the object type and class type
+- for-statement validator was implemented
+- adjust new line position for bypass comment
+- fixed the bug about super class
+
 ### 0.6.2 - December 20, 2024
 
 - fix the bug about rest parameter type

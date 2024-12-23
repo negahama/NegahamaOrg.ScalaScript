@@ -1841,6 +1841,33 @@ export class TypeSystem {
     return set
   }
 
+  /*
+    이 함수는 함수의 파라미터와 리턴의 실제 타입을 추론하는 함수이다.
+    이 함수는 크게 다음과 같은 3가지 경우를 처리한다.
+    1) 일반 함수
+    2) Array, Map, Set등의 generic을 가지는 함수형 메서드
+    3) Binding 되어진 람다 함수
+    
+    1) 일반 함수
+    일반 함수는 2)와 3)의 경우가 아닌 것을 의미하며 generic과 binding의 영향을 받지 않으므로 간단하다.
+    
+    2) Array, Map, Set등의 generic을 가지는 함수형 메서드
+    예를 들어 this.corpList.find(corp => corp.name == 'name')와 같은 코드에서 corp의 타입과 find의 리턴 타입을 추론하는 것이다.
+    전달되는 node는 find이며 이것의 이전 노드인 this.corpList의 타입을 이용해서 corp, find의 타입을 추론한다.
+    Map, Set의 경우도 거의 동일하지만 generic이 K, V 등으로 다수일 수 있고 K, V에 대응하는 실제 타입을
+    new Map<string, Corp>와 같은 new Expression에서 얻는다는 것이 다르다.
+
+    Map, Set의 경우는 아래와 같이 사용되는데
+    var corpMap = new Map<string, Corp>()
+    this.corpMap.get('name')
+    this.corpMap의 타입을 추론하면 class형 타입이 된다.
+    그리고 inferTypeNewExpression()에서 generic의 정보를 저장하기 때문에 corpMap의 ClassTypeDescriptor에 string, Corp가 저장되어져 있다.
+    하지만 배열은 corpList에 gereric 정보가 저장되어져 있지 않다.
+    
+    배열 자체($array$)는 generic의 정보를 가지고 있고 배열도 new Array<Corp>와 같이 사용할 수 있지만 현재는 지원하지 않는다.
+
+    3) Binding 되어진 람다 함수
+  */
   /**
    * Determines the functional method type for a given node in the call chain.
    *
@@ -1854,33 +1881,6 @@ export class TypeSystem {
    * @param node - The AST node representing the call chain.
    * @returns The inferred type description.
    */
-  /*
-    이 함수는 함수의 파라미터와 리턴의 실제 타입을 추론하는 함수이다.
-    이 함수는 크게 다음과 같은 3가지 경우를 처리한다.
-    1) 일반 함수
-    2) 배열, Map, Set등의 generic을 가지는 함수형 메서드
-    3) Binding 되어진 람다 함수
-    
-    1) 일반 함수
-    일반 함수는 2)와 3)의 경우가 아닌 것을 의미하며 generic과 binding의 영향을 받지 않으므로 간단하다.
-    
-    2) 배열, Map, Set등의 generic을 가지는 함수형 메서드
-    예를 들어 this.corpList.find(corp => corp.name == 'name')와 같은 코드에서 corp의 타입과 find의 리턴 타입을 추론하는 것이다.
-    전달되는 node는 find이며 이것의 이전 노드인 this.corpList의 타입을 이용해서 corp, find의 타입을 추론한다.
-    Map, Set의 경우도 거의 동일하지만 generic이 K, V 등으로 다수일 수 있고 K, V에 대응하는 실제 타입을
-    new Map<string, Corp>와 같은 new Expression에서 얻는다는 것이 다르다.
-
-    Map, Set의 경우는 아래와 같이 사용되는데
-    var corpMap = new Map<string, Corp>()
-    this.corpMap.get('name')
-    this.corpMap의 타입을 추론하면 object형 타입이 된다.
-    그리고 inferTypeNewExpression()에서 generic의 정보를 저장하기 때문에 corpMap의 타입에 string, Corp가 저장되어져 있다.
-    하지만 배열은 corpList에 gereric 정보가 저장되어져 있지 않다.
-    
-    배열 자체는 generic의 정보를 가지고 있고 배열도 new Array<Corp>와 같이 사용할 수 있지만 현재는 지원하지 않는다.
-
-    3) Binding 되어진 람다 함수
-  */
   static getFunctionInfo(node: AstNode | undefined): FunctionTypeDescriptor | AnyTypeDescriptor | undefined {
     if (!node) {
       console.error(chalk.red('getFunctionInfo: node is null'))

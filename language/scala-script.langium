@@ -5,6 +5,8 @@ entry Program: codes+=Code*;
 Code: Statement | Expression;
 
 /*
+  ScalaScript를 이해하기 위해서는 형(type)과 값(value), 문(statement)과 식(expression)을 구분하는 것이 매우 중요하다.
+
   변수
   변수는 타입이나 값이 아니다. 값을 가질 수 있는 상자이다. 값의 종류(타입)에 따라서 사용법이 달라진다.
   VariableDef   | Definition | var n: number = 3
@@ -13,10 +15,12 @@ Code: Statement | Expression;
   VariableCall  | Name       | 변수 이름만으로 변수 사용
                 | Name(...)  | 타입이 함수인 경우 예) f(msg)
                 | Name[...]  | 타입이 배열인 경우 예) ary[1]
-                | Name.name  | 타입이 오브젝트인 경우 예) obj.name
+                | Name.name  | 타입이 오브젝트나 클래스인 경우 예) obj.name
 
   함수
-  FunctionDef   | Definition | fun f = (msg: string) -> void => { ... }
+  FunctionDef   | Definition | fun f = (msg: string) -> void => { ... } 이것은 함수의 정의이다.
+                |            | val f = (msg: string) -> void => { ... } 이것은 함수형 변수의 정의이다.  
+                |            | def f = (msg: string) -> void            이것은 함수 타입에 대한 별칭 선언이다.  
   FunctionType  | Type       | (msg: string) -> void
   FunctionValue | Expression | (msg: string) -> void => { ... }
 
@@ -27,7 +31,9 @@ Code: Statement | Expression;
 
   오브젝트
   ObjectDef     | X          | 오브젝트 자체를 정의하지는 않는다.
-  ObjectType    | Type       | { var name: string, var age: number }
+                |            | val object: { name: stirng, age: number}   이것은 오브젝트형 변수 정의이다.  
+                |            | def objType = { name: stirng, age: number} 이것은 오브젝트 타입에 대한 별칭 선언이다.  
+  ObjectType    | Type       | { name: string, age: number }
   ObjectValue   | Expression | { name: "samuel", age: 20 }
 
   Class
@@ -49,6 +55,7 @@ Types:
   ArrayType은 동일한 타입이 연속된 구조를 취하는 특수한 Compound 타입이다.
   ArrayType을 CompoundType과 구분해서 처리하는 것은 표기 방법과 처리가 매우 다르기 때문이다.
   현재 CompoundType은 ObjectType 밖에 없기 때문에 이를 별도로 구분하지 않고 ObjectType으로 사용한다.
+  이름이 있는 클래스 타입은 elementType의 TypeChain으로 표현된다.
 */
 SimpleType:
   ArrayType | ObjectType | ElementType;
@@ -57,16 +64,28 @@ SimpleType:
   해당 개체의 타입이 배열형임을 나타내기 위해 사용된다.
   ex) var ary: number[]
 
-  ArrayType을 elementType=(ObjectType | ElementType) '[' ']'; 으로 정의하면
-  ElementType에 FunctionType이 포함되어져 있어 var t: () -> number[] 의 경우
-  () -> number 의 배열로 인식된다.
+  ArrayType을 elementType=(ObjectType | ElementType) '[' ']'; 으로 정의하면 ElementType에 FunctionType이
+  포함되어져 있어 var t: () -> number[] 의 경우 () -> number 의 배열로 인식된다.
+  현재 (() -> number)[] 와 같은 함수 타입의 배열은 지원하지 않는다. 
 */
 ArrayType:
   elementType=(ObjectType | PrimitiveType | TypeChain) '[' ']';
 
 /*
-  해당 개체의 타입이 Object형임을 나타내기 위해 사용된다.
-  ex) var obj: { name: string, age: number }
+  Object Definition
+  -----------------------------------------------------------------------------
+  Object는 유저가 정의하는 타입중에 하나로 타입스크립트의 Object 타입과 동일하다.
+  이전에는 사용자 정의 자료구조를 별도로 구분하지 않고 모두 오브젝트라는 단일 개념으로 사용하려고 했는데
+  Object는 단순하게 사용할 수 있는데도 불구하고 Class의 복잡한 문법 구조의 영향을 받아 복잡해졌고 그래서 분리하였다. 
+  Object는 복합타입 컨테이너로 자신을 제외한 모든 타입(단일타입, 다른 복합타입, 배열타입등)을 가질 수 있다.
+  하지만 Object 자체는 이런 값들을 가질 수 있다는 타입이지 객체가 아니라는 점이 중요하다.
+
+  오브젝트형 변수가 정의되는 것이며 오브젝트 타입에 이름을 부여하는 것일 뿐 Object 자체를 정의하는 문법은 없다.
+
+  다른 것들과 마찬가지로 스칼라스크립트는 타입에 이름을 부여할 때 def를 사용한다.
+  예를들어 name과 age를 property로 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
+  이 타입을 매번 이렇게 쓰기가 불편하기 때문에 이를 def Person = { name: string, age: number } 와 같이
+  Person이라는 이름을 부여해서 사용하는 것이다.
 
   //todo 아래 방식이 정석인데 이 방식을 사용하면 모호성 문제가 생긴다. 어떤 차이가 있는걸까?
   '{' elements+=ObjectTypeElement? (','? elements+=ObjectTypeElement)* '}';
@@ -98,7 +117,8 @@ FunctionType:
   '(' Parameters? ')' FunctionReturn;
 
 /*
-  //todo TypeChain은 다음과 같은 경우를 위한 것인데 실제로 이런 경우는 transpile되면 interface안에 inferface가 정의되는 것이기 때문에 error가 된다.
+  //todo TypeChain은 다음과 같은 경우를 위한 것(ClassDef는 ClassDef를 포함할 수 있다)인데
+  실제로 이런 경우는 transpile되면 interface안에 inferface가 정의되는 것이기 때문에 error가 된다.
   ```
   def Corp = {
     def Firm = {
@@ -131,7 +151,7 @@ type NamedElement =
   | FunctionDef
   | ClassDef
   | Parameter
-  | Property
+  | Property    // Property는 NamedElement이긴 하지만 꼭 필요하진 않다. 
   | Iterator;
 
 //-----------------------------------------------------------------------------
@@ -156,12 +176,12 @@ Statement:
   -----------------------------------------------------------------------------
   모든 변수는 다음의 규칙을 가지고 있다.
   이름 : 타입 = 값
-  타입이나 값을 통해서 변수의 타입을 알수 있어야 한다.
+  타입이나 값을 통해서 변수의 타입을 알 수 있어야 한다.
   VariableDef Rule 자체는 타입과 값이 모두 없을 수 있지만 없으면 에러 타입이 된다.
   일반적으로 둘 다 있거나 적어도 하나는 있어야 하며 타입과 값은 모두 있으면 명시된 타입을 우선하며
   값만 있으면 값으로 타입을 추론한다.
 
-  이전에 다중 선언문을 지원했지만 삭제하기로 했다.
+  이전에는 다중 선언문을 지원했지만 삭제하기로 했다.
   다중 선언문의 유용성에 비해 처리가 복잡해지기 시작했기 때문이다.
   다중 선언문을 처리하기 위해서는 DefaultScopeComputation의 processNode()를 override해서
   여러 개의 이름을 각각의 AstNodeDescription으로 만들어 precomputedScope에 추가해 주어야 한다.
@@ -188,10 +208,13 @@ fragment TypedId:
   Function Defintion
   -----------------------------------------------------------------------------
   선언(또는 정의)에서 중요한 것은 대상이다. 선언의 대상은 변수일 수도 있고 타입 자체일 수도 있다.
-  우리가 보통 val array: number[] 와 같이 선언하는 것은 숫자형 배열을 타입으로 가지는 array라는
+  우리가 보통 const array: number[] 와 같이 선언하는 것은 숫자형 배열을 타입으로 가지는 array라는
   변수를 선언하는 것이며 class Person { ... } 은 Person이라는 이름을 가지는 타입을 선언하는 것이다.
   그럼 function display(msg: string) { ... } 와 같은 함수의 선언은 무엇을 선언한 것일까?
-  함수의 선언은 타입에 대한 선언이 아니라 변수 선언처럼 값에 대한 선언에 가깝다.
+  변수의 선언은 아니고 display라는 함수 타입을 선언한 것일까? 아니다.
+
+  함수의 선언(정확히는 정의)은 해당 함수가 어떤 식으로 동작하는지를 나타내는 함수의 바디를 포함하고 있다.
+  그래서 함수의 정의는 타입에 대한 것이 아니라 값에 대한 것이며 오히려 변수의 정의에 가깝다.
   다른 타입들은 특정 값을 명시하는 방법으로 상수를 사용(예를들어 3.14159라는 값에 PI라는
   이름을 부여하기 위해서 상수를 사용)하는데 반해 함수는 별도의 문법이 있는 것이다.
   함수의 정의는 함수형 언어에서는 전역 함수형 상수의 정의와 동일한 개념이다.
@@ -270,19 +293,11 @@ FunctionTypeDef:
   '=' '(' Parameters? ')' FunctionReturn;
 
 /*
-  Object Definition
+  Class Definition
   -----------------------------------------------------------------------------
-  Object는 유저가 정의하는 타입을 모두 포괄하는 단어이며 다른 언어의 Class, Interface, Object를 모두 포함하는 개념이다.
-  스칼라스크립트에서는 사용자 정의 자료구조를 별도로 구분하지 않고 모두 오브젝트라는 단일 개념으로 사용한다.
-  Object는 복합타입 컨테이너로 자신을 제외한 모든 타입(단일타입, 다른 복합타입, 배열타입등)을 가질 수 있다.
-  하지만 Object 자체는 이런 값들을 가질 수 있다는 타입이지 객체가 아니라는 점이 중요하다.
+  Class는 유저가 정의하는 타입중에 하나로 타입스크립트의 Interface와 class를 포함하는 개념이다.
 
-  Object의 정의란 특정 타입에 이름을 부여하는 것이며 스칼라스크립트에서는 타입에 이름을 부여할때 def를 사용한다.
-  예를들어 name과 age를 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
-  이 타입을 매번 이렇게 쓰기가 불편하기 때문에 이를 def Person = { name: string, age: number } 와 같이
-  Person이라는 이름을 부여해서 사용하는 것이다.
-
-  스칼라스크립트에서는 오브젝트와 클래스를 구분하지 않지만 실제로 타입스크립트로 변환할때는 구분해야 하는데
+  스칼라스크립트에서는 interface와 class를 구분하지 않지만 실제로 타입스크립트로 변환할때는 구분해야 하는데
   함수나 대입문이 있거나 변수의 값을 초기화하는 경우 클래스로 변환된다.
   자세한 내용은 transpileObjectDef()를 참고
 */
@@ -311,7 +326,8 @@ ForStatement:
 Iterator: ForOf | ForTo;
 
 ForOf: name=Id '<-' of=Expression;
-// 이것을 parser단계에서 처리되게 다음과 같이 할 수 있지만 그렇게 하면 to, until, step이 키워드로 설정되기 때문에 이 이름을 변수로 사용할 수 없다.
+// 이것을 parser단계에서 처리되게 다음과 같이 할 수 있지만
+// 그렇게 하면 to, until, step이 키워드로 설정되기 때문에 이 이름을 변수로 사용할 수 없다.
 // ForTo: name=Id '<-' e1=Expression to=('to' | 'until') e2=Expression ('step' stepValue=IntegerLiteral2)?;
 ForTo: name=Id '<-' e1=Expression to=Id e2=Expression (step=Id stepValue=IntegerLiteral2)?;
 
@@ -520,7 +536,8 @@ ObjectValue:
   Binding은 Id : Expression 이거나 또는 ... NamedElement 일 수 있으며 , 는 생략할 수 있다.
   Binding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
   Binding의 element는 Property의 name을 사용하기 때문에 Id 대신 [Property:Id]를 사용하면 좋겠지만
-  이것을 처리하려면 ScopeProvider가 매우 복잡해진다. 심지어 불가능해보인다. 예를들면 다음과 같은 코드에서
+  자동으로 cross-reference를 처리해 주지 못한다. reference 문제를 처리하려면 ScopeProvider가 매우 복잡해진다.
+  심지어 불가능해보인다. 예를들면 다음과 같은 코드에서
   ```
   def Trade = { item = 'item' }
   def Sales = { trade: Trade }
