@@ -133,6 +133,20 @@ export function enterLog(procKind: string, ...optionalParams: any[]): string {
 }
 
 /**
+ * Logs the entry of a process with a unique signature and optional parameters.
+ *
+ * @param procKind - A string representing the kind of process being logged.
+ * @param optionalParams - Additional optional parameters to log.
+ * @returns A string representing the unique signature of the log entry.
+ */
+var _tracing_signature_ = ''
+export function enterLog2(procKind: string, ...optionalParams: any[]): string {
+  _enable_log_ = true
+  _tracing_signature_ = enterLog(procKind, ...optionalParams)
+  return _tracing_signature_
+}
+
+/**
  * Logs a message to the console if logging is enabled.
  *
  * @param msg - The message to log.
@@ -170,6 +184,10 @@ export function exitLog(log: string, type?: TypeDescriptor, ...optionalParams: a
   console.groupEnd()
   if (!type) {
     console.log(log, ...optionalParams)
+    if (_tracing_signature_ && _tracing_signature_ == log) {
+      _tracing_signature_ = ''
+      _enable_log_ = false
+    }
     return
   }
 
@@ -179,6 +197,10 @@ export function exitLog(log: string, type?: TypeDescriptor, ...optionalParams: a
 
   // console.timeLog(log, typeInfo, ...optionalParams)
   console.log(log, typeInfo, ...optionalParams)
+  if (_tracing_signature_ && _tracing_signature_ == log) {
+    _tracing_signature_ = ''
+    _enable_log_ = false
+  }
 }
 
 /**

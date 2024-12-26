@@ -5,7 +5,28 @@ import assert from 'assert'
 import chalk from 'chalk'
 
 /**
+ * TypeDescriptor 클래스 계층 구조
  *
+ * TypeDescriptor
+ * - AnyTypeDescriptor
+ * - NilTypeDescriptor
+ * - VoidTypeDescriptor
+ * - StringTypeDescriptor
+ * - NumberTypeDescriptor
+ * - BooleanTypeDescriptor
+ * - GenericTypeDescriptor
+ * - UnionTypeDescriptor
+ * - ArrayTypeDescriptor
+ * - FunctionTypeDescriptor
+ * - ObjectTypeDescriptor
+ * - ClassTypeDescriptor
+ * - ErrorTypeDescriptor
+ *
+ * TypeDescriptor 클래스 계층 구조는 다음과 같은 특징을 가진다.
+ * - 모든 타입은 TypeDescriptor에서 상속되며 생성자에서 고유의 $type 속성값을 가져야 한다.
+ * - 모든 타입은 자신의 필요에 따라 toString(), showDetailInfo(), isEqual(), checkAssignableTo(), compareTo() 메소드를 재정의한다.
+ *
+ * TypeSystem 클래스와 완전히 독립된 구조로 하고 싶었지만 TypeSystem의 inferType() 메소드등을 일부 사용하고 있다.
  */
 export class TypeDescriptor {
   constructor(readonly $type = '') {}
@@ -25,20 +46,33 @@ export class TypeDescriptor {
   // this를 other에 assignment할 수 있는지를 판단한다.
   // assignment 여부에만 관심이 있으면 이 함수를 사용한다.
   // 그러면 이 함수에서 직접 checkAssignableTo를 호출하고 그 결과를 boolean으로 리턴해 준다.
-  // 하지만 이유도 처리해야 하는 경우라면 checkAssignableTo를 직접 호출해야 한다.
+  // 하지만 assign이 안될 때 그 이유도 처리해야 하는 경우라면 checkAssignableTo를 직접 호출해야 한다.
   isAssignableTo(other: TypeDescriptor): boolean {
-    const errors = this.checkAssignableTo(other)
-    if (errors.length == 0) return true
+    if (this.checkAssignableTo(other).length == 0) return true
     return false
   }
 
+  // checkAssignableTo()는 다른 타입과의 기본적인 assignment 처리를 구현하고 있지만
+  // 파생 클래스에서 특정 타입에 대해서 추가적인 처리가 필요한 경우에는 이 함수를 오버라이드한다.
+  // 여기서 파생 클래스에 해당하는 any, union에 대한 처리가 있는 것은 좋지 못하지만
+  // 많은 파생 클래스의 공통적인 처리에 해당하므로 여기서 구현하는 것으로 한다.
   checkAssignableTo(other: TypeDescriptor): string[] {
     if (this.$type == 'any' || other.$type == 'any') return []
     if (other.$type == 'union') {
-      const union = other as UnionTypeDescriptor
-      if (union.elementTypes.some(e => this.isAssignableTo(e))) return []
-      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
+      const otherUnion = other as UnionTypeDescriptor
+      // this가 other union의 elementTypes 중에서 하나라도 assign 가능하면 assignable로 판단한다.
+      if (otherUnion.elementTypes.some(e => this.isAssignableTo(e))) return []
+      else return [`Assigned union '${otherUnion.toString()}' don't have this type '${this.toString()}'`]
     }
+    if (this.$type == other.$type) {
+      return this.compareTo(other)
+    }
+    return [`Type ${this.toString()} is not equal ${other.toString()}`]
+  }
+
+  // 파생 클래스에서 자신과 동일한 타입에 대한 assignment 여부를 판단하기 위한 추상함수 성격의 함수이다.
+  // 기본적인 파생 클래스들을 위해서 isEqual()을 사용하는 기본 코드가 구현되어 있다.
+  compareTo(other: TypeDescriptor): string[] {
     if (this.isEqual(other)) return []
     return [`Type ${this.toString()} is not equal ${other.toString()}`]
   }
@@ -56,10 +90,6 @@ export class AnyTypeDescriptor extends TypeDescriptor {
 
   override isEqual(other: TypeDescriptor): boolean {
     return true
-  }
-
-  override checkAssignableTo(other: TypeDescriptor): string[] {
-    return []
   }
 }
 
@@ -180,10 +210,10 @@ export class UnionTypeDescriptor extends TypeDescriptor {
     const errors: string[] = []
     if (other.$type == 'any') return []
     if (other.$type == 'union') {
-      const union = other as UnionTypeDescriptor
+      const otherUnion = other as UnionTypeDescriptor
       // this.elementType 중에 하나라도 other에 포함되어 있으면 assignable이다.
-      if (this.elementTypes.some(e => union.isContain(e))) return []
-      else errors.push(`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`)
+      if (this.elementTypes.some(e => otherUnion.isContain(e))) return []
+      else errors.push(`Assigned union '${otherUnion.toString()}' don't have this type '${this.toString()}'`)
     } else {
       if (this.elementTypes.some(e => e.isEqual(other))) return []
       else errors.push(`Type ${this.toString()} is not equal ${other.toString()}`)
@@ -237,29 +267,15 @@ export class ArrayTypeDescriptor extends TypeDescriptor {
   }
 
   /**
-   * Determines if the current type is assignable to another type.
+   * Compares this `TypeDescriptor` to another `TypeDescriptor` and returns an array of strings
+   * representing the differences or issues found during the comparison.
    *
-   * @param other - The type to check against.
-   * @returns `true` if the current type is assignable to the other type, otherwise `false`.
-   *
-   * The method checks the following conditions:
-   * - If the other type is 'any', it returns `true`.
-   * - If the other type is a union type, it returns `true` if any element type in the union is equal to the current type.
-   * - If the other type is an object type, it checks if both types are object definitions and if the current type is in the class chain of the other type.
-   * - If none of the above conditions are met, it returns `false`.
+   * @param other - The other `TypeDescriptor` to compare against.
+   * @returns An array of strings detailing the differences or issues found.
    */
-  override checkAssignableTo(other: TypeDescriptor): string[] {
-    if (other.$type == 'any') return []
-    if (other.$type == 'union') {
-      const union = other as UnionTypeDescriptor
-      if (union.elementTypes.some(e => e.isEqual(this))) return []
-      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
-    }
-    if (other.$type == 'array') {
-      const otherArray = other as ArrayTypeDescriptor
-      return this.elementType.checkAssignableTo(otherArray.elementType)
-    }
-    return [`Type ${this.toString()} can not be compared with ${other.toString()}`]
+  override compareTo(other: TypeDescriptor): string[] {
+    const otherArray = other as ArrayTypeDescriptor
+    return this.elementType.checkAssignableTo(otherArray.elementType)
   }
 }
 
@@ -376,85 +392,70 @@ export class FunctionTypeDescriptor extends TypeDescriptor {
   }
 
   /**
-   * Checks if the current type is assignable to another type.
+   * Compares this `TypeDescriptor` with another `TypeDescriptor`.
    *
-   * @param other - The type to check against.
-   * @returns `true` if the current type is assignable to the other type, otherwise `false`.
+   * @param other - The other `TypeDescriptor` to compare with.
+   * @returns An array of error messages if the types are not assignable, otherwise an empty array.
    *
-   * The method performs the following checks:
-   * - If the other type is 'any', it returns `true`.
-   * - If the other type is a union, it returns `true` if any element type in the union is equal to the current type.
-   * - If the other type is a function, it checks the return type and parameters for compatibility.
-   *   - If the return types are not assignable, it logs an error and returns `false`.
-   *   - If either function has spread parameters, it returns `true` without further checks.
-   *   - For each parameter in the current function:
-   *     - If the parameter is not nullable and has no default value, it must exist in the other function and be assignable.
-   *     - If the parameter is nullable or has a default value, it must be assignable if it exists in the other function.
-   *   - Logs errors for any mismatched parameters.
-   * - Returns `false` if none of the above conditions are met.
+   * The comparison checks the following:
+   * - If the return types are assignable.
+   * - If either function has spread parameters, type checking is skipped.
+   * - For each parameter:
+   *   - If the parameter is not nullable and has no default value, it must exist in the other function and be assignable.
+   *   - If the parameter is nullable or has a default value, it does not need to exist in the other function, but if it does, it must be assignable.
    */
-  override checkAssignableTo(other: TypeDescriptor): string[] {
-    if (other.$type == 'any') return []
-    if (other.$type == 'union') {
-      const union = other as UnionTypeDescriptor
-      if (union.elementTypes.some(e => e.isEqual(this))) return []
-      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
+  override compareTo(other: TypeDescriptor): string[] {
+    const otherFunction = other as FunctionTypeDescriptor
+    const result = this.returnType.checkAssignableTo(otherFunction.returnType)
+    if (result.length > 0) {
+      return result
     }
-    if (other.$type == 'function') {
-      const otherFunction = other as FunctionTypeDescriptor
-      const result = this.returnType.checkAssignableTo(otherFunction.returnType)
-      if (result.length > 0) {
-        console.log(
-          chalk.red('returnType is not assignable:'),
-          this.returnType.toString(),
-          otherFunction.returnType.toString()
-        )
-        return result
-      }
-      if (this.parameters.find(p => p.spread) || otherFunction.parameters.find(p => p.spread)) {
-        // spread가 있으면 타입 체크를 하지 않는다.
-        return []
-      }
+    if (this.parameters.find(p => p.spread) || otherFunction.parameters.find(p => p.spread)) {
+      // spread가 있으면 타입 체크를 하지 않는다.
+      return []
+    }
 
-      const getOtherParam = (index: number) => {
-        if (index >= otherFunction.parameters.length) return undefined
-        return otherFunction.parameters[index].type
-      }
+    const getOtherParam = (index: number) => {
+      if (index >= otherFunction.parameters.length) return undefined
+      return otherFunction.parameters[index].type
+    }
 
-      const errors: string[] = []
-      this.parameters.forEach((p, i) => {
-        // nullable이나 defaultValue가 없는 파라미터는 다른 함수에서도 존재해야 한다.
-        if (!(p.nullable || p.defaultValue)) {
-          const otherParam = getOtherParam(i)
-          if (!otherParam) {
-            console.log(chalk.red('otherParam does not exist:'), i)
-            errors.push('otherParam does not exist')
-          } else {
-            const result = p.type.checkAssignableTo(otherParam)
-            if (result.length > 0) {
-              console.log(chalk.red('parameter type is not assignable:'), p.type.toString(), otherParam.toString())
-              errors.concat(result)
-            }
-          }
+    let errors: string[] = []
+    // 파라미터가 없는 경우도 고려해야 한다.
+    // 다른 함수에서도 파라미터가 없거나 nullable, default가 있는 것만 있어야 한다.
+    if (this.parameters.length == 0) {
+      if (otherFunction.parameters.length == 0) return []
+      else {
+        if (otherFunction.parameters.filter(p => !(p.nullable || p.defaultValue)))
+          return ['parameter does not matched']
+        return errors
+      }
+    }
+
+    this.parameters.forEach((p, i) => {
+      // nullable이나 defaultValue가 없는 파라미터는 다른 함수에서도 존재해야 한다.
+      if (!(p.nullable || p.defaultValue)) {
+        const otherParam = getOtherParam(i)
+        if (!otherParam) {
+          errors.push('otherParam does not exist')
         } else {
-          // 다른 함수에서 이 파라미터가 없어도 되지만 있다면 타입이 같아야 한다.
-          const otherParam = getOtherParam(i)
-          if (otherParam) {
-            const result = p.type.checkAssignableTo(otherParam)
-            if (result.length > 0) {
-              console.log(
-                chalk.red('nullable or defaultValue parameter type is not assignable:'),
-                p.type.toString(),
-                otherParam.toString()
-              )
-              errors.concat(result)
-            }
+          const result = p.type.checkAssignableTo(otherParam)
+          if (result.length > 0) {
+            errors = errors.concat(result)
           }
         }
-      })
-      return errors
-    }
-    return [`function can not be assignable to ${other.toString()}`]
+      } else {
+        // 다른 함수에서 이 파라미터가 없어도 되지만 있다면 타입이 같아야 한다.
+        const otherParam = getOtherParam(i)
+        if (otherParam) {
+          const result = p.type.checkAssignableTo(otherParam)
+          if (result.length > 0) {
+            errors = errors.concat(result)
+          }
+        }
+      }
+    })
+    return errors
   }
 
   /**
@@ -530,6 +531,10 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
     if (other.$type !== 'object') return false
     const otherObject = other as ObjectTypeDescriptor
     const otherElements = otherObject.getElementList()
+    if (this.getElementList().length != otherElements.length) {
+      console.log(chalk.red('개수가 다름:'), this.getElementList().length, otherElements.length)
+      return false
+    }
     for (let e of this.getElementList()) {
       const found = otherElements.find(o => o.name == e.name)
       if (!found) {
@@ -550,45 +555,21 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
   }
 
   /**
-   * Determines if the current type is assignable to another type.
+   * Checks if the current type descriptor is assignable to another type descriptor.
    *
-   * @param other - The type to check against.
-   * @returns `true` if the current type is assignable to the other type, otherwise `false`.
+   * @param other - The other type descriptor to check against.
+   * @returns An array of error messages if the current type is not assignable to the other type, otherwise an empty array.
    *
-   * The method checks the following conditions:
-   * - If the other type is 'any', it returns `true`.
-   * - If the other type is a union type, it returns `true` if any element type in the union is equal to the current type.
-   * - If the other type is an object type, it checks if both types are object definitions and if the current type is in the class chain of the other type.
-   * - If none of the above conditions are met, it returns `false`.
+   * This method overrides the base implementation to provide specific logic for checking
+   * assignability to a class type. If the other type is a class, it verifies that all elements
+   * in the current type exist in the other class and that their types are compatible.
+   *
+   * - If an element in the current type does not exist in the other class, an error message is added.
+   * - If an element exists but its type is not assignable to the corresponding element in the other class, an error message is added.
+   *
+   * If the other type is not a class, the method delegates to the base implementation.
    */
   override checkAssignableTo(other: TypeDescriptor): string[] {
-    if (other.$type == 'any') return []
-    if (other.$type == 'union') {
-      const union = other as UnionTypeDescriptor
-      if (union.elementTypes.some(e => e.isEqual(this))) return []
-      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
-    }
-
-    if (other.$type == 'object') {
-      const otherObject = other as ObjectTypeDescriptor
-      const errors: string[] = []
-      const otherElements = otherObject.getElementList()
-      for (let e of this.getElementList()) {
-        const found = otherElements.find(o => o.name == e.name)
-        if (!found) {
-          errors.push(`Element '${e.name}' does not exist in type '${otherObject.toString()}'`)
-          break
-        }
-        // 동일한 이름이 있으면 타입도 같아야 한다.
-        const t1 = TypeSystem.inferType(e.node)
-        const t2 = TypeSystem.inferType(found.node)
-        if (!t1.isAssignableTo(t2)) {
-          errors.push(`Element '${e.name}'s types are different(${t1.toString()}, ${t2.toString()})`)
-        }
-      }
-      return errors
-    }
-
     // ObjectValue는 Class에 assignable이 가능하다.
     if (other.$type == 'class') {
       const otherClass = other as ClassTypeDescriptor
@@ -609,7 +590,37 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
       }
       return errors
     }
-    return [`Type ${this.toString()} can not be compared with ${other.toString()}`]
+    return super.checkAssignableTo(other)
+  }
+
+  /**
+   * Compares the current `TypeDescriptor` with another `TypeDescriptor` and returns an array of error messages if there are discrepancies.
+   *
+   * @param other - The `TypeDescriptor` to compare with.
+   * @returns An array of error messages indicating the differences between the two `TypeDescriptor` objects.
+   *
+   * The comparison checks for the following:
+   * - If an element in the current `TypeDescriptor` does not exist in the other `TypeDescriptor`, an error message is added.
+   * - If an element with the same name exists in both `TypeDescriptor` objects but their types are different, an error message is added.
+   */
+  override compareTo(other: TypeDescriptor): string[] {
+    const otherObject = other as ObjectTypeDescriptor
+    const errors: string[] = []
+    const otherElements = otherObject.getElementList()
+    for (let e of this.getElementList()) {
+      const found = otherElements.find(o => o.name == e.name)
+      if (!found) {
+        errors.push(`Element '${e.name}' does not exist in type '${otherObject.toString()}'`)
+        break
+      }
+      // 동일한 이름이 있으면 타입도 같아야 한다.
+      const t1 = TypeSystem.inferType(e.node)
+      const t2 = TypeSystem.inferType(found.node)
+      if (!t1.isAssignableTo(t2)) {
+        errors.push(`Element '${e.name}'s types are different(${t1.toString()}, ${t2.toString()})`)
+      }
+    }
+    return errors
   }
 
   /**
@@ -708,34 +719,26 @@ export class ClassTypeDescriptor extends TypeDescriptor {
   }
 
   /**
-   * Determines if the current type is assignable to another type.
+   * Compares this `TypeDescriptor` with another `TypeDescriptor` to determine if they are assignable.
    *
-   * @param other - The type to check against.
-   * @returns `true` if the current type is assignable to the other type, otherwise `false`.
+   * @param other - The other `TypeDescriptor` to compare against.
+   * @returns An empty array if the types are assignable, otherwise an array containing an error message.
    *
-   * The method checks the following conditions:
-   * - If the other type is 'any', it returns `true`.
-   * - If the other type is a union type, it returns `true` if any element type in the union is equal to the current type.
-   * - If the other type is an object type, it checks if both types are object definitions and if the current type is in the class chain of the other type.
-   * - If none of the above conditions are met, it returns `false`.
+   * The comparison checks if both `TypeDescriptor` instances represent class definitions. If they do,
+   * it verifies if the class represented by this instance is in the class chain of the other class.
+   * If the class is in the chain, it returns an empty array indicating they are assignable.
+   * Otherwise, it returns an array with an error message indicating the classes are not in a parent-child relationship.
+   *
+   * If the nodes are not class definitions, it returns an array with an internal error message.
    */
-  override checkAssignableTo(other: TypeDescriptor): string[] {
-    if (other.$type == 'any') return []
-    if (other.$type == 'union') {
-      const union = other as UnionTypeDescriptor
-      if (union.elementTypes.some(e => e.isEqual(this))) return []
-      else return [`Assigned union '${union.toString()}' don't have this type '${this.toString()}'`]
+  override compareTo(other: TypeDescriptor): string[] {
+    const otherClass = other as ClassTypeDescriptor
+    if (ast.isClassDef(this.node) && ast.isClassDef(otherClass.node)) {
+      // 동일하거나 상속관계인 경우(자식이 부모 클래스에)만 assignable이다.
+      if (TypeSystem.getClassChain(this.node).includes(otherClass.node)) return []
+      else return [`Object ${otherClass.toString()} is not super class of ${this.toString()} in class chain`]
     }
-
-    if (other.$type == 'class') {
-      const otherClass = other as ClassTypeDescriptor
-      if (ast.isClassDef(this.node) && ast.isClassDef(otherClass.node)) {
-        // 동일하거나 상속관계인 경우(자식이 부모 클래스에)만 assignable이다.
-        if (TypeSystem.getClassChain(this.node).includes(otherClass.node)) return []
-        else return [`Object ${otherClass.toString()} is not super class of ${this.toString()} in class chain`]
-      }
-    }
-    return [`Type ${this.toString()} can not be compared with ${other.toString()}`]
+    return ['internal error in ClassTypeDescriptor.compareTo']
   }
 
   /**
@@ -1090,48 +1093,46 @@ export class TypeSystem {
       type = new ArrayTypeDescriptor(TypeSystem.inferType(node.elementType))
     } else if (ast.isObjectType(node)) {
       type = new ObjectTypeDescriptor(node)
-    } else if (ast.isElementType(node)) {
-      if (ast.isFunctionType(node)) {
-        type = new FunctionTypeDescriptor(node)
-      } else if (ast.isPrimitiveType(node)) {
-        switch (node.type) {
-          case 'any':
-            type = new AnyTypeDescriptor()
-            break
-          case 'nil':
-            type = new NilTypeDescriptor()
-            break
-          case 'void':
-            type = new VoidTypeDescriptor()
-            break
-          case 'string':
-            type = new StringTypeDescriptor()
-            break
-          case 'number':
-            type = new NumberTypeDescriptor()
-            break
-          case 'boolean':
-            type = new BooleanTypeDescriptor()
-            break
-          default:
-            type = new ErrorTypeDescriptor(`Unknown primitive type: ${node.type}`)
-            break
+    } else if (ast.isFunctionType(node)) {
+      type = new FunctionTypeDescriptor(node)
+    } else if (ast.isPrimitiveType(node)) {
+      switch (node.type) {
+        case 'any':
+          type = new AnyTypeDescriptor()
+          break
+        case 'nil':
+          type = new NilTypeDescriptor()
+          break
+        case 'void':
+          type = new VoidTypeDescriptor()
+          break
+        case 'string':
+          type = new StringTypeDescriptor()
+          break
+        case 'number':
+          type = new NumberTypeDescriptor()
+          break
+        case 'boolean':
+          type = new BooleanTypeDescriptor()
+          break
+        default:
+          type = new ErrorTypeDescriptor(`Unknown primitive type: ${node.type}`)
+          break
+      }
+    } else if (ast.isTypeChain(node)) {
+      traceLog('Type is reference')
+      if (node.reference.ref) {
+        const ref = node.reference.ref
+        if (ast.isClassDef(ref)) {
+          type = new ClassTypeDescriptor(ref)
         }
-      } else if (ast.isTypeChain(node)) {
-        traceLog('Type is reference')
-        if (node.reference.ref) {
-          const ref = node.reference.ref
-          if (ast.isClassDef(ref)) {
-            type = new ClassTypeDescriptor(ref)
-          }
-        }
-        if (TypeSystem.isErrorType(type)) {
-          // type 중에 ref가 없는 것은 Generic일 가능성이 있다.
-          const container = AstUtils.getContainerOfType(node, ast.isClassDef)
-          if (container && container.generic?.types.includes(node.reference.$refText)) {
-            type = new GenericTypeDescriptor(node.reference.$refText)
-          } else console.error(chalk.red('node.reference.ref is not valid:', node.reference.$refText))
-        }
+      }
+      if (TypeSystem.isErrorType(type)) {
+        // type 중에 ref가 없는 것은 Generic일 가능성이 있다.
+        const container = AstUtils.getContainerOfType(node, ast.isClassDef)
+        if (container && container.generic?.types.includes(node.reference.$refText)) {
+          type = new GenericTypeDescriptor(node.reference.$refText)
+        } else console.error(chalk.red(`${node.reference.$refText} is not valid type`))
       }
     }
     exitLog(log, type)
@@ -1200,12 +1201,12 @@ export class TypeSystem {
     if (element) {
       type = TypeSystem.inferType(element)
 
-      // CallChain이 변수, 함수, 배열등을 모두 포함할 수 있다.
+      // CallChain은 변수, 함수, 배열등을 모두 포함할 수 있다.
       // 이것의 타입이 무엇인가를 결정할 때는 context가 중요하다.
-      // 예를들어 `var n: number = someFunction()`는 `someFunction`의 타입이 `() -> number` 라는 것이
-      // 중요한 것이 아니라 number를 리턴한다는 것이 중요하다. 하지만 좌변에 있을 경우에는 예를들어
-      // 아래와 같은 경우 f의 타입은 `number`가 아니라 `() -> number[]` 이어야 한다.
-      // var f: () -> number[]
+      // 예를들어 `var n: number = f()`는 `f`의 타입이 `() -> number` 라는 것이 중요한 것이 아니라
+      // number를 리턴한다는 것이 중요하다. 하지만 좌변에 있을 경우에는 예를들어 아래와 같은 경우에는
+      // f의 타입은 `number`가 아니라 `() -> number` 이어야 한다.
+      // var f: () -> number
       // f = () => { return 1 }
       // 이와 같은 차이는 해당 CallChain이 함수 호출인가 아닌가에 달려있다.
       // 즉 ()을 사용해서 함수가 호출되는 경우는 함수의 리턴 타입이 중요하고

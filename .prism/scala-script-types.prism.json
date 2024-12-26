@@ -8,9 +8,9 @@
       "title": "`static inferTypeParameter(node: ast.Parameter): TypeDescription {` at language\\scala-script-types.ts#1224",
       "source": {
         "file": "/language/scala-script-types.ts",
-        "startLine": 1300,
+        "startLine": 1308,
         "startColumn": 0,
-        "endLine": 1301,
+        "endLine": 1309,
         "endColumn": 0
       },
       "notes": [

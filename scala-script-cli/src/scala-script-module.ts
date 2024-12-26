@@ -128,6 +128,7 @@ export function registerValidationChecks(services: ScalaScriptServices) {
     ClassDef: validator.checkClassDef,
     FunctionValue: validator.checkFunctionDef,
     ObjectValue: validator.checkClassDef,
+    ArrayValue: validator.checkArrayValue,
     ForStatement: validator.checkForStatement,
     CallChain: validator.checkCallChain,
     Assignment: validator.checkAssignment,

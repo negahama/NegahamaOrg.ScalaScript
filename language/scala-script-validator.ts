@@ -25,18 +25,37 @@ export class ScalaScriptValidator {
     traceLog('stmt.type :', `${stmt.type?.$type}, '${reduceLog(stmt.type?.$cstNode?.text)}'`)
     traceLog('stmt.value:', `${stmt.value?.$type}, '${reduceLog(stmt.value?.$cstNode?.text)}'`)
 
+    // val 로 선언된 변수는 초기화가 필요하다.
+    if ((stmt.kind == 'val')) {
+      if (!stmt.value) {
+        const msg = "checkVariableDef: 'val' need to be initialized in ScalaScript."
+        accept('error', msg, {
+          node: stmt,
+        })
+      }
+    }
     if (stmt.type && stmt.value) {
       const left = TypeSystem.inferType(stmt.type)
       const right = TypeSystem.inferType(stmt.value)
       traceLog(`checkVariableDef result: ${left.toString()} = ${right.toString()}`)
 
-      const errors = right.checkAssignableTo(left)
-      if (errors.length) {
-        const msg = `checkVariableDef: ${errors.join(', ')}`
-        accept('error', msg, {
-          node: stmt,
-          property: 'value',
-        })
+      if ((stmt.kind == 'val') && TypeSystem.isObjectType(left)) {
+        if (!right.isEqual(left)) {
+          const msg = "checkVariableDef: 'val' need to be initialized in ScalaScript."
+          accept('error', msg, {
+            node: stmt,
+            property: 'type',
+          })
+        }
+      } else {
+        const errors = right.checkAssignableTo(left)
+        if (errors.length) {
+          const msg = `checkVariableDef: ${errors.join(', ')}`
+          accept('error', msg, {
+            node: stmt,
+            property: 'value',
+          })
+        }
       }
     } else if (!stmt.type && !stmt.value) {
       const msg = 'Variables require a type hint or an assignment at creation'
@@ -100,6 +119,32 @@ export class ScalaScriptValidator {
     //   node: decl,
     //   property: "name",
     // })
+    exitLog(log)
+  }
+
+  /**
+   * Validates the types of items in an array expression.
+   *
+   * This method checks that all items in the given array expression have the same type.
+   * If an item has a different type than the first item, an error is reported.
+   *
+   * @param expr - The array expression to validate.
+   * @param accept - The validation acceptor used to report validation issues.
+   */
+  checkArrayValue(expr: ast.ArrayValue, accept: ValidationAcceptor): void {
+    const log = enterLog('checkArrayValue', reduceLog(expr.$cstNode?.text))
+    let type: TypeDescriptor | undefined = undefined
+    expr.items.forEach((item, index) => {
+      const itemType = TypeSystem.inferType(item)
+      if (!type) {
+        type = itemType
+      } else if (!type.isEqual(itemType)) {
+        const msg = `checkArrayValue: Array item at index ${index} has type '${itemType.toString()}' but expected '${type.toString()}'.`
+        accept('error', msg, {
+          node: item,
+        })
+      }
+    })
     exitLog(log)
   }
 

@@ -263,7 +263,7 @@ val timeFlies2 = (msg: string) -> void => {
   console.log("time flies like an arrow... ", msg)
 }
 
-@NotTrans val setTimeout: (callback: () -> void, time: number) -> void
+@NotTrans var setTimeout: (callback: () -> void, time: number) -> void
 val oncePerSecond = (callback: (p:string) -> void) -> void => {
 %%//fun oncePerSecond = (callback: (p: string) -> void) -> void => {
   setTimeout(() => { callback('1초 지남!') }, 1000)

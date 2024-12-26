@@ -45,7 +45,7 @@ export function generateTypeScript(program: ast.Program, filePath: string, desti
  * and generates the corresponding code. If the node is neither a statement nor an expression,
  * an error message is logged.
  */
-function generateCode(code: ast.Code): string {
+export function generateCode(code: ast.Code): string {
   let result = ''
   if (ast.isStatement(code)) result += generateStatement(code, 0)
   else if (ast.isExpression(code)) result += generateExpression(code, 0)

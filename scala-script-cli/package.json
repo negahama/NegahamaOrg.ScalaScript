@@ -44,7 +44,8 @@
     "watch": "tsc -b tsconfig.json --watch",
     "lint": "eslint src --ext ts",
     "langium:generate": "langium generate",
-    "langium:watch": "langium generate --watch"
+    "langium:watch": "langium generate --watch",
+    "test": "vitest"
   },
   "dependencies": {
     "chalk": "~5.3.0",
@@ -57,7 +58,8 @@
     "@typescript-eslint/parser": "~7.3.1",
     "eslint": "~8.57.0",
     "langium-cli": "~3.3.0",
-    "typescript": "~5.1.6"
+    "typescript": "~5.1.6",
+    "vitest": "^2.1.8"
   },
   "volta": {
     "node": "18.19.1",
