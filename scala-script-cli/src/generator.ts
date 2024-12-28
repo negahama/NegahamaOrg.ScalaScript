@@ -180,14 +180,6 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
   return result
 }
 
-/**
- * Transpiles a variable definition statement into a string representation.
- *
- * @param stmt - The variable definition statement to transpile.
- * @param indent - The current indentation level.
- * @param isClassMember - Indicates if the variable is a class member.
- * @returns The transpiled string representation of the variable definition.
- */
 /*
   타입스크립트로 변환할 때 다음과 같은 점을 고려해야 한다.
 
@@ -235,6 +227,14 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
   같은 형태로의 변환은 당연히 되고 다른 형태로 변환하는 경우는 f3만 에러가 된다.
   즉 함수는 함수형 변수로 재정의가 될 수 있지만 함수형 변수는 파생 클래스에서 함수로 재정의 할 수 없다.
 */
+/**
+ * Transpiles a variable definition statement into a string representation.
+ *
+ * @param stmt - The variable definition statement to transpile.
+ * @param indent - The current indentation level.
+ * @param isClassMember - Indicates if the variable is a class member.
+ * @returns The transpiled string representation of the variable definition.
+ */
 function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMember: boolean = false): string {
   let result = ''
   if (stmt.annotate == 'NotTrans') return result
@@ -495,7 +495,7 @@ function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
     } else if (ast.isBypass(m)) {
       result += generateStatement(m, indent + 1)
     } else {
-      console.error(chalk.red('internal error in transpileObjectDef'))
+      console.error(chalk.red('internal error in transpileClassDef'))
     }
     result += '\n'
   })
@@ -1025,17 +1025,6 @@ function generateTypes(expr: ast.Types | undefined, indent: number): string {
 }
 
 /**
- * Generates a string representation of a property with its type.
- *
- * @param expr - The property expression containing the name and type.
- * @param indent - The indentation level for formatting the output.
- * @returns A string representing the property with its type.
- */
-function generateProperty(expr: ast.Property, indent: number): string {
-  return `${expr.name}: ${generateTypes(expr.type, indent)}`
-}
-
-/**
  * Transpiles a given SimpleType AST node into its corresponding string representation.
  *
  * @param expr - The SimpleType AST node to transpile.
@@ -1097,6 +1086,17 @@ function generateTypeChain(expr: ast.TypeChain, indent: number): string {
     }
   }
   return result
+}
+
+/**
+ * Generates a string representation of a property with its type.
+ *
+ * @param expr - The property expression containing the name and type.
+ * @param indent - The indentation level for formatting the output.
+ * @returns A string representing the property with its type.
+ */
+function generateProperty(expr: ast.Property, indent: number): string {
+  return `${expr.name}: ${generateTypes(expr.type, indent)}`
 }
 
 /**
@@ -1219,7 +1219,22 @@ interface GenerateFunctionParams {
 }
 
 /**
- * Generates a function declaration or expression as a string based on the provided parameters.
+ * Generates a function declaration string based on the provided parameters.
+ *
+ * @param param - The parameters for generating the function.
+ * @param param.includeFunction - Whether to include the 'function' keyword.
+ * @param param.override - Whether to include the 'override' keyword.
+ * @param param.name - The name of the function.
+ * @param param.generic - The generic parameters of the function.
+ * @param param.params - The parameters of the function.
+ * @param param.paramsForceBracket - Whether to force the use of parentheses around parameters.
+ * @param param.returnType - The return type of the function.
+ * @param param.returnDelimiter - The delimiter between the function signature and the return type.
+ * @param param.body - The body of the function.
+ * @param param.bodyDelimiter - The delimiter between the function signature and the body.
+ * @param param.bodyForceBracket - Whether to force the use of braces around the body.
+ * @param param.indent - The indentation level for the generated code.
+ * @returns The generated function declaration as a string.
  */
 function generateFunction(param: GenerateFunctionParams): string {
   let result = param.includeFunction ? 'function ' : ''

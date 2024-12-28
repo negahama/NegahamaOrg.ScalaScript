@@ -43,9 +43,15 @@ Code: Statement | Expression;
 //-----------------------------------------------------------------------------
 // 스칼라스크립트의 자료형 관련
 //-----------------------------------------------------------------------------
-// Union type
-// Union type은 모든 타입의 가장 최상위 타입이며 간단히 Types라고 표현한다.
-Types: 
+Types:
+  UnionType;
+
+/*
+  Union type은 모든 타입의 가장 최상위 타입이다.
+  Union type은 최상위 타입이기 때문에 union의 배열을 불가능하다. 즉 (string | number)[] 은 불가하지만
+  배열의 union은 가능하기 때문에 string[] | number[] 와 같은 형태로 사용할 수 있다.
+*/
+UnionType: 
   types+=SimpleType ('|' types+=SimpleType)*;
 
 /*
@@ -77,10 +83,10 @@ ArrayType:
   Object는 유저가 정의하는 타입중에 하나로 타입스크립트의 Object 타입과 동일하다.
   이전에는 사용자 정의 자료구조를 별도로 구분하지 않고 모두 오브젝트라는 단일 개념으로 사용하려고 했는데
   Object는 단순하게 사용할 수 있는데도 불구하고 Class의 복잡한 문법 구조의 영향을 받아 복잡해졌고 그래서 분리하였다. 
-  Object는 복합타입 컨테이너로 자신을 제외한 모든 타입(단일타입, 다른 복합타입, 배열타입등)을 가질 수 있다.
+  Object는 복합타입 컨테이너로 모든 타입(단일타입, 다른 복합타입, 배열타입등)을 가질 수 있다.
   하지만 Object 자체는 이런 값들을 가질 수 있다는 타입이지 객체가 아니라는 점이 중요하다.
 
-  오브젝트형 변수가 정의되는 것이며 오브젝트 타입에 이름을 부여하는 것일 뿐 Object 자체를 정의하는 문법은 없다.
+  오브젝트형 변수를 정의하거나 오브젝트 타입에 이름을 부여할 수 있을 뿐 Object 자체를 정의하는 문법은 없다.
 
   다른 것들과 마찬가지로 스칼라스크립트는 타입에 이름을 부여할 때 def를 사용한다.
   예를들어 name과 age를 property로 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
@@ -178,9 +184,15 @@ Statement:
   이름 : 타입 = 값
   타입이나 값을 통해서 변수의 타입을 알 수 있어야 한다.
   VariableDef Rule 자체는 타입과 값이 모두 없을 수 있지만 없으면 에러 타입이 된다.
-  일반적으로 둘 다 있거나 적어도 하나는 있어야 하며 타입과 값은 모두 있으면 명시된 타입을 우선하며
-  값만 있으면 값으로 타입을 추론한다.
+  일반적으로 둘 다 있거나 적어도 하나는 있어야 하며 타입과 값은 모두 있으면 값을 우선한다.
+  값을 우선하는 이유는 타입은 union 일 수도 있기 때문이다. 값만 있으면 당연히 값으로 타입을 추론한다.
 
+  그리고 모든 변수는 사용 전에 값이 할당되어져 있어야 한다.
+  특히 val로 선언되어진 변수는 (타입스크립트 변환을 위해서) 선언과 동시에 초기값으로 설정되어야 한다.
+  하지만 아직 변수의 사용 시점을 정확히 알지 못한다. 변수의 사용은 CallChain에서 처리되므로 이를 이용하면 되는데
+  n + 1 처럼 n을 사용하는 시점과 n = 1 처럼 n에 값을 할당하는 것이 모두 n을 사용하는 것이므로 이를 구분하기가 쉽지 않다.
+  아울러 var로 선언되어진 변수가 union type이고 나중에 값이 할당되어지면 이 변수의 값과 타입을 정확히 추론하는 것도 어렵다. 
+    
   이전에는 다중 선언문을 지원했지만 삭제하기로 했다.
   다중 선언문의 유용성에 비해 처리가 복잡해지기 시작했기 때문이다.
   다중 선언문을 처리하기 위해서는 DefaultScopeComputation의 processNode()를 override해서
@@ -299,7 +311,7 @@ FunctionTypeDef:
 
   스칼라스크립트에서는 interface와 class를 구분하지 않지만 실제로 타입스크립트로 변환할때는 구분해야 하는데
   함수나 대입문이 있거나 변수의 값을 초기화하는 경우 클래스로 변환된다.
-  자세한 내용은 transpileObjectDef()를 참고
+  자세한 내용은 transpileClassDef()를 참고
 */
 ClassDef:
   Annotation? (export?='export')?
@@ -502,7 +514,7 @@ RefCall: {infer CallChain}
   this의 경우 ScopeProvider에서 처리하지 않고 inferTypeCallChain()에서 처리하고 있다.
   사실 this가 무엇인지를 찾을 때 ScopeProvider의 getScope()가 호출되는데 getScope()에서 inferTypeCallChain()을 호출해 처리한다.
   예를들어 this.method를 찾을 때 getScope()에서 method의 previous인 this에 대한 inferType() 호출하고 이때 inferTypeCallChain()에서
-  this에 해당하는 바로 상위의 ObjectDef를 리턴해 주고 이를 ScopeProvider가 Scope로 변환한다.
+  this에 해당하는 바로 상위의 ClassDef를 리턴해 주고 이를 ScopeProvider가 Scope로 변환한다.
 */
 ThisOrSuper: {infer CallChain} this=('this' | 'super');
 

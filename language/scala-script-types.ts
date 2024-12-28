@@ -5,6 +5,9 @@ import assert from 'assert'
 import chalk from 'chalk'
 
 /**
+ * TypeDescriptor는 타입에 대한 정보를 저장, 표시하고 비교하는 역할을 담당한다.
+ * 타입을 추론하는 것은 추론기(Inferer)인 TypeSystem에서 담당한다.
+ *
  * TypeDescriptor 클래스 계층 구조
  *
  * TypeDescriptor
@@ -60,21 +63,21 @@ export class TypeDescriptor {
     if (this.$type == 'any' || other.$type == 'any') return []
     if (other.$type == 'union') {
       const otherUnion = other as UnionTypeDescriptor
-      // this가 other union의 elementTypes 중에서 하나라도 assign 가능하면 assignable로 판단한다.
+      // this가 otherUnion의 elementTypes 중에서 하나라도 assign 가능하면 assignable로 판단한다.
       if (otherUnion.elementTypes.some(e => this.isAssignableTo(e))) return []
       else return [`Assigned union '${otherUnion.toString()}' don't have this type '${this.toString()}'`]
     }
     if (this.$type == other.$type) {
       return this.compareTo(other)
     }
-    return [`Type ${this.toString()} is not equal ${other.toString()}`]
+    return [`Type '${this.toString()}' is not assignable to type '${other.toString()}'`]
   }
 
   // 파생 클래스에서 자신과 동일한 타입에 대한 assignment 여부를 판단하기 위한 추상함수 성격의 함수이다.
   // 기본적인 파생 클래스들을 위해서 isEqual()을 사용하는 기본 코드가 구현되어 있다.
   compareTo(other: TypeDescriptor): string[] {
     if (this.isEqual(other)) return []
-    return [`Type ${this.toString()} is not equal ${other.toString()}`]
+    return [`Type '${this.toString()}' is not equal '${other.toString()}'`]
   }
 }
 
@@ -116,37 +119,37 @@ export class VoidTypeDescriptor extends TypeDescriptor {
 }
 
 /**
- * Represents a description of a string type.
+ * Represents a type descriptor for string types.
  *
  * @property $type - A constant string value indicating the type, which is always 'string'.
- * @property literal - An optional literal value of type `ast.Literal`.
+ * @param node - An optional AST expression associated with the string type.
  */
 export class StringTypeDescriptor extends TypeDescriptor {
-  constructor(public literal?: ast.Literal) {
+  constructor(public node?: ast.Expression) {
     super('string')
   }
 }
 
 /**
- * Represents a description of a number type.
+ * Represents a type descriptor for numbers in the ScalaScript language.
  *
- * @property $type - A string literal indicating the type, which is always 'number'.
- * @property literal - An optional property representing a literal value of the number type.
+ * @property $type - A constant string value indicating the type, which is always 'number'.
+ * @param node - An optional AST expression associated with the number type.
  */
 export class NumberTypeDescriptor extends TypeDescriptor {
-  constructor(public literal?: ast.Literal) {
+  constructor(public node?: ast.Expression) {
     super('number')
   }
 }
 
 /**
- * Represents a description of a boolean type in the ScalaScript language.
+ * Represents a type descriptor for boolean values.
  *
- * @property $type - A string literal that identifies the type as 'boolean'.
- * @property literal - An optional AST literal associated with the boolean type.
+ * @property $type - A constant string value indicating the type, which is always 'boolean'.
+ * @param node - An optional AST expression associated with the boolean type.
  */
 export class BooleanTypeDescriptor extends TypeDescriptor {
-  constructor(public literal?: ast.Literal) {
+  constructor(public node?: ast.Expression) {
     super('boolean')
   }
 }
@@ -183,8 +186,11 @@ export class GenericTypeDescriptor extends TypeDescriptor {
  * @property {TypeDescription[]} elementTypes - An array of type descriptions that are part of the union.
  */
 export class UnionTypeDescriptor extends TypeDescriptor {
-  constructor(public elementTypes: TypeDescriptor[]) {
+  elementTypes: TypeDescriptor[] = []
+
+  constructor(types: TypeDescriptor[]) {
     super('union')
+    this.elementTypes = this.normalize(types)
   }
 
   override toString(): string {
@@ -195,8 +201,8 @@ export class UnionTypeDescriptor extends TypeDescriptor {
     if (other.$type !== 'union') return false
     const otherUnion = other as UnionTypeDescriptor
     // Union 타입은 순서가 중요하지 않다.
-    const set1 = TypeSystem.getNormalizedType(this.elementTypes)
-    const set2 = TypeSystem.getNormalizedType(otherUnion.elementTypes)
+    const set1 = this.normalize(this.elementTypes)
+    const set2 = this.normalize(otherUnion.elementTypes)
     return set1.length == set2.length && set1.every(value => set2.find(e => value.isEqual(e)))
   }
 
@@ -216,13 +222,58 @@ export class UnionTypeDescriptor extends TypeDescriptor {
       else errors.push(`Assigned union '${otherUnion.toString()}' don't have this type '${this.toString()}'`)
     } else {
       if (this.elementTypes.some(e => e.isEqual(other))) return []
-      else errors.push(`Type ${this.toString()} is not equal ${other.toString()}`)
+      else errors.push(`Type '${this.toString()}' is not equal '${other.toString()}'`)
     }
     return errors
   }
 
   isContain(type: TypeDescriptor): boolean {
     return this.elementTypes.some(e => e.isEqual(type))
+  }
+
+  /**
+   * Returns an array of unique `TypeDescription` objects by removing duplicates.
+   *
+   * @param types - An array of `TypeDescription` objects to be normalized.
+   * @returns An array of unique `TypeDescription` objects.
+   */
+  normalize(types: TypeDescriptor[]): TypeDescriptor[] {
+    // 새로운 타입과 기존의 타입들이 호환되는지 확인한다.
+    // 새로운 타입이 기존의 타입들에 포함되면 true를 리턴하는데 이는 새로운 타입을 추가할 필요가 없다는 의미이다.
+    // any type은 모든 타입으로 변환될 수 있으므로 제거한다.
+    const compatibleType = (nt: TypeDescriptor, set: TypeDescriptor[]) => {
+      if (set.some(e => nt.isEqual(e))) return true
+
+      //todo nil도 일단은 any와 같이 취급한다.
+      if (nt.$type == 'any') return true
+      else if (nt.$type == 'nil') return true
+      else if (nt.$type == 'array') {
+        let found = false
+        set.forEach(e => {
+          if (e.$type == 'array') {
+            if ((nt as ArrayTypeDescriptor).elementType.isEqual((e as ArrayTypeDescriptor).elementType)) found = true
+          }
+        })
+        return found
+      }
+      return false
+    }
+
+    // types에 타입이 하나 이하이면 그냥 리턴
+    if (types.length <= 1) return types
+
+    // types에 union type이 포함되어 있으면 union type을 풀어서 각각의 타입으로 변환한다.
+    const spread: TypeDescriptor[] = []
+    types.forEach(t => {
+      if (t.$type == 'union') spread.push(...(t as UnionTypeDescriptor).elementTypes)
+      else spread.push(t)
+    })
+
+    const set: TypeDescriptor[] = []
+    spread.forEach(e => {
+      if (!compatibleType(e, set)) set.push(e)
+    })
+    return set
   }
 }
 
@@ -300,51 +351,22 @@ export interface FunctionParameter {
  * @property {GenericTypeDescription[]} generic - The list of generic infomation that the function accepts.
  */
 export class FunctionTypeDescriptor extends TypeDescriptor {
-  returnType: TypeDescriptor
+  returnType: TypeDescriptor = new VoidTypeDescriptor()
   parameters: FunctionParameter[] = []
   generic: GenericTypeDescriptor[] = []
 
   /**
    * Constructs a new instance of the class.
    *
-   * @param node - An optional AST node which can be of type `FunctionDef`, `FunctionType`, or `FunctionValue`.
+   * FunctionTypeDescriptor는 returnType, parameters, generic의 정보를 필요로 하는데
+   * 이 정보들을 여기 생성자에서 추론할 수 있지만 TypeSystem과의 결합성을 줄이고 TypeDescriptor로 한정하기 위해서
+   * 여기서 추론하지 않는다. 이 정보들은 FunctionDescriptor가 생성되어진 이후에 TypeSystem의 createFunctionType()에서
+   * 설정하며 TypeSystem은 이 개체의 설정에 대해서 책임을 진다.
    *
-   * Initializes the return type to `VoidTypeDescription` by default. If a return type is specified in the node,
-   * it infers the type from the return type. If no return type is specified but the node has a body, it infers
-   * the type from the body. If neither is present, it defaults to `VoidTypeDescription`.
-   *
-   * Initializes the parameters by mapping over the node's parameters and inferring their types.
-   *
-   * Initializes the generic types if the node is of type `FunctionDef`.
+   * @param node - An optional parameter that can be of type `ast.FunctionDef`, `ast.FunctionType`, or `ast.FunctionValue`.
    */
   constructor(node?: ast.FunctionDef | ast.FunctionType | ast.FunctionValue) {
     super('function')
-    // 명시된 리턴 타입이 있으면 이를 근거로 한다.
-    // 명시된 리턴 타입도 없으면 함수의 바디를 근거로 한다.
-    // 명시된 리턴 타입도 없고 함수의 바디도 없으면 void type으로 간주한다
-    this.returnType = new VoidTypeDescriptor()
-    if (!node) return
-
-    traceLog(`* return type: '${reduceLog(node.returnType?.$cstNode?.text)}'`)
-    if (node.returnType) this.returnType = TypeSystem.inferType(node.returnType)
-    else if ((ast.isFunctionDef(node) || ast.isFunctionValue(node)) && node.body)
-      this.returnType = TypeSystem.inferType(node.body)
-
-    traceLog('* parameter type: count is', node.params.length)
-    this.parameters = node.params.map(e => ({
-      name: e.name,
-      type: TypeSystem.inferType(e),
-      spread: e.spread,
-      nullable: e.nullable,
-      defaultValue: e.value,
-    }))
-
-    // ClassDef, FunctionDef에서 정의되어진 것들은 디폴트로 AnyTypeDescritption을 가지고 있다가
-    // NewExpression에서 실제 타입으로 대체된다.
-    this.generic = []
-    if (ast.isFunctionDef(node)) {
-      this.generic = node.generic?.types.map(name => new GenericTypeDescriptor(name)) ?? []
-    }
   }
 
   /**
@@ -426,8 +448,7 @@ export class FunctionTypeDescriptor extends TypeDescriptor {
     if (this.parameters.length == 0) {
       if (otherFunction.parameters.length == 0) return []
       else {
-        if (otherFunction.parameters.filter(p => !(p.nullable || p.defaultValue)))
-          return ['parameter does not matched']
+        if (otherFunction.parameters.filter(p => !(p.nullable || p.defaultValue))) return ['parameter does not matched']
         return errors
       }
     }
@@ -528,27 +549,23 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
    * Logs differences in names and types to the console for debugging purposes.
    */
   override isEqual(other: TypeDescriptor): boolean {
-    if (other.$type !== 'object') return false
-    const otherObject = other as ObjectTypeDescriptor
-    const otherElements = otherObject.getElementList()
-    if (this.getElementList().length != otherElements.length) {
-      console.log(chalk.red('개수가 다름:'), this.getElementList().length, otherElements.length)
-      return false
-    }
-    for (let e of this.getElementList()) {
-      const found = otherElements.find(o => o.name == e.name)
-      if (!found) {
-        console.log(chalk.red('이름이 없음:'), e.name, reduceLog(e.node.$cstNode?.text))
+    if (!(other.$type == 'object' || other.$type == 'class')) return false
+    if (other.$type == 'object') {
+      const otherObject = other as ObjectTypeDescriptor
+      const otherElements = otherObject.getElementList()
+      if (this.getElementList().length != otherElements.length) {
+        console.log(chalk.red('개수가 다름:'), this.getElementList().length, otherElements.length)
         return false
       }
-      // 동일한 이름이 있으면 타입도 같아야 한다.
-      const t1 = TypeSystem.inferType(e.node)
-      const t2 = TypeSystem.inferType(found.node)
-      if (!t1.isEqual(t2)) {
-        console.log(chalk.red('타입이 다름:'), e.name)
-        console.log('  t1:', chalk.green(t1.toString()), reduceLog(e.node.$cstNode?.text))
-        console.log('  t2:', chalk.green(t2.toString()), reduceLog(found.node.$cstNode?.text))
-        return false
+      for (let e of this.getElementList()) {
+        const result = otherObject.hasElement(e.name, e.node, 'isEqual')
+        if (result) return false
+      }
+    } else if (other.$type == 'class') {
+      const otherClass = other as ClassTypeDescriptor
+      for (let e of this.getElementList()) {
+        const result = otherClass.hasElement(e.name, e.node, 'isEqual')
+        if (result) return false
       }
     }
     return true
@@ -574,19 +591,9 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
     if (other.$type == 'class') {
       const otherClass = other as ClassTypeDescriptor
       const errors: string[] = []
-      const otherElements = otherClass.getElementList()
       for (let e of this.getElementList()) {
-        const found = otherElements.find(o => o.name == e.name)
-        if (!found) {
-          errors.push(`Element '${e.name}' does not exist in type '${otherClass.toString()}'`)
-          break
-        }
-        // 동일한 이름이 있으면 타입도 같아야 한다.
-        const t1 = TypeSystem.inferType(e.node)
-        const t2 = TypeSystem.inferType(found.node)
-        if (!t1.isAssignableTo(t2)) {
-          errors.push(`Element '${e.name}'s types are different(${t1.toString()}, ${t2.toString()})`)
-        }
+        const result = otherClass.hasElement(e.name, e.node, 'isAssignableTo')
+        if (result) errors.push(result)
       }
       return errors
     }
@@ -606,19 +613,9 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
   override compareTo(other: TypeDescriptor): string[] {
     const otherObject = other as ObjectTypeDescriptor
     const errors: string[] = []
-    const otherElements = otherObject.getElementList()
     for (let e of this.getElementList()) {
-      const found = otherElements.find(o => o.name == e.name)
-      if (!found) {
-        errors.push(`Element '${e.name}' does not exist in type '${otherObject.toString()}'`)
-        break
-      }
-      // 동일한 이름이 있으면 타입도 같아야 한다.
-      const t1 = TypeSystem.inferType(e.node)
-      const t2 = TypeSystem.inferType(found.node)
-      if (!t1.isAssignableTo(t2)) {
-        errors.push(`Element '${e.name}'s types are different(${t1.toString()}, ${t2.toString()})`)
-      }
+      const result = otherObject.hasElement(e.name, e.node, 'isAssignableTo')
+      if (result) errors.push(result)
     }
     return errors
   }
@@ -650,6 +647,26 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
       })
     }
     return list
+  }
+
+  /**
+   * Checks if an element with the given name exists in the element list and verifies its type.
+   *
+   * @param name - The name of the element to check.
+   * @param node - The AST node associated with the element.
+   * @param checkingType - The type of check to perform: 'isEqual' or 'isAssignableTo'.
+   * @returns A string indicating an error message if the element does not exist or if the types are different, otherwise undefined.
+   */
+  hasElement(name: string, node: AstNode, checkingType: 'isEqual' | 'isAssignableTo'): string | undefined {
+    const found = this.getElementList().find(e => e.name == name)
+    if (!found) return `Element '${name}' does not exist`
+
+    // 동일한 이름이 있으면 타입도 같아야 한다.
+    const t1 = TypeSystem.inferType(node)
+    const t2 = TypeSystem.inferType(found.node)
+    const result = checkingType == 'isEqual' ? t1.isEqual(t2) : t1.isAssignableTo(t2)
+    if (!result) return `Element '${name}'s types are different(${t1.toString()}, ${t2.toString()})`
+    return undefined
   }
 }
 
@@ -775,6 +792,26 @@ export class ClassTypeDescriptor extends TypeDescriptor {
     })
     return type
   }
+
+  /**
+   * Checks if an element with the given name exists in the element list and verifies its type.
+   *
+   * @param name - The name of the element to check.
+   * @param node - The AST node associated with the element.
+   * @param checkingType - The type of check to perform: 'isEqual' or 'isAssignableTo'.
+   * @returns A string indicating an error message if the element does not exist or if the types are different, otherwise undefined.
+   */
+  hasElement(name: string, node: AstNode, checkingType: 'isEqual' | 'isAssignableTo'): string | undefined {
+    const found = this.getElementList().find(e => e.name == name)
+    if (!found) return `Element '${name}' does not exist`
+
+    // 동일한 이름이 있으면 타입도 같아야 한다.
+    const t1 = TypeSystem.inferType(node)
+    const t2 = TypeSystem.inferType(found.node)
+    const result = checkingType == 'isEqual' ? t1.isEqual(t2) : t1.isAssignableTo(t2)
+    if (!result) return `Element '${name}'s types are different(${t1.toString()}, ${t2.toString()})`
+    return undefined
+  }
 }
 
 /**
@@ -813,10 +850,49 @@ export class TypeSystem {
   static createUnionType(types: TypeDescriptor[]): TypeDescriptor {
     // Union 타입은 중복된 타입을 제거해야 하는데 Set을 사용해서 이를 처리할 수 없다.
     // 중복된 타입을 제거한 후에도 union 타입인 경우에만 union을 리턴하고 아니면 단일 타입을 리턴한다.
-    const normalized = TypeSystem.getNormalizedType(types)
-    if (normalized.length == 0) return new ErrorTypeDescriptor('no types in union')
-    else if (normalized.length == 1) return normalized[0]
-    else return new UnionTypeDescriptor(normalized)
+    const union = new UnionTypeDescriptor(types)
+    if (union.elementTypes.length == 0) return new ErrorTypeDescriptor('no types in union')
+    else if (union.elementTypes.length == 1) return union.elementTypes[0]
+    else return union
+  }
+
+  /**
+   * Creates a new `FunctionTypeDescriptor` instance from the given AST node.
+   *
+   * @param node - The AST node representing a function definition, function type, or function value.
+   * @returns A new `FunctionTypeDescriptor` instance.
+   */
+  static createFunctionType(node: ast.FunctionDef | ast.FunctionType | ast.FunctionValue): FunctionTypeDescriptor {
+    const log = enterLog('createFunctionType', `${chalk.green(node?.$type)}, '${node?.$cstNode?.text}'`)
+
+    const type = new FunctionTypeDescriptor(node)
+
+    // 명시된 리턴 타입이 있으면 이를 근거로 한다.
+    // 명시된 리턴 타입도 없으면 함수의 바디를 근거로 한다.
+    // 명시된 리턴 타입도 없고 함수의 바디도 없으면 void type으로 간주한다
+    type.returnType = new VoidTypeDescriptor()
+    if (node.returnType) type.returnType = this.inferType(node.returnType)
+    else if ((ast.isFunctionDef(node) || ast.isFunctionValue(node)) && node.body)
+      type.returnType = this.inferType(node.body)
+    traceLog(`* return type: ${type.returnType.toString()}`)
+
+    type.parameters = node.params.map(e => ({
+      name: e.name,
+      type: this.inferType(e),
+      spread: e.spread,
+      nullable: e.nullable,
+      defaultValue: e.value,
+    }))
+    traceLog('* parameter type: count is', type.parameters.length)
+
+    // ClassDef, FunctionDef에서 정의되어진 것들은 디폴트로 AnyTypeDescritption을 가지고 있다가
+    // NewExpression에서 실제 타입으로 대체된다.
+    if (ast.isFunctionDef(node)) {
+      type.generic = node.generic?.types.map(name => new GenericTypeDescriptor(name)) ?? []
+    }
+
+    exitLog(log)
+    return type
   }
 
   /**
@@ -950,6 +1026,23 @@ export class TypeSystem {
   }
 
   /**
+   * Determines if the given type descriptor represents a primitive type.
+   *
+   * A type is considered primitive if it is one of the following:
+   * - Nil type
+   * - Void type
+   * - String type
+   * - Number type
+   * - Boolean type
+   *
+   * @param item - The type descriptor to check.
+   * @returns `true` if the type descriptor represents a primitive type, otherwise `false`.
+   */
+  static isPrimitiveType(item: TypeDescriptor): boolean {
+    return this.isStringType(item) || this.isNumberType(item) || this.isBooleanType(item)
+  }
+
+  /**
    * Infers the type of a given AST node.
    *
    * @param node - The AST node for which the type is to be inferred. Can be undefined.
@@ -985,61 +1078,61 @@ export class TypeSystem {
     let type: TypeDescriptor | undefined
 
     if (ast.isTypes(node)) {
-      type = TypeSystem.inferTypeTypes(node)
+      type = this.inferTypeTypes(node)
     } else if (ast.isSimpleType(node)) {
       // Types와 SimpleType은 분리되어져 있다.
       // SimpleType은 ArrayType | ObjectType | ElementType와 같이 UnionType이며 타입들의 단순한 집합이지만
       // Types는 types+=SimpleType ('|' types+=SimpleType)*와 같이 SimpleType의 배열로 단순히 타입이 아니다.
       // 일례로 TypeChain은 ElementType이고 SimpleType이긴 하지만 Types는 아니다.
-      type = TypeSystem.inferTypeSimpleType(node)
+      type = this.inferTypeSimpleType(node)
     } else if (ast.isVariableDef(node)) {
-      type = TypeSystem.inferTypeVariableDef(node)
+      type = this.inferTypeVariableDef(node)
     } else if (ast.isFunctionDef(node)) {
-      type = TypeSystem.inferTypeFunctionDef(node)
+      type = this.inferTypeFunctionDef(node)
     } else if (ast.isClassDef(node)) {
-      type = TypeSystem.inferTypeClassDef(node)
+      type = this.inferTypeClassDef(node)
     } else if (ast.isCallChain(node)) {
-      type = TypeSystem.inferTypeCallChain(node)
+      type = this.inferTypeCallChain(node)
     } else if (ast.isParameter(node)) {
-      type = TypeSystem.inferTypeParameter(node)
+      type = this.inferTypeParameter(node)
     } else if (ast.isProperty(node)) {
-      type = TypeSystem.inferTypeProperty(node)
+      type = this.inferTypeProperty(node)
     } else if (ast.isBinding(node)) {
-      type = TypeSystem.inferTypeBinding(node)
+      type = this.inferTypeBinding(node)
     } else if (ast.isForOf(node)) {
-      type = TypeSystem.inferTypeForOf(node)
+      type = this.inferTypeForOf(node)
     } else if (ast.isForTo(node)) {
-      type = TypeSystem.inferTypeForTo(node)
+      type = this.inferTypeForTo(node)
     } else if (ast.isAssignment(node)) {
-      type = TypeSystem.inferTypeAssignment(node)
+      type = this.inferTypeAssignment(node)
     } else if (ast.isLogicalNot(node)) {
-      type = TypeSystem.inferTypeLogicalNot(node)
+      type = this.inferTypeLogicalNot(node)
     } else if (ast.isIfExpression(node)) {
-      type = TypeSystem.inferTypeIfExpression(node)
+      type = this.inferTypeIfExpression(node)
     } else if (ast.isMatchExpression(node)) {
-      type = TypeSystem.inferTypeMatchExpression(node)
+      type = this.inferTypeMatchExpression(node)
     } else if (ast.isGroupExpression(node)) {
-      type = TypeSystem.inferTypeGroupExpression(node)
+      type = this.inferTypeGroupExpression(node)
     } else if (ast.isUnaryExpression(node)) {
-      type = TypeSystem.inferTypeUnaryExpression(node)
+      type = this.inferTypeUnaryExpression(node)
     } else if (ast.isBinaryExpression(node)) {
-      type = TypeSystem.inferTypeBinaryExpression(node)
+      type = this.inferTypeBinaryExpression(node)
     } else if (ast.isReturnExpression(node)) {
-      type = TypeSystem.inferTypeReturnExpression(node)
+      type = this.inferTypeReturnExpression(node)
     } else if (ast.isSpreadExpression(node)) {
-      type = TypeSystem.inferTypeSpreadExpression(node)
+      type = this.inferTypeSpreadExpression(node)
     } else if (ast.isNewExpression(node)) {
-      type = TypeSystem.inferTypeNewExpression(node)
+      type = this.inferTypeNewExpression(node)
     } else if (ast.isArrayValue(node)) {
-      type = TypeSystem.inferTypeArrayValue(node)
+      type = this.inferTypeArrayValue(node)
     } else if (ast.isObjectValue(node)) {
-      type = TypeSystem.inferTypeObjectValue(node)
+      type = this.inferTypeObjectValue(node)
     } else if (ast.isFunctionValue(node)) {
-      type = TypeSystem.inferTypeFunctionValue(node)
+      type = this.inferTypeFunctionValue(node)
     } else if (ast.isLiteral(node)) {
-      type = TypeSystem.inferTypeLiteral(node)
+      type = this.inferTypeLiteral(node)
     } else if (ast.isBlock(node)) {
-      type = TypeSystem.inferTypeBlock(node)
+      type = this.inferTypeBlock(node)
     }
 
     if (!type) {
@@ -1047,7 +1140,7 @@ export class TypeSystem {
     }
 
     // for debugging...
-    if (TypeSystem.isErrorType(type)) {
+    if (this.isErrorType(type)) {
       console.error(chalk.red('inferType Error:'), `${type.toString()}, '${node.$cstNode?.text}'`)
     }
 
@@ -1069,9 +1162,9 @@ export class TypeSystem {
    */
   static inferTypeTypes(node: ast.Types): TypeDescriptor {
     const log = enterLog('inferTypeTypes', `'${node.$cstNode?.text}'`)
-    const ts = node.types.map(t => TypeSystem.inferType(t))
+    const ts = node.types.map(t => this.inferType(t))
     // 실제 Union 타입이 아니면 처리를 단순화하기 위해 개별 타입으로 리턴한다.
-    const type = TypeSystem.createUnionType(ts)
+    const type = this.createUnionType(ts)
     exitLog(log, type)
     return type
   }
@@ -1090,11 +1183,11 @@ export class TypeSystem {
     const log = enterLog('inferTypeSimpleType', `'${node.$cstNode?.text}'`)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (ast.isArrayType(node)) {
-      type = new ArrayTypeDescriptor(TypeSystem.inferType(node.elementType))
+      type = new ArrayTypeDescriptor(this.inferType(node.elementType))
     } else if (ast.isObjectType(node)) {
       type = new ObjectTypeDescriptor(node)
     } else if (ast.isFunctionType(node)) {
-      type = new FunctionTypeDescriptor(node)
+      type = this.createFunctionType(node)
     } else if (ast.isPrimitiveType(node)) {
       switch (node.type) {
         case 'any':
@@ -1127,7 +1220,7 @@ export class TypeSystem {
           type = new ClassTypeDescriptor(ref)
         }
       }
-      if (TypeSystem.isErrorType(type)) {
+      if (this.isErrorType(type)) {
         // type 중에 ref가 없는 것은 Generic일 가능성이 있다.
         const container = AstUtils.getContainerOfType(node, ast.isClassDef)
         if (container && container.generic?.types.includes(node.reference.$refText)) {
@@ -1139,6 +1232,27 @@ export class TypeSystem {
     return type
   }
 
+  /*
+    타입이 명시되어진 경우라도 값에서 더 유용한 타입을 추론할 수 있다.
+    예를 들면 명시된 타입이 union인 경우 실제 값의 타입이 union 자체보다 유용하다.
+    하지만 항상 그런 것은 아니다. 값의 타입이 any인 경우나 유효하지 않은 경우에는 명시된 타입을 더 유용하다.
+
+    값의 타입을 추론하는 것은 신중하게 처리되어야 한다. 왜냐하면 값으로 방대하고 복잡한 오브젝트가
+    올 수도 있는데 때때로 이것은 recursive definition을 유발할 수도 있기 때문이다.
+    val 보유기술: ChainPrompt = {
+      prompt: '추가할 기술?'
+      callback: (corp, options) => { console.log(corp.name, options) }
+      nextChain: { prompt: '기술수준?' }
+    }
+    위 코드에서 corp.name에서 corp의 타입을 추론하려고 하려고 parameter인 corp를 추론하려고 하는데
+    이 parameter corp는 callback을 알아야 하고 callback은 ChainPrompt를 알아야 해결될 수 있다.
+    이까지는 문제가 안되는데 VariableDef이 val 보유기술: ChainPrompt에서 value를 추론하면
+    callback의 parameter corp에 대해 다시 알아야 하고 처음 과정이 아직 끝난 상태가 아니기 때문에
+    recursive definition이 발생한다.
+
+    아울러 값이 있는 경우에는 값 자체를 TypeDescriptor의 node, literal로 사용하는 것이 더 유용하다.
+    이것은 해당 변수에 값이 할당되어졌는지를 확인할 때도 유용하고 변수의 실제 값을 나중에 참조할 수 있다.
+  */
   /**
    * Infers the type of a variable definition node.
    *
@@ -1146,10 +1260,36 @@ export class TypeSystem {
    * @returns The inferred type description of the variable definition.
    */
   static inferTypeVariableDef(node: ast.VariableDef): TypeDescriptor {
-    const log = enterLog('inferTypeVariableDef', node.name)
+    const log = enterLog('inferTypeVariableDef', `variable name: ${node.name}`)
     let type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
-    if (node.type) type = TypeSystem.inferType(node.type)
-    else if (node.value) type = TypeSystem.inferType(node.value)
+    if (node.type) {
+      type = this.inferType(node.type)
+      // 명시된 타입만 있고 값이 없는 경우 명시된 타입을 사용한다.
+      if (node.value) {
+        // 명시된 타입도 있고 값도 있는 경우
+        // 값의 타입을 사용하는 경우를 union으로 선언되어진 경우와 primitive type인 경우만으로 한정한다.
+        // isAssignableTo()를 호출하지 않아도 deep한 추론을 하지 않기 때문에 위에서 말한 문제점을 줄일 수 있다.
+        if (this.isUnionType(type)) {
+          const valueType = this.inferType(node.value)
+          traceLog(`명시된 타입: ${type.toString()}, 값의 타입: ${valueType.toString()}`)
+          if (this.isAnyType(valueType)) {
+            // do nothing
+            // } else if (!valueType.isAssignableTo(type)) {
+            //   const msg =
+            //     `Variable '${node.name}' value '${valueType.toString()}' is not assignable to ` +
+            //     `type '${type.toString()}'`
+            //   console.error(chalk.red(msg))
+          } else type = valueType
+        } else if (this.isPrimitiveType(type)) {
+          type = this.inferType(node.value)
+        }
+      }
+    }
+    // 명시된 타입없이 값만 있는 경우 값을 보고 타입을 추론한다.
+    else if (node.value) {
+      type = this.inferType(node.value)
+      traceLog('명시된 타입없이 value만으로 추론:', type.toString())
+    }
     exitLog(log, type)
     return type
   }
@@ -1162,7 +1302,7 @@ export class TypeSystem {
    */
   static inferTypeFunctionDef(node: ast.FunctionDef): TypeDescriptor {
     const log = enterLog('inferTypeFunctionDef', node.name)
-    const type = new FunctionTypeDescriptor(node)
+    const type = this.createFunctionType(node)
     exitLog(log, type)
     return type
   }
@@ -1199,7 +1339,7 @@ export class TypeSystem {
 
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (element) {
-      type = TypeSystem.inferType(element)
+      type = this.inferType(element)
 
       // CallChain은 변수, 함수, 배열등을 모두 포함할 수 있다.
       // 이것의 타입이 무엇인가를 결정할 때는 context가 중요하다.
@@ -1213,19 +1353,19 @@ export class TypeSystem {
       // 그렇지 않으면 함수 자체의 타입이 중요하다.
 
       // 배열 호출이면 배열 요소가 리턴되어야 한다.
-      if (TypeSystem.isArrayType(type) && node.isArray) {
+      if (this.isArrayType(type) && node.isArray) {
         traceLog('배열 호출이면 배열 요소가 리턴되어야 한다', type.elementType.toString())
         type = type.elementType
       }
 
       // 함수 호출이면 함수 리턴 타입이 리턴되어야 한다
-      if (TypeSystem.isFunctionType(type) && node.isFunction) {
+      if (this.isFunctionType(type) && node.isFunction) {
         traceLog('함수 호출이면 함수 리턴 타입이 리턴되어야 한다', type.returnType.toString())
         // 일반적인 함수 호출이면 함수의 리턴 타입을 리턴하고
         // 함수형 메서드 호출인 경우에는 return type을 조정해 준다.
         // 이때 if (fmt) type.returnType = fmt 같이 하면 정의된 함수의 리턴 타입이 변경되므로 주의해야 한다.
-        const fmt = TypeSystem.getFunctionInfo(node)
-        if (fmt && TypeSystem.isFunctionType(fmt)) {
+        const fmt = this.getFunctionInfo(node)
+        if (fmt && this.isFunctionType(fmt)) {
           // console.log('After getFunctionInfo():', node.$cstNode?.text, fmt.returnType.toString())
           type = fmt.returnType
         } else type = type.returnType
@@ -1244,7 +1384,7 @@ export class TypeSystem {
         } else if (node.$cstNode?.text == 'super') {
           // super는 현재 클래스의 부모 클래스를 찾는다.
           //todo 문제는 조부모 클래스인데... 일단은 부모만 사용한다.
-          const classChain = TypeSystem.getClassChain(classItem).filter(c => c != classItem)
+          const classChain = this.getClassChain(classItem).filter(c => c != classItem)
           if (classChain.length > 0) {
             const superClass = classChain[0]
             traceLog(`'super' refers ${superClass.name}`)
@@ -1274,11 +1414,11 @@ export class TypeSystem {
       // previous가 함수이면 이것의 리턴 타입을 자신의 타입으로 리턴하게 하고
       // previous가 배열이면 배열의 element 타입을 자신의 타입으로 취한다.
       if (node.previous) {
-        const previousType = TypeSystem.inferType(node.previous)
+        const previousType = this.inferType(node.previous)
         console.log(chalk.red('여기는 정확히 어떨 때 호출되는가?', id))
         console.log(chalk.green(`  previous: ${node.previous?.$cstNode?.text}'s type: ${previousType.$type}`))
-        if (TypeSystem.isFunctionType(previousType)) type = previousType.returnType
-        else if (TypeSystem.isArrayType(previousType)) type = previousType.elementType
+        if (this.isFunctionType(previousType)) type = previousType.returnType
+        else if (this.isArrayType(previousType)) type = previousType.elementType
         else type = new ErrorTypeDescriptor('Could not infer type for element ' + node.element?.$refText, node)
         exitLog(log, type)
         return type
@@ -1301,13 +1441,13 @@ export class TypeSystem {
   static inferTypeParameter(node: ast.Parameter): TypeDescriptor {
     const log = enterLog('inferTypeParameter', node.name)
     let type: TypeDescriptor = new AnyTypeDescriptor()
-    if (node.type) type = TypeSystem.inferType(node.type)
-    else if (node.value) type = TypeSystem.inferType(node.value)
+    if (node.type) type = this.inferType(node.type)
+    else if (node.value) type = this.inferType(node.value)
     else {
       // getFunctionInfo()는 함수 자체에 대한 정보를 리턴하기 때문에 파라미터와 함수의 인수들을 매치하는 작업이 필요하다.
       // node.$container.$container가 쓰인 이유는 [이 문서](/.prism/docs/d064613466b71eae97f19e05193accdf.md)을 참고한다.
       const funcNode = node.$container.$container
-      const funcType = TypeSystem.getFunctionInfo(funcNode)
+      const funcType = this.getFunctionInfo(funcNode)
       if (!funcType) {
         // for debugging...
         console.error(
@@ -1316,9 +1456,9 @@ export class TypeSystem {
           chalk.green(funcNode?.$type),
           reduceLog(funcNode?.$cstNode?.text)
         )
-      } else if (TypeSystem.isArrayType(funcType)) {
+      } else if (this.isArrayType(funcType)) {
         type = funcType
-      } else if (TypeSystem.isFunctionType(funcType)) {
+      } else if (this.isFunctionType(funcType)) {
         // for debugging...
         // console.log('parameter.name:', node.name, `'${reduceLog(funcNode?.$cstNode?.text)}'`)
         // funcType.showDetailInfo()
@@ -1331,7 +1471,7 @@ export class TypeSystem {
           if (funcParamIndex != undefined && funcParamIndex != -1) {
             const funcArg = callchain?.args[funcParamIndex]
             const argType = funcType.parameters[funcParamIndex].type
-            if (ast.isFunctionValue(funcArg) && argType && TypeSystem.isFunctionType(argType)) {
+            if (ast.isFunctionValue(funcArg) && argType && this.isFunctionType(argType)) {
               let lambdaParamIndex = node.$container.params.findIndex(param => param.name == node.name)
               if (lambdaParamIndex != -1) {
                 type = argType.parameters[lambdaParamIndex].type
@@ -1360,7 +1500,7 @@ export class TypeSystem {
    */
   static inferTypeProperty(node: ast.Property): TypeDescriptor {
     const log = enterLog('inferTypeProperty', node.name)
-    const type = TypeSystem.inferType(node.type)
+    const type = this.inferType(node.type)
     exitLog(log, type)
     return type
   }
@@ -1381,7 +1521,7 @@ export class TypeSystem {
     // Binding에는 value가 없을수는 없지만 없으면 nil type으로 취급한다.
     //todo 타입스크립트에서는 name과 value가 동일하면 하나만 사용할 수 있는데 스칼라스크립트에서는 아직 그렇지 않다.
     let type: TypeDescriptor = new NilTypeDescriptor()
-    if (node.value) type = TypeSystem.inferType(node.value)
+    if (node.value) type = this.inferType(node.value)
     exitLog(log, type)
     return type
   }
@@ -1395,8 +1535,8 @@ export class TypeSystem {
    */
   static inferTypeForOf(node: ast.ForOf): TypeDescriptor {
     const log = enterLog('inferTypeForOf', node.name)
-    let type = TypeSystem.inferType(node.of)
-    if (TypeSystem.isArrayType(type)) type = type.elementType
+    let type = this.inferType(node.of)
+    if (this.isArrayType(type)) type = type.elementType
     exitLog(log, type)
     return type
   }
@@ -1410,9 +1550,9 @@ export class TypeSystem {
    */
   static inferTypeForTo(node: ast.ForTo): TypeDescriptor {
     const log = enterLog('inferTypeForTo', node.name)
-    let e1 = TypeSystem.inferType(node.e1)
-    let e2 = TypeSystem.inferType(node.e1)
-    if (TypeSystem.isNumberType(e1) && TypeSystem.isNumberType(e2)) {
+    let e1 = this.inferType(node.e1)
+    let e2 = this.inferType(node.e1)
+    if (this.isNumberType(e1) && this.isNumberType(e2)) {
       exitLog(log, e1)
       return e1
     }
@@ -1433,8 +1573,8 @@ export class TypeSystem {
   static inferTypeAssignment(node: ast.Assignment): TypeDescriptor {
     const log = enterLog('inferTypeAssignment', node.operator)
     let type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
-    if (node.assign) type = TypeSystem.inferType(node.assign)
-    else if (node.value) type = TypeSystem.inferType(node.value)
+    if (node.assign) type = this.inferType(node.assign)
+    else if (node.value) type = this.inferType(node.value)
     exitLog(log, type)
     return type
   }
@@ -1448,7 +1588,7 @@ export class TypeSystem {
   static inferTypeLogicalNot(node: ast.LogicalNot): TypeDescriptor {
     const log = enterLog('inferTypeLogicalNot', node.operator)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
-    if (node.operator === '!' || node.operator === 'not') type = new BooleanTypeDescriptor()
+    if (node.operator === '!' || node.operator === 'not') type = new BooleanTypeDescriptor(node)
     exitLog(log, type)
     return type
   }
@@ -1467,14 +1607,14 @@ export class TypeSystem {
       exitLog(log, type)
       return type
     }
-    type = TypeSystem.inferType(node.then)
+    type = this.inferType(node.then)
 
     // IfExpression에 else가 있으면 then과 else의 타입을 비교해서 union type으로 만든다.
     // 그렇지 않은 모든 경우는 then의 타입을 그대로 사용한다.
     if (node.else) {
-      const elseType = TypeSystem.inferType(node.else)
+      const elseType = this.inferType(node.else)
       if (!type.isEqual(elseType)) {
-        type = TypeSystem.createUnionType([type, elseType])
+        type = this.createUnionType([type, elseType])
       }
     }
     exitLog(log, type)
@@ -1491,11 +1631,11 @@ export class TypeSystem {
     const log = enterLog('inferTypeMatchExpression', node.$type)
     const types: TypeDescriptor[] = []
     node.cases.forEach(c => {
-      if (c.body) types.push(TypeSystem.inferType(c.body))
+      if (c.body) types.push(this.inferType(c.body))
     })
     // type이 없으면 void type으로 처리한다.
-    let type: TypeDescriptor = TypeSystem.createUnionType(types)
-    if (TypeSystem.isErrorType(type)) type = new VoidTypeDescriptor()
+    let type: TypeDescriptor = this.createUnionType(types)
+    if (this.isErrorType(type)) type = new VoidTypeDescriptor()
     exitLog(log, type)
     return type
   }
@@ -1508,7 +1648,7 @@ export class TypeSystem {
    */
   static inferTypeGroupExpression(node: ast.GroupExpression): TypeDescriptor {
     const log = enterLog('inferTypeGroupExpression', `'${node.$cstNode?.text}'`)
-    const type = TypeSystem.inferType(node.value)
+    const type = this.inferType(node.value)
     exitLog(log, type)
     return type
   }
@@ -1523,7 +1663,7 @@ export class TypeSystem {
     const log = enterLog('inferTypeUnaryExpression', node.operator ? node.operator : '+')
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (node.operator && node.operator === 'typeof') type = new StringTypeDescriptor()
-    else type = TypeSystem.inferType(node.value)
+    else type = this.inferType(node.value)
     exitLog(log, type)
     return type
   }
@@ -1546,13 +1686,13 @@ export class TypeSystem {
     const log = enterLog('inferTypeBinaryExpression', node.operator)
     let type: TypeDescriptor = new ErrorTypeDescriptor('Could not infer type from binary expression', node)
     if (['and', 'or', '&&', '||', '<', '<=', '>', '>=', '==', '!='].includes(node.operator)) {
-      type = new BooleanTypeDescriptor()
+      type = new BooleanTypeDescriptor(node)
     } else if (['-', '+', '**', '*', '/', '%'].includes(node.operator)) {
-      type = new NumberTypeDescriptor()
+      type = new NumberTypeDescriptor(node)
     } else if (['..'].includes(node.operator)) {
-      const left = TypeSystem.inferType(node.left)
-      const right = TypeSystem.inferType(node.right)
-      if (TypeSystem.isStringType(left) || TypeSystem.isStringType(right)) {
+      const left = this.inferType(node.left)
+      const right = this.inferType(node.right)
+      if (this.isStringType(left) || this.isStringType(right)) {
         type = new StringTypeDescriptor()
       }
     } else if (node.operator === 'instanceof') {
@@ -1572,7 +1712,7 @@ export class TypeSystem {
   static inferTypeReturnExpression(node: ast.ReturnExpression): TypeDescriptor {
     const log = enterLog('inferTypeReturnExpression')
     let type: TypeDescriptor = new VoidTypeDescriptor()
-    if (node.value) type = TypeSystem.inferType(node.value)
+    if (node.value) type = this.inferType(node.value)
     exitLog(log, type)
     return type
   }
@@ -1589,7 +1729,7 @@ export class TypeSystem {
     const log = enterLog('inferTypeSpreadExpression', node.$cstNode?.text)
     let type: TypeDescriptor = new AnyTypeDescriptor()
     if (node.spread && node.spread.ref) {
-      type = TypeSystem.inferType(node.spread.ref)
+      type = this.inferType(node.spread.ref)
     }
     exitLog(log, type)
     return type
@@ -1608,10 +1748,10 @@ export class TypeSystem {
 
     // new Array<number>()와 같은 경우에는 ArrayTypeDescription으로 변경해 준다.
     // generic이 있으면 generic의 타입을 element type으로 사용하고 없으면 any type으로 처리한다.
-    if (TypeSystem.isClassType(type) && node.class.$refText === 'Array') {
+    if (this.isClassType(type) && node.class.$refText === 'Array') {
       if (node.generic) {
         assert(node.generic.types.length === 1, 'Array type must have one generic type')
-        const t = TypeSystem.inferType(node.generic.types[0])
+        const t = this.inferType(node.generic.types[0])
         type = new ArrayTypeDescriptor(t)
       } else type = new ArrayTypeDescriptor(new AnyTypeDescriptor())
       exitLog(log, type)
@@ -1620,9 +1760,9 @@ export class TypeSystem {
 
     // 생성시 generic정보가 있으면 오브젝트의 타입에 이를 추가한다.
     // new Set<string>(), new Set<number>()와 같은 경우에도 ClassTypeDescription은 동일하지 않기 때문에 상관없다.
-    if (node.generic && TypeSystem.isClassType(type)) {
+    if (node.generic && this.isClassType(type)) {
       type.generic = node.generic.types.map((g, index) => {
-        const t = TypeSystem.inferType(g)
+        const t = this.inferType(g)
         return new GenericTypeDescriptor(index.toString(), t)
       })
     }
@@ -1650,13 +1790,13 @@ export class TypeSystem {
       node.items.forEach(item => {
         // 배열 안에서 spread가 사용되면 spread를 풀어서 처리해야 한다.
         if (ast.isSpreadExpression(item)) {
-          const spreadType = TypeSystem.inferType(item)
-          if (TypeSystem.isClassType(spreadType)) types.push(new AnyTypeDescriptor())
-          else if (TypeSystem.isArrayType(spreadType)) types.push(spreadType.elementType)
+          const spreadType = this.inferType(item)
+          if (this.isClassType(spreadType)) types.push(new AnyTypeDescriptor())
+          else if (this.isArrayType(spreadType)) types.push(spreadType.elementType)
           else types.push(spreadType)
-        } else types.push(TypeSystem.inferType(item))
+        } else types.push(this.inferType(item))
       })
-      type = new ArrayTypeDescriptor(TypeSystem.createUnionType(types))
+      type = new ArrayTypeDescriptor(this.createUnionType(types))
     } else type = new AnyTypeDescriptor()
     exitLog(log, type)
     return type
@@ -1683,7 +1823,7 @@ export class TypeSystem {
    */
   static inferTypeFunctionValue(node: ast.FunctionValue): TypeDescriptor {
     const log = enterLog('inferTypeFunctionValue', `'${reduceLog(node.$cstNode?.text)}'`)
-    const type = new FunctionTypeDescriptor(node)
+    const type = this.createFunctionType(node)
     exitLog(log, type)
     return type
   }
@@ -1710,7 +1850,7 @@ export class TypeSystem {
           break
         case 'true':
         case 'false':
-          type = new BooleanTypeDescriptor()
+          type = new BooleanTypeDescriptor(node)
           break
         default:
           type = new StringTypeDescriptor(node)
@@ -1759,16 +1899,16 @@ export class TypeSystem {
       // 함수의 바디에 명시된 return 문이 없어도 void type으로 간주한다.
       // extractReturnExpression은 람다함수에서 리턴하는 경우를 배제한다.
       // 여러 개의 return문이 있으면 각각의 타입이 union으로 처리한다.
-      const types: TypeDescriptor[] = extractReturns(node).map(r => TypeSystem.inferType(r))
-      type = TypeSystem.createUnionType(types)
-      if (TypeSystem.isErrorType(type)) {
+      const types: TypeDescriptor[] = extractReturns(node).map(r => this.inferType(r))
+      type = this.createUnionType(types)
+      if (this.isErrorType(type)) {
         // console.error(chalk.red(type.toString()), types.length)
         // types.forEach(t => console.error('  ', t.toString()))
         type = new VoidTypeDescriptor()
       }
     } else {
       // Block이 단일 식인 경우 이 식의 타입을 리턴한다.
-      if (node.codes.length == 1) type = TypeSystem.inferType(node.codes[0])
+      if (node.codes.length == 1) type = this.inferType(node.codes[0])
       else console.error(chalk.red('Block is not bracket but has multiple codes'))
     }
     exitLog(log, type)
@@ -1795,51 +1935,6 @@ export class TypeSystem {
     }
     // Sets preserve insertion order
     return Array.from(set)
-  }
-
-  /**
-   * Returns an array of unique `TypeDescription` objects by removing duplicates.
-   *
-   * @param types - An array of `TypeDescription` objects to be normalized.
-   * @returns An array of unique `TypeDescription` objects.
-   */
-  static getNormalizedType(types: TypeDescriptor[]): TypeDescriptor[] {
-    // 새로운 타입과 기존의 타입들이 호환되는지 확인한다.
-    // 새로운 타입이 기존의 타입들에 포함되면 true를 리턴하는데 이는 새로운 타입을 추가할 필요가 없다는 의미이다.
-    // any type은 모든 타입으로 변환될 수 있으므로 제거한다.
-    const compatibleType = (nt: TypeDescriptor, set: TypeDescriptor[]) => {
-      if (set.some(e => nt.$type === e.$type)) return true
-
-      //todo nil도 일단은 any와 같이 취급한다.
-      if (TypeSystem.isAnyType(nt)) return true
-      else if (TypeSystem.isNilType(nt)) return true
-      else if (TypeSystem.isArrayType(nt)) {
-        let found = false
-        set.forEach(e => {
-          if (TypeSystem.isArrayType(e)) {
-            if (TypeSystem.isAnyType(nt.elementType) || TypeSystem.isAnyType(e.elementType)) found = true
-          }
-        })
-        return found
-      }
-      return false
-    }
-
-    // types에 타입이 하나 이하이면 그냥 리턴
-    if (types.length <= 1) return types
-
-    // types에 union type이 포함되어 있으면 union type을 풀어서 각각의 타입으로 변환한다.
-    const spread: TypeDescriptor[] = []
-    types.forEach(t => {
-      if (TypeSystem.isUnionType(t)) spread.push(...t.elementTypes)
-      else spread.push(t)
-    })
-
-    const set: TypeDescriptor[] = []
-    spread.forEach(e => {
-      if (!compatibleType(e, set)) set.push(e)
-    })
-    return set
   }
 
   /*
@@ -1917,16 +2012,16 @@ export class TypeSystem {
       }[] = []
 
       if (node.previous) {
-        const prevType = TypeSystem.inferType(node.previous)
+        const prevType = this.inferType(node.previous)
 
         gather.add('node.prev', node.previous.$cstNode?.text)
         gather.add('prevType', prevType.toString())
 
-        if (TypeSystem.isArrayType(prevType)) {
+        if (this.isArrayType(prevType)) {
           // find는 변수나 함수로 정의되어져 있다.
-          funcType = TypeSystem.inferType(nodeRef)
+          funcType = this.inferType(nodeRef)
           assert.ok(ast.isVariableDef(nodeRef) || ast.isFunctionDef(nodeRef), 'it is not valid definition')
-          assert.ok(TypeSystem.isFunctionType(funcType), `'${nodeName}' is not function`)
+          assert.ok(this.isFunctionType(funcType), `'${nodeName}' is not function`)
 
           // VariableDef의 container는 ClassBody이고 그 위에가 ClassDef이다.
           const grandContainer = nodeRef?.$container?.$container
@@ -1939,11 +2034,11 @@ export class TypeSystem {
             generic.push({ name: grandContainer.generic?.types[0], type: t })
             isProcessed = true
           } else gather.add('error1', `'${nodeName}'s grandContainer is not object`)
-        } else if (TypeSystem.isClassType(prevType)) {
+        } else if (this.isClassType(prevType)) {
           if (prevType.toString() == 'Map' || prevType.toString() == 'Set') {
-            funcType = TypeSystem.inferType(nodeRef)
+            funcType = this.inferType(nodeRef)
             assert.ok(ast.isVariableDef(nodeRef) || ast.isFunctionDef(nodeRef), 'it is not valid definition')
-            assert.ok(TypeSystem.isFunctionType(funcType), `'${nodeName}' is not function`)
+            assert.ok(this.isFunctionType(funcType), `'${nodeName}' is not function`)
 
             // Map, Set은 prevType에 NewExpression에서 설정된 generic 정보가 있다.
             let genericIds: string[] = []
@@ -1963,14 +2058,14 @@ export class TypeSystem {
 
       // Array, Map, Set의 함수형 메서드가 아닌 일반 함수의 경우
       if (!isProcessed) {
-        const type = TypeSystem.inferType(nodeRef)
+        const type = this.inferType(nodeRef)
 
         gather.add('isProcessed', 'now procesing')
         gather.add('type', type.toString())
 
-        if (TypeSystem.isFunctionType(type) || TypeSystem.isAnyType(type)) {
+        if (this.isFunctionType(type) || this.isAnyType(type)) {
           funcType = type
-        } else if (TypeSystem.isClassType(type) && nodeName == 'assert') {
+        } else if (this.isClassType(type) && nodeName == 'assert') {
           // assert는 단독 함수로도 존재하고 ok, equal등을 가지는 오브젝트로도 존재하기 때문에 별도 처리가 필요하다.
           const type = new FunctionTypeDescriptor()
           type.changeReturnType(new VoidTypeDescriptor())
@@ -1999,13 +2094,13 @@ export class TypeSystem {
           type: TypeDescriptor
         }[]
       ) => {
-        if (TypeSystem.isGenericType(t)) {
+        if (this.isGenericType(t)) {
           const m = g.find(e => e.name == t.name)
           return m?.type || new AnyTypeDescriptor()
-        } else if (TypeSystem.isArrayType(t)) {
-          if (TypeSystem.isGenericType(t.elementType)) return new ArrayTypeDescriptor(g[0].type)
+        } else if (this.isArrayType(t)) {
+          if (this.isGenericType(t.elementType) && g.length > 0) return new ArrayTypeDescriptor(g[0].type)
           else return new ArrayTypeDescriptor(t.elementType)
-        } else if (TypeSystem.isFunctionType(t)) {
+        } else if (this.isFunctionType(t)) {
           const desc = new FunctionTypeDescriptor()
           desc.changeReturnType(replace(t.returnType, g))
           t.parameters.forEach(p => {
@@ -2024,13 +2119,13 @@ export class TypeSystem {
 
       // 어떤 경우이든지 funcType에 추론된 함수의 타입이 저장되는데 generic이 있으면 실제 타입으로 변환해 준다.
       if (funcType) {
-        if (TypeSystem.isAnyType(funcType)) {
+        if (this.isAnyType(funcType)) {
           gather.add('funcType', funcType.toString())
           exitLog(log, funcType)
           return funcType
-        } else if (TypeSystem.isFunctionType(funcType)) {
+        } else if (this.isFunctionType(funcType)) {
           const newType = replace(funcType, generic)
-          if (TypeSystem.isFunctionType(newType)) {
+          if (this.isFunctionType(newType)) {
             gather.add('newType', newType.toString())
             exitLog(log, newType)
             return newType
@@ -2070,16 +2165,16 @@ export class TypeSystem {
         if (object && object.$container) {
           if (ast.isVariableDef(object.$container)) {
             const container = object.$container
-            const containerType = TypeSystem.inferType(container)
+            const containerType = this.inferType(container)
             gather.add('fd.container.$type', container.$type)
             gather.add('fd.container.type', containerType.toString())
             // 해당 Binding이 소속된 ClassDef를 찾아서 해당 항목의 타입을 찾아야 한다.
-            if (TypeSystem.isClassType(containerType)) {
+            if (this.isClassType(containerType)) {
               return containerType.getElementType(property)
             }
           } else if (ast.isBinding(object.$container)) {
             const result = findBindingRootDef(object.$container)
-            if (result && TypeSystem.isClassType(result)) {
+            if (result && this.isClassType(result)) {
               return result.getElementType(property)
             } else gather.add('error10', 'find-bind is not valid')
           } else gather.add('error11', 'container is not valid')
@@ -2089,7 +2184,7 @@ export class TypeSystem {
 
       const propType = findBindingRootDef(node)
       gather.add('propType', propType?.toString())
-      if (propType && TypeSystem.isFunctionType(propType)) {
+      if (propType && this.isFunctionType(propType)) {
         // propType.showDetailInfo()
         return propType
       } else gather.add('error8', 'propType is not function type')

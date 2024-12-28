@@ -21,12 +21,12 @@ export class ScalaScriptValidator {
    * - If neither type nor value is present, it reports an error indicating that variables require a type hint or an assignment at creation.
    */
   checkVariableDef(stmt: ast.VariableDef, accept: ValidationAcceptor): void {
-    const log = enterLog('checkVariableDef', `variable name: ${stmt.name}`)
-    traceLog('stmt.type :', `${stmt.type?.$type}, '${reduceLog(stmt.type?.$cstNode?.text)}'`)
-    traceLog('stmt.value:', `${stmt.value?.$type}, '${reduceLog(stmt.value?.$cstNode?.text)}'`)
+    const log = enterLog('checkVariableDef', `'${reduceLog(stmt.$cstNode?.text)}'`)
+    traceLog('- stmt.type :', `${stmt.type?.$type}, '${reduceLog(stmt.type?.$cstNode?.text)}'`)
+    traceLog('- stmt.value:', `${stmt.value?.$type}, '${reduceLog(stmt.value?.$cstNode?.text)}'`)
 
     // val 로 선언된 변수는 초기화가 필요하다.
-    if ((stmt.kind == 'val')) {
+    if (stmt.kind == 'val') {
       if (!stmt.value) {
         const msg = "checkVariableDef: 'val' need to be initialized in ScalaScript."
         accept('error', msg, {
@@ -34,12 +34,30 @@ export class ScalaScriptValidator {
         })
       }
     }
-    if (stmt.type && stmt.value) {
-      const left = TypeSystem.inferType(stmt.type)
-      const right = TypeSystem.inferType(stmt.value)
-      traceLog(`checkVariableDef result: ${left.toString()} = ${right.toString()}`)
 
-      if ((stmt.kind == 'val') && TypeSystem.isObjectType(left)) {
+    // union type의 변수도 초기화가 필요하다.
+    if (stmt.type) {
+      const type = TypeSystem.inferType(stmt.type)
+      if (TypeSystem.isUnionType(type)) {
+        if (!stmt.value) {
+          const msg = 'checkVariableDef: Union type need to be initialized in ScalaScript.'
+          accept('error', msg, {
+            node: stmt,
+          })
+        }
+      }
+    }
+
+    // type과 value가 모두 있을 때 value는 type에 assignable이어야 한다.
+    if (stmt.type && stmt.value) {
+      traceLog('* checkVariableDef infer type')
+      const left = TypeSystem.inferType(stmt.type)
+      traceLog('* checkVariableDef infer value')
+      const right = TypeSystem.inferType(stmt.value)
+      traceLog(`* checkVariableDef result: ${left.toString()} = ${right.toString()}`)
+
+      // val로 선언된 object type의 변수는 object의 모든 프로퍼티가 초기화되어야 하는데 그러기 위해서는 isEqual로 체크되어야 한다.
+      if (stmt.kind == 'val' && TypeSystem.isObjectType(left)) {
         if (!right.isEqual(left)) {
           const msg = "checkVariableDef: 'val' need to be initialized in ScalaScript."
           accept('error', msg, {
@@ -64,6 +82,7 @@ export class ScalaScriptValidator {
         property: 'name',
       })
     }
+
     exitLog(log)
   }
 
@@ -81,15 +100,19 @@ export class ScalaScriptValidator {
    *    If not, it reports an error.
    */
   checkFunctionDef(stmt: ast.FunctionDef | ast.FunctionValue, accept: ValidationAcceptor): void {
-    const log = enterLog('checkFunctionDef', reduceLog(stmt.$cstNode?.text))
+    const log = enterLog('checkFunctionDef', `'${reduceLog(stmt.$cstNode?.text)}'`)
+    traceLog(`- return: ${stmt.returnType?.$type}, '${reduceLog(stmt.returnType?.$cstNode?.text)}'`)
+    traceLog(`- body  : ${stmt.body?.$type}, '${reduceLog(stmt.body?.$cstNode?.text)}'`)
 
     if (stmt.body && stmt.returnType) {
+      traceLog('* checkFunctionDef infer return')
       const retType = TypeSystem.inferType(stmt.returnType)
+      traceLog('* checkFunctionDef infer body')
       const bodyType = TypeSystem.inferType(stmt.body)
 
       const tr = retType.toString()
       const tb = bodyType.toString()
-      traceLog(`checkFunctionDef result: ${tr} => ${tb}`)
+      traceLog(`* checkFunctionDef result: ${tr} => ${tb}`)
 
       if (!bodyType.isAssignableTo(retType)) {
         const msg = `checkFunctionDef: Type '${tb}' is not assignable to type '${tr}'.`
@@ -98,6 +121,7 @@ export class ScalaScriptValidator {
         })
       }
     }
+
     exitLog(log)
   }
 
@@ -112,7 +136,7 @@ export class ScalaScriptValidator {
     if (ast.isClassDef(stmt)) {
       log = enterLog('checkClassDef', stmt.name)
     } else {
-      log = enterLog('checkObjectValue', reduceLog(stmt.$cstNode?.text))
+      log = enterLog('checkObjectValue', `'${reduceLog(stmt.$cstNode?.text)}'`)
     }
     // todo: implement classes
     // accept("error", "Classes are currently unsupported.", {
@@ -132,8 +156,9 @@ export class ScalaScriptValidator {
    * @param accept - The validation acceptor used to report validation issues.
    */
   checkArrayValue(expr: ast.ArrayValue, accept: ValidationAcceptor): void {
-    const log = enterLog('checkArrayValue', reduceLog(expr.$cstNode?.text))
-    let type: TypeDescriptor | undefined = undefined
+    const log = enterLog('checkArrayValue', `'${reduceLog(expr.$cstNode?.text)}'`)
+
+    let type: TypeDescriptor
     expr.items.forEach((item, index) => {
       const itemType = TypeSystem.inferType(item)
       if (!type) {
@@ -145,6 +170,7 @@ export class ScalaScriptValidator {
         })
       }
     })
+
     exitLog(log)
   }
 
@@ -155,7 +181,8 @@ export class ScalaScriptValidator {
    * @param accept - The ValidationAcceptor used to report validation issues.
    */
   checkForStatement(stmt: ast.ForStatement, accept: ValidationAcceptor): void {
-    const log = enterLog('checkForStatement', stmt.$cstNode?.text)
+    const log = enterLog('checkForStatement', `'${stmt.$cstNode?.text}'`)
+
     stmt.iterators.forEach(iterator => {
       if (ast.isForOf(iterator)) {
       } else if (ast.isForTo(iterator)) {
@@ -197,6 +224,7 @@ export class ScalaScriptValidator {
         console.error(chalk.red('internal error in checkForStatement'))
       }
     })
+
     exitLog(log)
   }
 
@@ -228,7 +256,7 @@ export class ScalaScriptValidator {
    * @returns void
    */
   checkCallChain(expr: ast.CallChain, accept: ValidationAcceptor): void {
-    const log = enterLog('checkCallChain', expr.$cstNode?.text)
+    const log = enterLog('checkCallChain', `'${reduceLog(expr.$cstNode?.text)}'`)
 
     // default parameter, optional parameter, rest parameter등으로 인해 파라미터의 처리가 간단하지 않다.
     if (expr.isFunction) {
@@ -357,6 +385,7 @@ export class ScalaScriptValidator {
       // const type = TypeSystem.inferType(expr)
       // console.log('🚀 ~ checkCallChain: type:', expr.element?.$refText, chalk.green(type.toString()))
     }
+
     exitLog(log)
   }
 
@@ -367,24 +396,27 @@ export class ScalaScriptValidator {
    * @param accept - The validation acceptor to report validation issues.
    */
   checkAssignment(expr: ast.Assignment, accept: ValidationAcceptor): void {
-    const log = enterLog('checkAssignment', expr.assign.$type)
-    traceLog(`left : ${expr.assign.$type}, ${reduceLog(expr.assign.$cstNode?.text)}`)
-    traceLog(`right: ${expr.value.$type}, ${reduceLog(expr.value.$cstNode?.text)}`)
+    const log = enterLog('checkAssignment', `'${reduceLog(expr.$cstNode?.text)}'`)
+    traceLog(`- left : ${expr.assign.$type}, '${reduceLog(expr.assign.$cstNode?.text)}'`)
+    traceLog(`- right: ${expr.value.$type}, '${reduceLog(expr.value.$cstNode?.text)}'`)
 
+    traceLog('* checkAssignment infer left')
     const left = TypeSystem.inferType(expr.assign)
+    traceLog('* checkAssignment infer right')
     const right = TypeSystem.inferType(expr.value)
 
     const tl = left.toString()
     const tr = right.toString()
-    traceLog(`checkAssignment result: ${tl} = ${tr}`)
+    traceLog(`* checkAssignment result: ${tl} = ${tr}`)
 
     if (!right.isAssignableTo(left)) {
-      const msg = `checkAssignment: Type '${right.toString()}' is not assignable to type '${left.toString()}'.`
+      const msg = `checkAssignment: Type '${tr}' is not assignable to type '${tl}'.`
       accept('error', msg, {
         node: expr,
         property: 'value',
       })
     }
+
     exitLog(log)
   }
 
@@ -395,7 +427,7 @@ export class ScalaScriptValidator {
    * @param accept - The validation acceptor to collect validation issues.
    */
   checkIfExpression(expr: ast.IfExpression, accept: ValidationAcceptor): void {
-    const log = enterLog('checkIfExpression', expr.$cstNode?.text)
+    const log = enterLog('checkIfExpression', `'${reduceLog(expr.$cstNode?.text)}'`)
     exitLog(log)
   }
 
@@ -407,6 +439,7 @@ export class ScalaScriptValidator {
    */
   checkUnaryExpression(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
     const log = enterLog('checkUnaryExpression', unary.value.$type)
+
     if (unary.operator) {
       const item = TypeSystem.inferType(unary.value)
       if (!this.isLegalOperation(unary.operator, item)) {
@@ -418,6 +451,7 @@ export class ScalaScriptValidator {
         })
       }
     }
+
     exitLog(log)
   }
 
@@ -438,14 +472,14 @@ export class ScalaScriptValidator {
    */
   checkBinaryExpression(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
     const log = enterLog('checkBinaryExpression', binary.operator)
-    traceLog(`expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`)
+    traceLog(`- expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`)
 
     const left = TypeSystem.inferType(binary.left)
     const right = TypeSystem.inferType(binary.right)
 
     const tl = left.toString()
     const tr = right.toString()
-    traceLog(`checkBinaryExpression result: ${tl} ${binary.operator} ${tr}`)
+    traceLog(`* checkBinaryExpression result: ${tl} ${binary.operator} ${tr}`)
 
     if (!this.isLegalOperation(binary.operator, left, right)) {
       const msg = `checkBinaryExpression: Cannot perform operation '${binary.operator}' on values of type '${tl}' and '${tr}'.`
@@ -464,6 +498,7 @@ export class ScalaScriptValidator {
         })
       }
     }
+
     exitLog(log)
   }
 

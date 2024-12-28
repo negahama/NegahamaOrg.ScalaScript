@@ -6,7 +6,7 @@ import { parseHelper } from 'langium/test'
 import { Program } from '../../language/generated/ast.js'
 import { createScalaScriptServices } from '../src/scala-script-module.js'
 import { generateCode } from '../src/generator.js'
-import { FunctionTypeDescriptor, TypeSystem } from '../../language/scala-script-types.js'
+import { FunctionTypeDescriptor, TypeSystem, UnionTypeDescriptor } from '../../language/scala-script-types.js'
 
 let services: ReturnType<typeof createScalaScriptServices>
 let parse: ReturnType<typeof parseHelper<Program>>
@@ -86,28 +86,6 @@ function diagnosticToString(d: Diagnostic) {
 
 describe('basic tests', () => {
   /**
-   * TestCase : Type inference test
-   */
-  test('test of infer types', async () => {
-    const code = `
-var f1: () -> number[]
-`
-    const document = await parse(code)
-    expect(
-      document.parseResult.parserErrors.length &&
-        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
-    ).toBe(0)
-    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
-
-    const code0 = document.parseResult.value.codes[0]
-    const type0 = TypeSystem.inferType(code0) as FunctionTypeDescriptor
-    expect(type0.$type).toBe('function')
-    expect(type0.returnType.toString()).toBe('array<number>')
-    expect(type0.parameters.length).toBe(0)
-  })
-
-  /**
    * TestCase : indent를 이용한 블럭 테스트
    */
   test('test of block with indent', async () => {
@@ -125,7 +103,8 @@ var f = (a: number) => {
   if (toggle == 0) then
     console.log('toggle == 0')
     toggle = 1
-}`
+}
+`
     const transpiled = `let toggle = 0
 if (toggle == 0) {
   console.log('toggle == 0')
@@ -141,7 +120,15 @@ let f = (a: number) => {
   }
   toggle = 1
 }`
+
     const document = await parse(code)
+    expect(
+      document.parseResult.parserErrors.length &&
+        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
+    ).toBe(0)
+    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
+    expect(document?.diagnostics?.length).toBe(0)
+
     expect(
       document.parseResult?.value.codes
         .map(code => generateCode(code), {
@@ -149,28 +136,28 @@ let f = (a: number) => {
         })
         .join('\n')
     ).toBe(transpiled)
-
-    expect(
-      document.parseResult.parserErrors.length &&
-        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
-    ).toBe(0)
-    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
   })
 
   /**
    * TestCase : 함수형 변수에 값을 대입할 경우
-   * 파라메터와 리턴 타입의 정확한 경우에만 대입되어야 하고 이외에는 에러가 발생해야 한다.
+   * 파라메터와 리턴 타입이 정확한 경우에만 대입되어야 하고 이외에는 에러가 발생해야 한다.
    */
   test('test of functional variable assignment', async () => {
     const code = `
+val run = (x: string) => { console.log(x) }
+
 var f1: () -> number[]
 f1 = () => return [1, 2, 3]
-var f2: () -> number[] = () => { return [1, 2, 3] }
-var f3: () -> number[] = () => [1, 2, 3]
+f1 = () => {
+  val ary = [1, 2, 3]
+  return ary
+}
+var f2: () -> number[] = () => [1, 2, 3]
+
 // 아직 지원하지 않음
-// var f4 : (() -> number)[]
-// f4 = [() => 1, () => 2, () => 3]`
+// var f3 : (() -> number)[]
+// f3 = [() => 1, () => 2, () => 3]
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -178,16 +165,31 @@ var f3: () -> number[] = () => [1, 2, 3]
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
     expect(document?.diagnostics?.length).toBe(0)
+
+    const code0 = document.parseResult.value.codes[0]
+    const type0 = TypeSystem.inferType(code0) as FunctionTypeDescriptor
+    expect(type0.$type).toBe('function')
+    expect(type0.returnType.$type).toBe('void')
+    expect(type0.parameters.length).toBe(1)
+    expect(type0.parameters[0].name).toBe('x')
+    expect(type0.parameters[0].type.toString()).toBe('string')
+
+    const code1 = document.parseResult.value.codes[1]
+    const type1 = TypeSystem.inferType(code1) as FunctionTypeDescriptor
+    expect(type1.$type).toBe('function')
+    expect(type1.returnType.toString()).toBe('array<number>')
+    expect(type1.parameters.length).toBe(0)
   })
 
   test('test of functional variable assignment - error cases', async () => {
     const code = `
 var f1: () -> number
 var f2: (a: string) -> number[]
-f1 = (a: string) => { return 1 }
-f2 = (a: string) => { return 1 }
-f2 = (a: number) => { return [1] }
-f2 = () => { return [1] }`
+f1 = (a: string) => return 1    // f1은 파라미터를 가지지 않음
+f2 = (a: string) => return 1    // f2는 리턴 타입이 number[]이어야 함
+f2 = (a: number) => return [1]  // f2는 파라미터 타입이 string이어야 함
+f2 = () => return [1]           // f2는 파라미터 타입이 string이어야 함
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -199,6 +201,35 @@ f2 = () => { return [1] }`
 })
 
 describe('data types tests', () => {
+  /**
+   * TestCase : union 관련 테스트
+   */
+  test('test of union', async () => {
+    const code = `
+val n1: string[] | number[] = ['1', '2', '3']
+val n2: string[] | number[] = [1, 2, 3]
+n1.push('1')
+n1.push(1)    // error
+n2.push('1')  // error
+n2.push(1)
+`
+    const document = await parse(code)
+    expect(
+      document.parseResult.parserErrors.length &&
+        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
+    ).toBe(0)
+    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
+
+    const code1 = document.parseResult.value.codes[1]
+    const type1 = TypeSystem.inferType(code1) as UnionTypeDescriptor
+    expect(type1.$type).toBe('array')
+    // expect(type1.$type).toBe('union')
+    // expect(type1.elementTypes[0].toString()).toBe('array<string>')
+    // expect(type1.elementTypes[1].toString()).toBe('array<number>')
+
+    expect(document?.diagnostics?.length).toBe(2)
+  })
+
   /**
    * TestCase : array, map, set 관련 테스트
    */
@@ -237,7 +268,8 @@ val getAllTech = () => {
   var set = new Set<string>()
   var ary = ['a', 'b', 'c']
   ary.forEach(e => set.add(e))
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -264,7 +296,8 @@ val getAllTech = () => {
   var ary = ['a', 'b', 'c']
   // 이건 스칼라스크립트에서 지원하지 않음
   ary.forEach(set.add, set)
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -314,14 +347,6 @@ def Sales = {
 def SalesHistory = {
   private var sales: Sales[] = []
   var add = () => {
-    // this.sales.push({
-    //   date: 10
-    //   cash: 100
-    //   trade: {
-    //     item1: 'item1' // error
-    //     price: 100
-    //   }
-    // })
     this.sales.push({
       date: 10
       cash: 100
@@ -331,19 +356,15 @@ def SalesHistory = {
       }
     })
   }
-  %%// 타입스크립트에서 아래 코드는 필수 프로퍼티가 모두 존재하지 않기 때문에 에러가 된다.
-  var add2 = () => {
-    // this.sales.push({ date1: 20 })
-    // this.sales.push({ date: 20 })
-  }
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 
   test('test of object type definition - transpile', async () => {
@@ -365,7 +386,8 @@ val vehicle: {
 
 // property assignment and usage
 vehicle.name = 'train'
-vehicle.run = () => { console.log('fast run on the rail') }`
+vehicle.run = () => { console.log('fast run on the rail') }
+`
     const transpiled = `const vehicle: {
   name: string
   parts: string[]
@@ -379,19 +401,19 @@ vehicle.name = 'train'
 vehicle.run = () => console.log('fast run on the rail')`
     const document = await parse(code)
     expect(
+      document.parseResult.parserErrors.length &&
+        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
+    ).toBe(0)
+    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
+    expect(document?.diagnostics?.length).toBe(0)
+
+    expect(
       document.parseResult?.value.codes
         .map(code => generateCode(code), {
           appendNewLineIfNotEmpty: true,
         })
         .join('\n')
     ).toBe(transpiled)
-
-    expect(
-      document.parseResult.parserErrors.length &&
-        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
-    ).toBe(0)
-    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
   })
 
   test('test of object type definition - error cases', async () => {
@@ -409,13 +431,11 @@ def Trade = {
   var item = 'item'
   var price = 100
 }
-
 def Sales = {
   var date: number
   var cash: number
   var trade: Trade
 }
-
 def SalesHistory = {
   private var sales: Sales[] = []
   var add = () => {
@@ -433,7 +453,8 @@ def SalesHistory = {
     this.sales.push({ date1: 20 })
     this.sales.push({ date: 20 })
   }
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -452,11 +473,6 @@ describe('infer types tests', () => {
     const code = `
 def Corp = {
   var name: string
-  var firms: string[]
-  val process = () => {
-    %%// for debugging...
-    console.log('process')
-  }
 }
 def ChainPrompt = {
   var prompt: string
@@ -467,7 +483,8 @@ val 보유기술: ChainPrompt = {
   prompt: '추가할 기술?'
   callback: (corp, options) => { console.log(corp.name, options) }
   nextChain: { prompt: '기술수준?' }
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -548,7 +565,8 @@ corps.forEach(e => {
 val printSaleDetail = (date: string, callback: (corp: Corp, sale: number) -> string) => {}
 printSaleDetail('01-01', (corp, sale) => {
   return corp.name .. sale.toString()
-})`
+})
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -581,7 +599,8 @@ val f3 = () => {
   people.forEach(p => {
     people.filter(d => d.name == p.age)
   })
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -606,7 +625,8 @@ def ToInterface = {
 def ToClass = {
   var n: number = 0
   static var s: string = ''
-}`
+}
+`
     const transpiled = `
 interface ToInterface {
   n: number
@@ -619,19 +639,19 @@ class ToClass {
 }`
     const document = await parse(code)
     expect(
+      document.parseResult.parserErrors.length &&
+        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
+    ).toBe(0)
+    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
+    expect(document?.diagnostics?.length).toBe(0)
+
+    expect(
       document.parseResult?.value.codes
         .map(code => generateCode(code), {
           appendNewLineIfNotEmpty: true,
         })
         .join('\n')
     ).toBe(transpiled)
-
-    expect(
-      document.parseResult.parserErrors.length &&
-        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
-    ).toBe(0)
-    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
   })
 
   /**
@@ -653,7 +673,8 @@ Corp.staticMethod()
 var corp = new Corp()
 corp.normalMethod()
 //todo 타입스크립트에서 static 함수는 클래스명으로만 호출 가능하다. 따라서 이것은 에러로 처리되어야 하는데 아직 지원하지 않음
-corp.staticMethod()`
+corp.staticMethod()
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -680,7 +701,8 @@ Corp.normalMethod()
 
 //todo 타입스크립트에서 static 함수는 클래스명으로만 호출 가능하다. 따라서 이것은 에러로 처리되어야 하는데 아직 지원하지 않음
 var corp = new Corp()
-corp.staticMethod()`
+corp.staticMethod()
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -709,7 +731,8 @@ def Corp = {
 val f = (Corp: Corp) => {
   Corp.normalMethod()
   Corp.staticMethod()
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -728,7 +751,8 @@ val f = (Corp: Corp) => {
 // def에 자신을 타입으로 가지는 element가 존재하는 경우
 def Corp = {
   var corp: Corp = new Corp()
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -759,7 +783,8 @@ def child extends parents = {
     if (value > 100) return super.process()
     console.log("child process")
   }
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -817,7 +842,8 @@ val TC04 = () => {
   // element가 더 적은 경우에 할당할 때는 추가 항목이 있을 수 없으며 타입이 맞아야 한다.
   t3 = { name: 'TC00_1' }
   t4 = { name: 'TC00_1', extra1: 1 }
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -877,7 +903,8 @@ val TC04 = () => {
   t3 = { name: 'TC00_1', extra1: 'extra' }
   t4 = t1
   t4 = { name: 'TC00_1', extra1: 'extra' }
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -927,7 +954,8 @@ def OverrideTest2 extends OverrideTest = {
 val overrideTest = new OverrideTest2()
 console.log(overrideTest.get11())
 console.log(overrideTest.get12())
-console.log(overrideTest.get32())`
+console.log(overrideTest.get32())
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&
@@ -961,7 +989,8 @@ static val smartlog = (msg: string = '') => {
     // if (logger instanceof FileLogger) logger.log2(msg)
     logger.log(msg)
   })
-}`
+}
+`
     const document = await parse(code)
     expect(
       document.parseResult.parserErrors.length &&

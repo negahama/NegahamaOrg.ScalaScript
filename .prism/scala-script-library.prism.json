@@ -5,7 +5,7 @@
   "issues": [
     {
       "id": "d1f74f260f249d8eb40edff17ff2701f",
-      "title": "`val concat: (...value: any[]) -> T[]` at language\\scala-script-library.ts#86",
+      "title": "`var concat: (...value: any[]) -> T[]` at language\\scala-script-library.ts#86",
       "source": {
         "file": "/language/scala-script-library.ts",
         "startLine": 86,

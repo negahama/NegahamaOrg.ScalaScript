@@ -273,7 +273,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 인수의 가장 가까운 단일 정밀도 표현을 반환합니다.
   static var fround: (x: number) -> number
   // 두 32비트 정수의 곱을 반환합니다.
-  static var imul: (x: number, y) -> number
+  static var imul: (x: number, y: number) -> number
   // 숫자의 자연로그(e를 밑으로 하는 로그, 즉 ln) 값을 반환합니다.
   static var log: (x: number) -> number
   // 숫자 x에 대해 1 + x의 자연로그(e를 밑으로 하는 로그, ln) 값을 반환합니다.
@@ -287,7 +287,7 @@ export const ScalaScriptBuiltinLibrary = `
   // 0개 이상의 인수에서 제일 작은 수를 반환합니다.
   static var min: (x: number, y: number) -> number
   // x의 y 제곱을 반환합니다.
-  static var pow: (x: number, y) -> number
+  static var pow: (x: number, y: number) -> number
   // 0과 1 사이의 난수를 반환합니다.
   static var random: () -> number
   // 숫자에서 가장 가까운 정수를 반환합니다.

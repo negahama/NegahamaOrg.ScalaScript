@@ -260,8 +260,8 @@ export function Dump(node: AstNode | undefined) {
 /**
  * Finds a variable definition or parameter with the specified name within the given AST node and its ancestors.
  *
- * ObjectDef의 name으로 property를 호출하면 static property만을 대상으로 해야 한다.
- * 그런데 이때 이 name이 object name인지 variable name인지를 구분해야 한다.
+ * ClassDef의 name으로 property를 호출하면 static property만을 대상으로 해야 한다.
+ * 그런데 이때 이 name이 class name인지 variable name인지를 구분해야 한다.
  * 즉 다음과 같은 경우를 구분해야 한다.
  *
  * def T = {
@@ -326,7 +326,7 @@ export function findFunctionDefWithName(node: AstNode | undefined, name: string 
  * @param name - The name of the object definition to find. If undefined, the function returns undefined.
  * @returns The found object definition node if it exists, otherwise undefined.
  */
-export function findObjectDefWithName(node: AstNode | undefined, name: string | undefined) {
+export function findClassDefWithName(node: AstNode | undefined, name: string | undefined) {
   if (!node || !name) return undefined
   let item: AstNode | undefined = node
   while (item) {
