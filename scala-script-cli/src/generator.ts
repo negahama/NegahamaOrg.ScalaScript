@@ -142,8 +142,6 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
   if (expr == undefined) return result
   if (ast.isAssignment(expr)) {
     result += transpileAssignment(expr, indent)
-  } else if (ast.isLogicalNot(expr)) {
-    result += transpileLogicalNot(expr, indent)
   } else if (ast.isCallChain(expr)) {
     result += transpileCallChain(expr, indent)
   } else if (ast.isIfExpression(expr)) {
@@ -659,27 +657,6 @@ function transpileAssignment(expr: ast.Assignment, indent: number): string {
 }
 
 /**
- * Transpiles a logical NOT expression from the abstract syntax tree (AST) to a string representation.
- *
- * @param expr - The logical NOT expression node from the AST.
- * @param indent - The current indentation level for formatting the output string.
- * @returns The string representation of the logical NOT expression.
- */
-function transpileLogicalNot(expr: ast.LogicalNot, indent: number): string {
-  let op = ''
-  switch (expr.operator) {
-    case 'not': {
-      op = '!'
-      break
-    }
-    default: {
-      op = expr.operator
-    }
-  }
-  return `${op} ${generateExpression(expr.value, indent)}`
-}
-
-/**
  * Transpiles a call chain expression into a string representation.
  *
  * @param expr - The call chain expression to transpile.
@@ -861,9 +838,10 @@ function transpileGroupExpression(expr: ast.GroupExpression, indent: number): st
  */
 function transpileUnaryExpression(expr: ast.UnaryExpression, indent: number): string {
   if (expr.operator) {
-    // typeof만 공백을 포함하고 나머지(+, -)는 공백없이 표현한다
+    // not은 !으로 변환하고 typeof만 공백을 포함하고 나머지(+, -, !)는 공백없이 표현한다
     let operator = expr.operator
     if (expr.operator == 'typeof') operator += ' '
+    else if (expr.operator == 'not') operator = '!'
     return `${operator}${generateExpression(expr.value, indent)}`
   } else return generateExpression(expr.value, indent)
 }

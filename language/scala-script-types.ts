@@ -1105,8 +1105,6 @@ export class TypeSystem {
       type = this.inferTypeForTo(node)
     } else if (ast.isAssignment(node)) {
       type = this.inferTypeAssignment(node)
-    } else if (ast.isLogicalNot(node)) {
-      type = this.inferTypeLogicalNot(node)
     } else if (ast.isIfExpression(node)) {
       type = this.inferTypeIfExpression(node)
     } else if (ast.isMatchExpression(node)) {
@@ -1580,20 +1578,6 @@ export class TypeSystem {
   }
 
   /**
-   * Infers the type of a logical NOT operation in the AST.
-   *
-   * @param node - The AST node representing the logical NOT operation.
-   * @returns The inferred type description of the logical NOT operation.
-   */
-  static inferTypeLogicalNot(node: ast.LogicalNot): TypeDescriptor {
-    const log = enterLog('inferTypeLogicalNot', node.operator)
-    let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
-    if (node.operator === '!' || node.operator === 'not') type = new BooleanTypeDescriptor(node)
-    exitLog(log, type)
-    return type
-  }
-
-  /**
    * Infers the type of an IfExpression node.
    *
    * @param node - The IfExpression AST node to infer the type for.
@@ -1662,8 +1646,12 @@ export class TypeSystem {
   static inferTypeUnaryExpression(node: ast.UnaryExpression): TypeDescriptor {
     const log = enterLog('inferTypeUnaryExpression', node.operator ? node.operator : '+')
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
-    if (node.operator && node.operator === 'typeof') type = new StringTypeDescriptor()
-    else type = this.inferType(node.value)
+    if (node.operator) {
+      if (node.operator === 'typeof') type = new StringTypeDescriptor(node)
+      else if (node.operator === '-' || node.operator === '+') type = new NumberTypeDescriptor(node)
+      else if (node.operator === '!' || node.operator === 'not') type = new BooleanTypeDescriptor(node)
+      else type = new ErrorTypeDescriptor(`Unknown unary operator: ${node.operator}`)
+    } else type = this.inferType(node.value)
     exitLog(log, type)
     return type
   }
@@ -1855,8 +1843,10 @@ export class TypeSystem {
         default:
           type = new StringTypeDescriptor(node)
       }
-    } else {
+    } else if (typeof node.value == 'number') {
       type = new NumberTypeDescriptor(node)
+    } else if (typeof node.value == 'boolean') {
+      type = new BooleanTypeDescriptor(node)
     }
     exitLog(log, type)
     return type

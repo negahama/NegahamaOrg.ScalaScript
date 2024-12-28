@@ -343,10 +343,6 @@ ForOf: name=Id '<-' of=Expression;
 // ForTo: name=Id '<-' e1=Expression to=('to' | 'until') e2=Expression ('step' stepValue=IntegerLiteral2)?;
 ForTo: name=Id '<-' e1=Expression to=Id e2=Expression (step=Id stepValue=IntegerLiteral2)?;
 
-// step은 마이너스를 포함한 정수값만을 가질 수 있다.
-IntegerLiteral2 returns number:
-  ('-' | '+')? IntegerLiteral;
-
 // While Loop
 WhileStatement:
   'while' ConditionClause loop=Block;
@@ -378,7 +374,6 @@ terminal BYPASS returns string: /(%%\/\/[^\n\r]*|%%[\s\S]*?%%)/;
 */
 Expression:
   Logical
-  | LogicalNot
   | Assignment
   | IfExpression
   | InfixExpression
@@ -433,10 +428,16 @@ CaseClause:
 CaseDefalut returns string: '_';
 CasePattern: Literal;
 
-// Unary operators
-// 이것은 거듭제곱보다 우선순위가 높은 연산이다.
+/*
+  Unary operators
+  이것은 거듭제곱보다 우선순위가 높은 연산이다.
+  BinaryExpression, MatchExpression 및 CallChain등은 모두
+  A (operator B)* 형태로 되어져 있어 A 자체를 포함하는 구조로 되어져 있다.
+  UnaryExpression도 동일한 메커니즘을 위해 operator가 없을 수도 있는 구조로 되어있다.
+  만약 그렇지 않다면 모든 Expression은 여기서 명시한 operator를 가지고 있어야만 한다.
+*/
 UnaryOperator infers Expression:
-  {infer UnaryExpression} (operator=('-' | '+' | 'typeof'))? value=CallChain;
+  {infer UnaryExpression} (operator=('-' | '+' | 'typeof' | 'not' | '!'))? value=CallChain;
 
 /*
   Member call and Chaining of Member calls
@@ -476,8 +477,10 @@ CallChain infers Expression:
 
 /*
   CallChain의 시작점으로 사용되는 atomic expressions
-  이것은 RefCall(변수, 함수, 배열)과 this, super, (expr), new를 포함하며
-  Literal도 포함된다. Literal은 'abc'.split() 또는 1 + 2 와 같은 구문을 위해 필수적이다. 
+  이것은 RefCall(변수, 함수, 배열)과 this, super, (expr), new, [1,2], literal를 포함한다.
+  ArrayValue는 RefCall의 배열과 다르다. RefCall의 배열은 ary[1] 과 같이 배열형 변수의 사용을 의미하며
+  ArrayValue는 배열의 literal 표현으로 [1, 2, 3].forEach(...)와 같은 구문을 위해 필요하다.
+  Literal은 'abc'.split() 또는 1 + 2와 같은 구문을 위해 필수적이다.
 */
 SimpleExpression infers Expression:
   RefCall
@@ -495,7 +498,7 @@ SimpleExpression infers Expression:
 
   개체의 호출에서 중요한 점은 해당 개체가 ScalaScript에서 정의된 것이면 당연히 정상적으로 동작을 하지만
   타입스크립트에서 정의되어져 있는 것들은 예를들면 console.log의 console은 정의되지 않았기 때문에 에러가 된다.
-  그래서 타입스크립트의 라이브러리를 사용할때는 cross-reference를 처리하기 위해 추가적인 코드가 필요한데
+  그래서 타입스크립트의 라이브러리에 대한 cross-reference를 처리하기 위해 스칼라스크립트에서의 추가적인 코드가 필요하다.
   많이 사용되는 타입스크립트의 함수들이 scala-script-library.ts에 정의되어져 있다.
 */
 RefCall: {infer CallChain}
@@ -531,10 +534,10 @@ NewExpression:
   There are literals for booleans, integer numbers, floating point numbers, strings, and so on.
   The syntax of these literals is in each case as in TypeScript.
   FloatingPointLiteral, IntegerLiteral은 minus을 포함하지 않는다.
-  minus는 unary operation으로 따로 정의되어져 있음 
+  minus는 unary operation으로 따로 정의되어져 있음
 */
 Literal:
-  value=( 'any' | 'nil' | 'void' | 'true' | 'false' | FloatingPointLiteral | IntegerLiteral | StringLiteral | RegExStringLiteral );
+  value=( 'any' | 'nil' | 'void' | BooleanLiteral | NumberLiteral | StringLiteral | RegExStringLiteral );
 
 // ex) ary = [ 1, 2, 3 ], [], [ 1, ...ary ]
 ArrayValue:
@@ -565,10 +568,6 @@ ObjectValue:
 */
 Binding: (element=Id ':' value=Expression | spread=SpreadExpression) (',')?;
 
-// 이 규칙이 UnaryExpression과 독립적인 것은 연산 우선 순위가 다르기 때문이다.
-LogicalNot:
-  operator=('not' | '!') value=Expression;
-
 /*
   Assignment를 아래와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.
   Assignment infers Expression:
@@ -594,13 +593,13 @@ IfExpression:
   ('else' else=Block)?;
 
 /*
-  Logical, LogicalNot은 거의 모든 expression을 취급하기 때문에 조건절의 validation이 별도로 필요하다.
+  Logical은 거의 모든 expression을 취급하기 때문에 조건절의 validation이 별도로 필요하다.
   조건절은 괄호가 없지만 괄호를 사용할 수도 있는데 이때는 GroupExpression이 사용된 것이다.
   반드시 괄호를 사용해야 할 경우에는 다음을 사용한다.
-  '(' condition=(Logical | LogicalNot) ')';
+  '(' condition=Logical ')';
 */
 fragment ConditionClause:
-  condition=(Logical | LogicalNot);
+  condition=Logical;
 
 IfElseExpression:
   ('elif' | 'else if') ConditionClause elif=Block?;
@@ -643,10 +642,10 @@ hidden terminal NL: /[\r\n]+/;
 // Boolean Literals
 // It has to place before ID or Identifier
 // Otherwise `true` and `false` is identified for Indentifier
-// terminal BooleanLiteral returns boolean: 'true' | 'false';
+terminal BooleanLiteral returns boolean: 'true' | 'false';
 
-// NumberLiteral returns number:
-//   FloatingPointLiteral | IntegerLiteral;
+NumberLiteral returns number:
+  FloatingPointLiteral | IntegerLiteral;
 
 // Floating Point Literals
 // example : 0.0    3.14159    1e30    1.0e-100
@@ -668,6 +667,10 @@ terminal BinDigit       returns number: /[0-1]/;
 terminal OctDigit       returns number: /[0-7]/;
 terminal HexDigit       returns number: /[0-9a-fA-F]/;
 terminal Digit          returns number: /[0-9]/;
+
+// step은 마이너스를 포함한 정수값만을 가질 수 있다.
+IntegerLiteral2 returns number:
+  ('-' | '+')? IntegerLiteral;
 
 // Character Literals
 // terminal CharLiteral  : "'" (PrintableChar | CharEscapeSeq) "'";
