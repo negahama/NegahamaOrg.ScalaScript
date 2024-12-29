@@ -441,6 +441,7 @@ export class ScalaScriptValidator {
     const log = enterLog('checkUnaryExpression', unary.value.$type)
 
     if (unary.operator) {
+      traceLog('* checkUnaryExpression infer value')
       const item = TypeSystem.inferType(unary.value)
       if (!this.isLegalOperation(unary.operator, item)) {
         const msg =
@@ -472,21 +473,19 @@ export class ScalaScriptValidator {
    */
   checkBinaryExpression(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
     const log = enterLog('checkBinaryExpression', binary.operator)
-    traceLog(`- expression: '${binary.left.$cstNode?.text}' '${binary.operator}' '${binary.right.$cstNode?.text}'`)
+    traceLog(`- left : ${binary.left.$type}, '${reduceLog(binary.left.$cstNode?.text)}'`)
+    traceLog(`- right: ${binary.right.$type}, '${reduceLog(binary.right.$cstNode?.text)}'`)
 
+    traceLog('* checkBinaryExpression infer left')
     const left = TypeSystem.inferType(binary.left)
+    traceLog('* checkBinaryExpression infer right')
     const right = TypeSystem.inferType(binary.right)
 
     const tl = left.toString()
     const tr = right.toString()
     traceLog(`* checkBinaryExpression result: ${tl} ${binary.operator} ${tr}`)
 
-    if (!this.isLegalOperation(binary.operator, left, right)) {
-      const msg = `checkBinaryExpression: Cannot perform operation '${binary.operator}' on values of type '${tl}' and '${tr}'.`
-      accept('error', msg, {
-        node: binary,
-      })
-    } else if (['==', '!='].includes(binary.operator)) {
+    if (['==', '!='].includes(binary.operator)) {
       if (!this.isLegalOperation(binary.operator, left, right)) {
         const msg =
           'checkBinaryExpression: This comparison will always return ' +
@@ -495,6 +494,13 @@ export class ScalaScriptValidator {
         accept('warning', msg, {
           node: binary,
           property: 'operator',
+        })
+      }
+    } else {
+      if (!this.isLegalOperation(binary.operator, left, right)) {
+        const msg = `checkBinaryExpression: Cannot perform operation '${binary.operator}' on values of type '${tl}' and '${tr}'.`
+        accept('error', msg, {
+          node: binary,
         })
       }
     }

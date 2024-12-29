@@ -1026,23 +1026,6 @@ export class TypeSystem {
   }
 
   /**
-   * Determines if the given type descriptor represents a primitive type.
-   *
-   * A type is considered primitive if it is one of the following:
-   * - Nil type
-   * - Void type
-   * - String type
-   * - Number type
-   * - Boolean type
-   *
-   * @param item - The type descriptor to check.
-   * @returns `true` if the type descriptor represents a primitive type, otherwise `false`.
-   */
-  static isPrimitiveType(item: TypeDescriptor): boolean {
-    return this.isStringType(item) || this.isNumberType(item) || this.isBooleanType(item)
-  }
-
-  /**
    * Infers the type of a given AST node.
    *
    * @param node - The AST node for which the type is to be inferred. Can be undefined.
@@ -1237,18 +1220,20 @@ export class TypeSystem {
 
     값의 타입을 추론하는 것은 신중하게 처리되어야 한다. 왜냐하면 값으로 방대하고 복잡한 오브젝트가
     올 수도 있는데 때때로 이것은 recursive definition을 유발할 수도 있기 때문이다.
+    ```
     val 보유기술: ChainPrompt = {
       prompt: '추가할 기술?'
       callback: (corp, options) => { console.log(corp.name, options) }
       nextChain: { prompt: '기술수준?' }
     }
-    위 코드에서 corp.name에서 corp의 타입을 추론하려고 하려고 parameter인 corp를 추론하려고 하는데
-    이 parameter corp는 callback을 알아야 하고 callback은 ChainPrompt를 알아야 해결될 수 있다.
-    이까지는 문제가 안되는데 VariableDef이 val 보유기술: ChainPrompt에서 value를 추론하면
-    callback의 parameter corp에 대해 다시 알아야 하고 처음 과정이 아직 끝난 상태가 아니기 때문에
+    ```
+    위 코드에서 `corp.name`에서 `corp`의 타입을 추론하려고 parameter인 `corp`를 추론하려고 하는데
+    이 parameter `corp`는 `callback`을 알아야 하고 `callback`은 `ChainPrompt`를 알아야 해결될 수 있다.
+    여기까지는 문제가 안되는데 `VariableDef`인 `val 보유기술: ChainPrompt = {...}` 에서 `value`를 추론하면
+    `callback`의 parameter `corp`에 대해 다시 알아야 하고 처음 과정이 아직 끝난 상태가 아니기 때문에
     recursive definition이 발생한다.
 
-    아울러 값이 있는 경우에는 값 자체를 TypeDescriptor의 node, literal로 사용하는 것이 더 유용하다.
+    아울러 값이 있는 경우에는 값 자체를 TypeDescriptor의 node로 사용하는 것이 더 유용하다.
     이것은 해당 변수에 값이 할당되어졌는지를 확인할 때도 유용하고 변수의 실제 값을 나중에 참조할 수 있다.
   */
   /**
@@ -1278,7 +1263,7 @@ export class TypeSystem {
             //     `type '${type.toString()}'`
             //   console.error(chalk.red(msg))
           } else type = valueType
-        } else if (this.isPrimitiveType(type)) {
+        } else if (this.isStringType(type) || this.isNumberType(type) || this.isBooleanType(type)) {
           type = this.inferType(node.value)
         }
       }
@@ -1561,9 +1546,10 @@ export class TypeSystem {
 
   /**
    * Infers the type of an assignment node.
-   * 대입문이라고 해서 이 함수가 매번 호출되는 것은 아니다. 왜냐하면 타입을 추론하는 것은 validator에서 하는데
-   * ScalaScriptValidator의 checkAssignment()에서 좌변과 우변을 따로 추론하기 때문이다. 따라서 이 함수가 호출되는 경우는
-   * 다중 대입문처럼 한쪽에 대입문이 있는 경우(a = b = 0)이거나 대입문 형식이 아닌데 대입문인 경우({ num: no += 1 })들이다.
+   *
+   * 대입문이라고 해서 이 함수가 매번 호출되는 것은 아니다.
+   * 왜냐하면 대입문의 타입 추론은 validator의 `checkAssignment()`에서 하는데 좌변과 우변을 따로 추론하기 때문이다.
+   * 따라서 이 함수가 호출되는 경우는 다중 대입문인 경우(`a = b = 0`)이거나 복합 대입문인 경우(`n += 1`)이다.
    *
    * @param node - The assignment node to infer the type for.
    * @returns The inferred type description of the assignment node.
@@ -1584,7 +1570,7 @@ export class TypeSystem {
    * @returns The inferred type description of the IfExpression node.
    */
   static inferTypeIfExpression(node: ast.IfExpression): TypeDescriptor {
-    const log = enterLog('inferTypeIfExpression', node.$type)
+    const log = enterLog('inferTypeIfExpression', `'${reduceLog(node.$cstNode?.text)}'`)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (!node.then) {
       console.error(chalk.red('IfExpression has no then node'))
@@ -1658,6 +1644,19 @@ export class TypeSystem {
 
   /**
    * Infers the type of a binary expression node.
+   * 
+   * `inferAssignment()`와 마찬가지로 이 함수도 `Validator`의 `CheckBinaryExpression()`에서 좌변과 우변을 따로
+   * 추론하기 때문에 `1 + 2 * 3` 같이 이항 연산자가 연속적인 경우에만 호출되며 심지어 실제 타입을 리턴하지도 않는다.
+   * 실제 타입을 리턴하지 않는 이유는 실제 타입을 힘들게(경우에 따라서는 이것은 비용이 많이 들수도 있고 심지어 
+   * 재귀호출 문제를 발생시킬 수도 있다) 구할 필요가 없기 때문이다.
+   * 
+   * 예를 들어 `1 + 2 * 3`가 있다고 하면 validator가 실제 이항 연산자 `+` 를 `1`과 `2 * 3`으로 나눠서 처리할 때
+   * 이 함수는 `2 * 3`의 타입이 number type이라고 알려주는 것이다. 실제 평가해서 구한 타입이 아니라 가져야 할 타입,
+   * 가짜 타입을 알려주는 것이다. 그래도 되는 이유는 결국은 `2 * 3`을 다시 평가하기 때문에 미리 구할 필요가 없기 때문이다.  
+
+   * 연산자에 적합한 타입인지의 여부를 검사하는 것은 validator에서 하고 최종적으로 연산의 각 항목(`1 + 2`에서 `1`, `2`)은
+   * unary, literal, callchain등으로 표현되기 때문에 사실 이 함수 자체가 거의 무의미하다. 하지만 이항 연산자가 연속인
+   * 경우에 이 함수는 꼭 필요하며 여기서 적절한 타입을 리턴하지 않으면 Validator에서 바로 에러가 되어 버린다.
    *
    * @param node - The binary expression AST node to infer the type for.
    * @returns The inferred type description of the binary expression.
@@ -1707,8 +1706,9 @@ export class TypeSystem {
 
   /**
    * Infers the type of a spread expression node.
-   * Spread expression은 ...을 사용해서 배열을 풀어서 사용하는 경우이다.
-   * 예를들어 a = [1, 2, 3]이라고 할 때 b = [...a, 4, 5]와 같이 사용하는 경우이다.
+   * 
+   * Spread expression은 `...`을 사용해서 배열을 풀어서 사용하는 경우이다.
+   * 예를들어 `a = [1, 2, 3]`이라고 할 때 `b = [...a, 4, 5]`와 같이 사용하는 경우이다.
    *
    * @param node - The return expression node to infer the type from.
    * @returns The inferred type description of the return expression.
@@ -1872,6 +1872,7 @@ export class TypeSystem {
       // return AstUtils.streamAllContents(node).filter(ast.isReturnExpression).toArray()
       const result: ast.ReturnExpression[] = []
       AstUtils.streamContents(node).forEach(n => {
+        // forEach 같은 람다함수에서 리턴하는 경우를 제외하기 위해 함수인 경우는 빼고 처리한다.
         if (ast.isFunctionDef(n) || ast.isFunctionType(n) || ast.isFunctionValue(n)) return
         else if (ast.isReturnExpression(n)) result.push(n)
         else {
@@ -1884,17 +1885,19 @@ export class TypeSystem {
 
     const log = enterLog('inferTypeBlock', reduceLog(node.$cstNode?.text))
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
-    // Block이 여러 식으로 구성된 경우
     if (node.isBracket) {
-      // 함수의 바디에 명시된 return 문이 없어도 void type으로 간주한다.
-      // extractReturnExpression은 람다함수에서 리턴하는 경우를 배제한다.
-      // 여러 개의 return문이 있으면 각각의 타입이 union으로 처리한다.
-      const types: TypeDescriptor[] = extractReturns(node).map(r => this.inferType(r))
-      type = this.createUnionType(types)
-      if (this.isErrorType(type)) {
-        // console.error(chalk.red(type.toString()), types.length)
-        // types.forEach(t => console.error('  ', t.toString()))
-        type = new VoidTypeDescriptor()
+      // Block이 여러 식으로 구성된 경우
+      // 함수의 바디에 명시된 return 문이 없으면 void type으로 간주한다.
+      const returns = extractReturns(node)
+      if (returns.length == 0) type = new VoidTypeDescriptor()
+      else if (returns.length == 1) type = this.inferType(returns[0])
+      else {
+        // 여러 개의 return문이 있으면 각각의 타입을 union type으로 처리한다.
+        const types: TypeDescriptor[] = returns.map(r => this.inferType(r))
+        type = this.createUnionType(types)
+        if (this.isErrorType(type)) {
+          type = new VoidTypeDescriptor()
+        }
       }
     } else {
       // Block이 단일 식인 경우 이 식의 타입을 리턴한다.
@@ -1938,19 +1941,19 @@ export class TypeSystem {
     일반 함수는 2)와 3)의 경우가 아닌 것을 의미하며 generic과 binding의 영향을 받지 않으므로 간단하다.
     
     2) Array, Map, Set등의 generic을 가지는 함수형 메서드
-    예를 들어 this.corpList.find(corp => corp.name == 'name')와 같은 코드에서 corp의 타입과 find의 리턴 타입을 추론하는 것이다.
-    전달되는 node는 find이며 이것의 이전 노드인 this.corpList의 타입을 이용해서 corp, find의 타입을 추론한다.
+    예를 들어 `this.corpList.find(corp => corp.name == 'name')`와 같은 코드에서 `corp`의 타입과 `find`의 리턴 타입을 추론하는 것이다.
+    전달되는 node는 `find`이며 이것의 이전 노드인 `this.corpList`의 타입을 이용해서 `corp`, `find`의 타입을 추론한다.
     Map, Set의 경우도 거의 동일하지만 generic이 K, V 등으로 다수일 수 있고 K, V에 대응하는 실제 타입을
-    new Map<string, Corp>와 같은 new Expression에서 얻는다는 것이 다르다.
+    `new Map<string, Corp>`와 같은 new Expression에서 얻는다는 것이 다르다.
 
     Map, Set의 경우는 아래와 같이 사용되는데
-    var corpMap = new Map<string, Corp>()
-    this.corpMap.get('name')
-    this.corpMap의 타입을 추론하면 class형 타입이 된다.
-    그리고 inferTypeNewExpression()에서 generic의 정보를 저장하기 때문에 corpMap의 ClassTypeDescriptor에 string, Corp가 저장되어져 있다.
+    `var corpMap = new Map<string, Corp>()`
+    `this.corpMap.get('name')`
+    `this.corpMap`의 타입을 추론하면 class형 타입이 된다.
+    그리고 `inferTypeNewExpression()`에서 generic의 정보를 저장하기 때문에 `corpMap`의 `ClassTypeDescriptor`에 `string`, `Corp`가 저장되어져 있다.
     하지만 배열은 corpList에 gereric 정보가 저장되어져 있지 않다.
     
-    배열 자체($array$)는 generic의 정보를 가지고 있고 배열도 new Array<Corp>와 같이 사용할 수 있지만 현재는 지원하지 않는다.
+    배열 자체($array$)는 generic의 정보를 가지고 있고 배열도 `new Array<Corp>`와 같이 사용할 수 있지만 현재는 지원하지 않는다.
 
     3) Binding 되어진 람다 함수
   */

@@ -139,6 +139,55 @@ let f = (a: number) => {
   })
 
   /**
+   * TestCase : if expression 테스트
+   */
+  test('test of if expression', async () => {
+    const code = `
+var a = 1
+var b = true
+var c = b == (if a > 0 then true else false)
+var d: boolean = if a > 0 then true else false
+var n = if a > 0 then {
+    console.log('a > 0')
+    return true
+} else {
+    console.log('a <= 0')
+    return false
+}
+`
+    const transpiled = `let a = 1
+let b = true
+let c = b == ((a > 0) ? true : false)
+let d: boolean = (a > 0) ? true : false
+let n = function() {
+  if (a > 0) {
+    console.log('a > 0')
+    return true
+  }
+  else {
+    console.log('a <= 0')
+    return false
+  }
+}()`
+
+    const document = await parse(code)
+    expect(
+      document.parseResult.parserErrors.length &&
+        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
+    ).toBe(0)
+    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
+    expect(document?.diagnostics?.length).toBe(0)
+
+    expect(
+      document.parseResult?.value.codes
+        .map(code => generateCode(code), {
+          appendNewLineIfNotEmpty: true,
+        })
+        .join('\n')
+    ).toBe(transpiled)
+  })
+
+  /**
    * TestCase : 함수형 변수에 값을 대입할 경우
    * 파라메터와 리턴 타입이 정확한 경우에만 대입되어야 하고 이외에는 에러가 발생해야 한다.
    */

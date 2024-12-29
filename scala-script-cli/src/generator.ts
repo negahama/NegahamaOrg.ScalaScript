@@ -4,6 +4,7 @@ import { AstUtils } from 'langium'
 import { expandToNode, joinToNode, toString } from 'langium/generate'
 import { extractDestinationAndName } from './cli-util.js'
 import * as ast from '../../language/generated/ast.js'
+import { TypeSystem } from '../../language/scala-script-types.js'
 import chalk from 'chalk'
 
 /**
@@ -741,10 +742,29 @@ function transpileCallChain(expr: ast.CallChain, indent: number): string {
  */
 function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
   let result = ''
+  // IfExpression을 expression으로 처리하는 문제
+  // 스칼라스크립트에서 if를 expression으로 처리하기 위해서 처음에는 삼항 연산자만을 사용했는데 제약이 많았다.
+  // 간단한 조건절인 경우 여전히 삼항 연산자는 유용한 선택이 될 수 있지만 보다 일반적인 처리를 위해서 다른 방법이 필요했다.
+  // 그래서 익명 함수를 이용해서 이를 구현한다.
+  //
+  // 중요한 것은 IfExpression이 문으로 쓰이는지 식으로 쓰이는지를 구분하는 것이다.
+  // if 문이 값을 리턴하지 않으면 그냥 문으로 취급할 수 있기 때문이다.
+  // 값을 리턴한다는 것은 다음을 의미한다.
+  // - 중괄호없이 하나의 식만 가지는 경우
+  // - return expression으로 종료하는 경우
+  //
+  // IfExpression이 식으로 쓰이는 경우에는 IfExpression 전체를 하나의 익명 함수로 감싸고
+  // 이 함수를 IfExpression의 상위 컨테이너에게 넘긴다. 예를 들어 아래의 구문은
+  // var n = if a > 0 then { console.log('a > 0') return true } else { console.log('a <= 0') return false }
+  // 다음과 같이 변환된다.
+  // var n = function() { if (a > 0) { console.log('a > 0'); return true } else { console.log('a <= 0'); return false } }()
+  //
+  // 현재는 else if 절은 지원하지 않는다. 즉 else if가 있으면 문으로 취급한다.
+  // 또한 삼항 연산자로 처리할 수 있는 것은 삼항 연산자로 처리한다.
   // 삼항 연산자 처리 조건
   // else if 문 없이 then, else 문만 있어야 한다.
   // then, else 모두 중괄호 없어야 하며 식이 하나만 있어야 한다.
-  // 하나의 식은 return 이 아니어야 한다.
+  // 하나의 식은 return 이 아니어야 하며 void나 nil이 아니어야 한다.
   if (
     expr.then &&
     !expr.then.isBracket &&
@@ -758,17 +778,44 @@ function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
     !ast.isReturnExpression(expr.else.codes[0]) &&
     (expr.elif == undefined || expr.elif.length == 0)
   ) {
-    result += `${generateCondition(expr.condition, indent)} ? `
+    // 위 조건으로 처리할 경우 console.log()와 같은 값이 없는 expression이 포함될 수 있다.
+    const thenType = TypeSystem.inferType(expr.then.codes[0])
+    const elseType = TypeSystem.inferType(expr.else.codes[0])
+    if (
+      !(TypeSystem.isVoidType(thenType) || TypeSystem.isNilType(thenType)) &&
+      !(TypeSystem.isVoidType(elseType) || TypeSystem.isNilType(elseType))
+    ) {
+      result += `${generateCondition(expr.condition, indent)} ? `
 
-    // then 절에 해당하는 부분은 세미콜론을 포함하지 않아야 한다.
-    let then = generateExpression(expr.then.codes[0], indent)
-    if (then.endsWith(';')) {
-      then = then.slice(0, then.lastIndexOf(';'))
+      // then 절에 해당하는 부분은 세미콜론을 포함하지 않아야 한다.
+      let then = generateExpression(expr.then.codes[0], indent)
+      if (then.endsWith(';')) {
+        then = then.slice(0, then.lastIndexOf(';'))
+      }
+
+      result += then + ' : '
+      result += generateExpression(expr.else.codes[0], indent)
+      return result
     }
-
-    result += then + ' : '
-    result += generateExpression(expr.else.codes[0], indent)
-    return result
+  } else if (
+    expr.then &&
+    expr.else &&
+    (expr.elif == undefined || expr.elif.length == 0) &&
+    (ast.isExpression(expr.$container) || ast.isAssignment(expr.$container) || ast.isVariableDef(expr.$container))
+  ) {
+    const thenType = TypeSystem.inferType(expr.then)
+    const elseType = TypeSystem.inferType(expr.else)
+    if (
+      !(TypeSystem.isVoidType(thenType) || TypeSystem.isNilType(thenType)) &&
+      !(TypeSystem.isVoidType(elseType) || TypeSystem.isNilType(elseType))
+    ) {
+      result += 'function() {\n'
+      result += applyIndent(indent + 1, 'if ' + generateCondition(expr.condition, indent) + ' ')
+      result += generateBlock(expr.then, indent + 1) + '\n'
+      result += applyIndent(indent + 1, 'else ' + generateBlock(expr.else, indent + 1)) + '\n'
+      result += applyIndent(indent, '}()') // 익명 함수 호출
+      return result
+    }
   }
 
   result += 'if ' + generateCondition(expr.condition, indent) + ' '

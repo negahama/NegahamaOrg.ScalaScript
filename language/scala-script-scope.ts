@@ -246,7 +246,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     이것의 scope를 제공하기 위해서 corp를 찾는다. 이 과정에서 getScope()가 다시 호출될 수도 있다.
     corp의 종류에 따라서 ClassDef, ObjectType, any type등으로 나눠지지만 모두 corp에서 가능한 모든 이름을 Scope로 리턴한다.
   */
-  /*  
+  /*
     이 함수는 previous의 추론 타입이 class이고 ref의 astNode가 ClassDef인 경우에 호출된다.
     ```
     def Corp = {
