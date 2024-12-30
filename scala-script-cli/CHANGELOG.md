@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.4 - December 30, 2024
+
+- refactoring grammar and logic
+- fixed bugs
+
 ### 0.6.3 - December 23, 2024
 
 - seperate the object type and class type
