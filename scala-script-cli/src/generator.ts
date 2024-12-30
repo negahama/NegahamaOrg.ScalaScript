@@ -465,8 +465,7 @@ function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
   if (stmt.annotate == 'NotTrans') return result
   if (stmt.export) result += 'export '
 
-  // interface가 되는 조건
-  // body 에 함수나 할당문이 있을 경우 또는 변수 선언문에서 값으로 초기화하는 경우가 아닌 경우
+  // body 에 함수나 할당문, 초기값을 가지는 변수 선언문이 있으면 class가 된다.
   let isInterface = true
   stmt.body.elements.forEach(m => {
     if (ast.isFunctionDef(m) || ast.isAssignment(m)) isInterface = false
@@ -621,14 +620,13 @@ function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number)
 function transpileBypass(stmt: ast.Bypass, indent: number): string {
   let result = ''
   if (stmt.bypass) {
-    // line comment는 indent를 적용하고 newline을 추가하지 않는다.
-    // block comment는 indent를 적용하지 않는 대신 newline을 추가한다.
-    // 하지만 /** ... */ 형태의 block comment는 처음 라인은 indent를 적용해야 한다.
+    // line comment는 newline을 추가하지 않는다.
+    // block comment는 block 위에 newline을 추가한다.
     if (stmt.bypass.startsWith('%%//')) {
       result += applyIndent(indent, stmt.bypass.replace('%%', ''))
     } else if (stmt.bypass.startsWith('%%/**')) {
       result += '\n' + applyIndent(indent, stmt.bypass.replaceAll('%%', ''))
-    } else result += '\n' + stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', '')
+    } else result += '\n' + applyIndent(indent, stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', ''))
   }
   return result
 }
@@ -764,7 +762,7 @@ function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
   // 삼항 연산자 처리 조건
   // else if 문 없이 then, else 문만 있어야 한다.
   // then, else 모두 중괄호 없어야 하며 식이 하나만 있어야 한다.
-  // 하나의 식은 return 이 아니어야 하며 void나 nil이 아니어야 한다.
+  // 하나의 식은 return 이 아니어야 하며 void가 아니어야 한다.
   if (
     expr.then &&
     !expr.then.isBracket &&
@@ -781,10 +779,9 @@ function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
     // 위 조건으로 처리할 경우 console.log()와 같은 값이 없는 expression이 포함될 수 있다.
     const thenType = TypeSystem.inferType(expr.then.codes[0])
     const elseType = TypeSystem.inferType(expr.else.codes[0])
-    if (
-      !(TypeSystem.isVoidType(thenType) || TypeSystem.isNilType(thenType)) &&
-      !(TypeSystem.isVoidType(elseType) || TypeSystem.isNilType(elseType))
-    ) {
+
+    // nil 여부는 검사하지 않는다.  nil은 의도적으로 리턴할 수 있기 때문이다.
+    if (!TypeSystem.isVoidType(thenType) && !TypeSystem.isVoidType(elseType)) {
       result += `${generateCondition(expr.condition, indent)} ? `
 
       // then 절에 해당하는 부분은 세미콜론을 포함하지 않아야 한다.
@@ -805,10 +802,9 @@ function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
   ) {
     const thenType = TypeSystem.inferType(expr.then)
     const elseType = TypeSystem.inferType(expr.else)
-    if (
-      !(TypeSystem.isVoidType(thenType) || TypeSystem.isNilType(thenType)) &&
-      !(TypeSystem.isVoidType(elseType) || TypeSystem.isNilType(elseType))
-    ) {
+
+    // nil 여부는 검사하지 않는다.  nil은 의도적으로 리턴할 수 있기 때문이다.
+    if (!TypeSystem.isVoidType(thenType) && !TypeSystem.isVoidType(elseType)) {
       result += 'function() {\n'
       result += applyIndent(indent + 1, 'if ' + generateCondition(expr.condition, indent) + ' ')
       result += generateBlock(expr.then, indent + 1) + '\n'
@@ -1157,7 +1153,7 @@ function generateBlock(
       else if (ast.isExpression(code)) element += generateExpression(code, indent + 1)
       else console.log(chalk.red('ERROR in Block:', code))
     }
-    // bypass는 indent를 적용하지 않는다.
+    // bypass는 indent를 적용하지 않는다. bypass 자체에서 처리하고 있음음
     if (ast.isBypass(code)) {
       result += element + '\n'
     } else {
@@ -1340,7 +1336,7 @@ function generateFunction(param: GenerateFunctionParams): string {
  */
 function generateCondition(condition: ast.Expression, indent: number): string {
   const e = generateExpression(condition, indent)
-  return ast.isGroupExpression(condition) || ast.isUnaryExpression(condition) ? e : '(' + e + ')'
+  return e.startsWith('(') && e.endsWith(')') ? e : '(' + e + ')'
 }
 
 /**

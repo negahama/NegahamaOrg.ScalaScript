@@ -96,6 +96,13 @@ if a > 0 s = "true"
 
 %%// 삼항 연산자
 var gender = if a == 1 then 'male' else 'female'
+gender = if a == 1 then {
+  console.log('male')
+  return 'male'
+} else {
+  console.log('female')
+  return 'female'
+}
 
 %%// 중위 연산자를 포함한 if 문
 if not s console log 'a is not true'

@@ -21,7 +21,7 @@ export class ScalaScriptValidator {
    * - If neither type nor value is present, it reports an error indicating that variables require a type hint or an assignment at creation.
    */
   checkVariableDef(stmt: ast.VariableDef, accept: ValidationAcceptor): void {
-    const log = enterLog('checkVariableDef', `'${reduceLog(stmt.$cstNode?.text)}'`)
+    const log = enterLog('checkVariableDef', stmt)
     traceLog('- stmt.type :', `${stmt.type?.$type}, '${reduceLog(stmt.type?.$cstNode?.text)}'`)
     traceLog('- stmt.value:', `${stmt.value?.$type}, '${reduceLog(stmt.value?.$cstNode?.text)}'`)
 
@@ -100,7 +100,7 @@ export class ScalaScriptValidator {
    *    If not, it reports an error.
    */
   checkFunctionDef(stmt: ast.FunctionDef | ast.FunctionValue, accept: ValidationAcceptor): void {
-    const log = enterLog('checkFunctionDef', `'${reduceLog(stmt.$cstNode?.text)}'`)
+    const log = enterLog('checkFunctionDef', stmt)
     traceLog(`- return: ${stmt.returnType?.$type}, '${reduceLog(stmt.returnType?.$cstNode?.text)}'`)
     traceLog(`- body  : ${stmt.body?.$type}, '${reduceLog(stmt.body?.$cstNode?.text)}'`)
 
@@ -134,9 +134,9 @@ export class ScalaScriptValidator {
   checkClassDef(stmt: ast.ClassDef | ast.ObjectValue, accept: ValidationAcceptor): void {
     let log: string
     if (ast.isClassDef(stmt)) {
-      log = enterLog('checkClassDef', stmt.name)
+      log = enterLog('checkClassDef', stmt)
     } else {
-      log = enterLog('checkObjectValue', `'${reduceLog(stmt.$cstNode?.text)}'`)
+      log = enterLog('checkObjectValue', stmt)
     }
     // todo: implement classes
     // accept("error", "Classes are currently unsupported.", {
@@ -156,7 +156,7 @@ export class ScalaScriptValidator {
    * @param accept - The validation acceptor used to report validation issues.
    */
   checkArrayValue(expr: ast.ArrayValue, accept: ValidationAcceptor): void {
-    const log = enterLog('checkArrayValue', `'${reduceLog(expr.$cstNode?.text)}'`)
+    const log = enterLog('checkArrayValue', expr)
 
     let type: TypeDescriptor
     expr.items.forEach((item, index) => {
@@ -181,7 +181,7 @@ export class ScalaScriptValidator {
    * @param accept - The ValidationAcceptor used to report validation issues.
    */
   checkForStatement(stmt: ast.ForStatement, accept: ValidationAcceptor): void {
-    const log = enterLog('checkForStatement', `'${stmt.$cstNode?.text}'`)
+    const log = enterLog('checkForStatement', stmt)
 
     stmt.iterators.forEach(iterator => {
       if (ast.isForOf(iterator)) {
@@ -256,7 +256,7 @@ export class ScalaScriptValidator {
    * @returns void
    */
   checkCallChain(expr: ast.CallChain, accept: ValidationAcceptor): void {
-    const log = enterLog('checkCallChain', `'${reduceLog(expr.$cstNode?.text)}'`)
+    const log = enterLog('checkCallChain', expr)
 
     // default parameter, optional parameter, rest parameter등으로 인해 파라미터의 처리가 간단하지 않다.
     if (expr.isFunction) {
@@ -396,7 +396,7 @@ export class ScalaScriptValidator {
    * @param accept - The validation acceptor to report validation issues.
    */
   checkAssignment(expr: ast.Assignment, accept: ValidationAcceptor): void {
-    const log = enterLog('checkAssignment', `'${reduceLog(expr.$cstNode?.text)}'`)
+    const log = enterLog('checkAssignment', expr)
     traceLog(`- left : ${expr.assign.$type}, '${reduceLog(expr.assign.$cstNode?.text)}'`)
     traceLog(`- right: ${expr.value.$type}, '${reduceLog(expr.value.$cstNode?.text)}'`)
 
@@ -427,7 +427,7 @@ export class ScalaScriptValidator {
    * @param accept - The validation acceptor to collect validation issues.
    */
   checkIfExpression(expr: ast.IfExpression, accept: ValidationAcceptor): void {
-    const log = enterLog('checkIfExpression', `'${reduceLog(expr.$cstNode?.text)}'`)
+    const log = enterLog('checkIfExpression', expr)
     exitLog(log)
   }
 
@@ -438,7 +438,7 @@ export class ScalaScriptValidator {
    * @param accept - The validation acceptor to report errors.
    */
   checkUnaryExpression(unary: ast.UnaryExpression, accept: ValidationAcceptor): void {
-    const log = enterLog('checkUnaryExpression', unary.value.$type)
+    const log = enterLog('checkUnaryExpression', unary)
 
     if (unary.operator) {
       traceLog('* checkUnaryExpression infer value')
@@ -472,7 +472,7 @@ export class ScalaScriptValidator {
    * 7. Logs the exit of the function.
    */
   checkBinaryExpression(binary: ast.BinaryExpression, accept: ValidationAcceptor): void {
-    const log = enterLog('checkBinaryExpression', binary.operator)
+    const log = enterLog('checkBinaryExpression', binary)
     traceLog(`- left : ${binary.left.$type}, '${reduceLog(binary.left.$cstNode?.text)}'`)
     traceLog(`- right: ${binary.right.$type}, '${reduceLog(binary.right.$cstNode?.text)}'`)
 

@@ -44,7 +44,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
   override getScope(context: ReferenceInfo): Scope {
     const refText = context.reference.$refText
     const scopeId = `${context.container.$type}.${context.property} = '${refText}'`
-    const scopeLog = enterLog('getScope', scopeId)
+    const scopeLog = enterLog('getScope', undefined, scopeId)
     const superScope = super.getScope(context)
 
     // 현재 node의 ref를 구하는 것은 유용할 수 있지만 ref를 호출하면 그 ref의 scope를 처리하기 위해서
@@ -201,7 +201,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * 7. Returns the created scope or the super scope if no specific scope is found.
    */
   scopeTypeChain(context: ReferenceInfo): Scope | void {
-    const log = enterLog('scopeTypeChain', reduceLog(context.container.$cstNode?.text))
+    const log = enterLog('scopeTypeChain', context.container)
     const typeChain = context.container as ast.TypeChain
 
     // 해당 타입이 generic 타입인지를 확인하고 generic이면 새로운 scope를 생성해서 리턴한다.
@@ -294,7 +294,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * It then attempts to get the global class scope or creates a new scope with the specified options.
    */
   scopeClass(context: ReferenceInfo, previous: ast.Expression, type: ClassTypeDescriptor) {
-    const log = enterLog('scopeClass', context.reference.$refText, previous?.$cstNode?.text, type.node.name)
+    const log = enterLog('scopeClass', undefined, context.reference.$refText, previous?.$cstNode?.text, type.node.name)
 
     // previous와 class의 이름이 동일하면 일단 static으로 처리한다.
     let staticOnly = false
@@ -351,7 +351,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns The constructed scope object.
    */
   scopeObjectType(context: ReferenceInfo, type: ObjectTypeDescriptor) {
-    const log = enterLog('scopeObjectType', type.node.$cstNode?.text)
+    const log = enterLog('scopeObjectType', type.node)
 
     // 이 함수는 ObjectValue만을 대상으로 한다.
     if (ast.isObjectValue(type.node)) {
@@ -377,7 +377,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns The scope containing members of the global object named `$string$`.
    */
   scopeString(context: ReferenceInfo) {
-    const log = enterLog('scopeString')
+    const log = enterLog('scopeString', context.container)
     const scope = this.getGlobalClass(context, '$string$', false)
     exitLog(log)
     return scope
@@ -390,7 +390,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns The global object definition for the number scope.
    */
   scopeNumber(context: ReferenceInfo) {
-    const log = enterLog('scopeNumber')
+    const log = enterLog('scopeNumber', context.container)
     const scope = this.getGlobalClass(context, '$number$', false)
     exitLog(log)
     return scope
@@ -403,7 +403,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns The global object definition for the array scope.
    */
   scopeArray(context: ReferenceInfo) {
-    const log = enterLog('scopeArray', context.reference.$refText)
+    const log = enterLog('scopeArray', undefined, context.reference.$refText)
     const scope = this.getGlobalClass(context, '$array$', false)
     exitLog(log)
     return scope
@@ -436,7 +436,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
    * @returns A new scope containing the descriptions of the elements.
    */
   scopeAny(context: ReferenceInfo, previous: ast.Expression) {
-    const log = enterLog('scopeAny', `ref text: ${previous.$cstNode?.text}, ${context.reference.$refText}`)
+    const log = enterLog('scopeAny', undefined, `ref text: ${previous.$cstNode?.text}, ${context.reference.$refText}`)
     // for debugging...
     // console.trace(chalk.red('scopeAny'), `ref text: ${previous.$cstNode?.text}, ${context.reference.$refText}`)
     const elements: AstNode[] = [previous]

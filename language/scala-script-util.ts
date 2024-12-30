@@ -110,10 +110,11 @@ export function enableLog(enable: boolean) {
  * Logs the entry of a process with a unique signature and optional parameters.
  *
  * @param procKind - A string representing the kind of process being logged.
+ * @param astNode - The AST node associated with the process, if any.
  * @param optionalParams - Additional optional parameters to log.
  * @returns A string representing the unique signature of the log entry.
  */
-export function enterLog(procKind: string, ...optionalParams: any[]): string {
+export function enterLog(procKind: string, astNode: AstNode | undefined, ...optionalParams: any[]): string {
   const applyColor = (text: string): string => {
     if (text.toLowerCase().includes('infer')) return chalk.cyan(text)
     if (text.toLowerCase().includes('check')) return chalk.blue(text)
@@ -124,9 +125,14 @@ export function enterLog(procKind: string, ...optionalParams: any[]): string {
   if (!_enable_log_) return ''
   _sig_number_ += 1
   const signature = `|${_sig_number_}| ${applyColor(procKind)}:`
-  // 여기서 ...optionalParams 이 아닌 optionalParams을 사용하면 값이 [] 안에 표시된다.
-  // 즉 배열의 형태로 표시되는데 배열로 처리되면 값들을 구분하는 comma와 대괄호로 인해 보기 좋은 경우도 많다.
-  console.log(`>${signature}`, ...optionalParams)
+  if (astNode) {
+    const nodeText = `'${reduceLog(astNode.$cstNode?.text)}'` + (optionalParams.length > 0 ? ',' : '')
+    console.log(`>${signature}`, nodeText, ...optionalParams)
+  } else {
+    // 여기서 ...optionalParams 이 아닌 optionalParams을 사용하면 값이 [] 안에 표시된다.
+    // 즉 배열의 형태로 표시되는데 배열로 처리되면 값들을 구분하는 comma와 대괄호로 인해 보기 좋은 경우도 많다.
+    console.log(`>${signature}`, ...optionalParams)
+  }
   // console.time(`<${signature}`)
   console.group()
   return `<${signature}`
@@ -136,13 +142,14 @@ export function enterLog(procKind: string, ...optionalParams: any[]): string {
  * Logs the entry of a process with a unique signature and optional parameters.
  *
  * @param procKind - A string representing the kind of process being logged.
+ * @param astNode - The AST node associated with the process, if any.
  * @param optionalParams - Additional optional parameters to log.
  * @returns A string representing the unique signature of the log entry.
  */
 var _tracing_signature_ = ''
-export function enterLog2(procKind: string, ...optionalParams: any[]): string {
+export function enterLog2(procKind: string, astNode: AstNode | undefined, ...optionalParams: any[]): string {
   _enable_log_ = true
-  _tracing_signature_ = enterLog(procKind, ...optionalParams)
+  _tracing_signature_ = enterLog(procKind, astNode, ...optionalParams)
   return _tracing_signature_
 }
 

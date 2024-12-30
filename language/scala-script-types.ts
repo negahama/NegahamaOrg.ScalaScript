@@ -863,7 +863,7 @@ export class TypeSystem {
    * @returns A new `FunctionTypeDescriptor` instance.
    */
   static createFunctionType(node: ast.FunctionDef | ast.FunctionType | ast.FunctionValue): FunctionTypeDescriptor {
-    const log = enterLog('createFunctionType', `${chalk.green(node?.$type)}, '${node?.$cstNode?.text}'`)
+    const log = enterLog('createFunctionType', node, `${chalk.green(node?.$type)}`)
 
     const type = new FunctionTypeDescriptor(node)
 
@@ -891,7 +891,7 @@ export class TypeSystem {
       type.generic = node.generic?.types.map(name => new GenericTypeDescriptor(name)) ?? []
     }
 
-    exitLog(log)
+    exitLog(log, type)
     return type
   }
 
@@ -1041,7 +1041,7 @@ export class TypeSystem {
    * The function logs the entry and exit points for debugging purposes.
    */
   static inferType(node: AstNode | undefined): TypeDescriptor {
-    const log = enterLog('inferType', `${chalk.green(node?.$type)}, '${node?.$cstNode?.text}'`)
+    const log = enterLog('inferType', undefined, `${chalk.green(node?.$type)}, '${reduceLog(node?.$cstNode?.text)}'`)
 
     if (!node) {
       const type = new ErrorTypeDescriptor('Could not infer type for undefined', node)
@@ -1142,7 +1142,7 @@ export class TypeSystem {
    * - If there are multiple types, it returns a union type.
    */
   static inferTypeTypes(node: ast.Types): TypeDescriptor {
-    const log = enterLog('inferTypeTypes', `'${node.$cstNode?.text}'`)
+    const log = enterLog('inferTypeTypes', node)
     const ts = node.types.map(t => this.inferType(t))
     // 실제 Union 타입이 아니면 처리를 단순화하기 위해 개별 타입으로 리턴한다.
     const type = this.createUnionType(ts)
@@ -1161,7 +1161,7 @@ export class TypeSystem {
    * If the type cannot be determined, it returns an error type.
    */
   static inferTypeSimpleType(node: ast.SimpleType): TypeDescriptor {
-    const log = enterLog('inferTypeSimpleType', `'${node.$cstNode?.text}'`)
+    const log = enterLog('inferTypeSimpleType', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (ast.isArrayType(node)) {
       type = new ArrayTypeDescriptor(this.inferType(node.elementType))
@@ -1243,7 +1243,7 @@ export class TypeSystem {
    * @returns The inferred type description of the variable definition.
    */
   static inferTypeVariableDef(node: ast.VariableDef): TypeDescriptor {
-    const log = enterLog('inferTypeVariableDef', `variable name: ${node.name}`)
+    const log = enterLog('inferTypeVariableDef', undefined, node.name)
     let type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
     if (node.type) {
       type = this.inferType(node.type)
@@ -1284,7 +1284,7 @@ export class TypeSystem {
    * @returns A `TypeDescription` object representing the inferred type of the function.
    */
   static inferTypeFunctionDef(node: ast.FunctionDef): TypeDescriptor {
-    const log = enterLog('inferTypeFunctionDef', node.name)
+    const log = enterLog('inferTypeFunctionDef', undefined, node.name)
     const type = this.createFunctionType(node)
     exitLog(log, type)
     return type
@@ -1297,7 +1297,7 @@ export class TypeSystem {
    * @returns The inferred type description for the object.
    */
   static inferTypeClassDef(node: ast.ClassDef): TypeDescriptor {
-    const log = enterLog('inferTypeClassDef', node.name)
+    const log = enterLog('inferTypeClassDef', undefined, node.name)
     const type = new ClassTypeDescriptor(node)
     exitLog(log, type)
     return type
@@ -1315,7 +1315,7 @@ export class TypeSystem {
    */
   static inferTypeCallChain(node: ast.CallChain): TypeDescriptor {
     const id = `element='${node.element?.$refText}', cst='${node?.$cstNode?.text}'`
-    const log = enterLog('inferTypeCallChain', id)
+    const log = enterLog('inferTypeCallChain', undefined, id)
     traceLog(chalk.redBright('ref 참조전:'), id)
     const element = node.element?.ref
     traceLog(chalk.green('ref 참조후:'), id)
@@ -1422,7 +1422,7 @@ export class TypeSystem {
    * @returns The inferred type description of the parameter.
    */
   static inferTypeParameter(node: ast.Parameter): TypeDescriptor {
-    const log = enterLog('inferTypeParameter', node.name)
+    const log = enterLog('inferTypeParameter', undefined, node.name)
     let type: TypeDescriptor = new AnyTypeDescriptor()
     if (node.type) type = this.inferType(node.type)
     else if (node.value) type = this.inferType(node.value)
@@ -1482,7 +1482,7 @@ export class TypeSystem {
    * @returns The inferred type descriptor for the given property node.
    */
   static inferTypeProperty(node: ast.Property): TypeDescriptor {
-    const log = enterLog('inferTypeProperty', node.name)
+    const log = enterLog('inferTypeProperty', undefined, node.name)
     const type = this.inferType(node.type)
     exitLog(log, type)
     return type
@@ -1500,7 +1500,7 @@ export class TypeSystem {
    * @returns The inferred type description of the assignment binding node.
    */
   static inferTypeBinding(node: ast.Binding): TypeDescriptor {
-    const log = enterLog('inferTypeBinding', node.element)
+    const log = enterLog('inferTypeBinding', node)
     // Binding에는 value가 없을수는 없지만 없으면 nil type으로 취급한다.
     //todo 타입스크립트에서는 name과 value가 동일하면 하나만 사용할 수 있는데 스칼라스크립트에서는 아직 그렇지 않다.
     let type: TypeDescriptor = new NilTypeDescriptor()
@@ -1517,7 +1517,7 @@ export class TypeSystem {
    * @returns The inferred type of the elements being iterated over.
    */
   static inferTypeForOf(node: ast.ForOf): TypeDescriptor {
-    const log = enterLog('inferTypeForOf', node.name)
+    const log = enterLog('inferTypeForOf', node)
     let type = this.inferType(node.of)
     if (this.isArrayType(type)) type = type.elementType
     exitLog(log, type)
@@ -1532,7 +1532,7 @@ export class TypeSystem {
    * @returns The inferred type description.
    */
   static inferTypeForTo(node: ast.ForTo): TypeDescriptor {
-    const log = enterLog('inferTypeForTo', node.name)
+    const log = enterLog('inferTypeForTo', node)
     let e1 = this.inferType(node.e1)
     let e2 = this.inferType(node.e1)
     if (this.isNumberType(e1) && this.isNumberType(e2)) {
@@ -1555,7 +1555,7 @@ export class TypeSystem {
    * @returns The inferred type description of the assignment node.
    */
   static inferTypeAssignment(node: ast.Assignment): TypeDescriptor {
-    const log = enterLog('inferTypeAssignment', node.operator)
+    const log = enterLog('inferTypeAssignment', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
     if (node.assign) type = this.inferType(node.assign)
     else if (node.value) type = this.inferType(node.value)
@@ -1570,7 +1570,7 @@ export class TypeSystem {
    * @returns The inferred type description of the IfExpression node.
    */
   static inferTypeIfExpression(node: ast.IfExpression): TypeDescriptor {
-    const log = enterLog('inferTypeIfExpression', `'${reduceLog(node.$cstNode?.text)}'`)
+    const log = enterLog('inferTypeIfExpression', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (!node.then) {
       console.error(chalk.red('IfExpression has no then node'))
@@ -1598,7 +1598,7 @@ export class TypeSystem {
    * @returns The inferred type description of the MatchExpression node.
    */
   static inferTypeMatchExpression(node: ast.MatchExpression): TypeDescriptor {
-    const log = enterLog('inferTypeMatchExpression', node.$type)
+    const log = enterLog('inferTypeMatchExpression', node)
     const types: TypeDescriptor[] = []
     node.cases.forEach(c => {
       if (c.body) types.push(this.inferType(c.body))
@@ -1617,7 +1617,7 @@ export class TypeSystem {
    * @returns The inferred type description of the function value.
    */
   static inferTypeGroupExpression(node: ast.GroupExpression): TypeDescriptor {
-    const log = enterLog('inferTypeGroupExpression', `'${node.$cstNode?.text}'`)
+    const log = enterLog('inferTypeGroupExpression', node)
     const type = this.inferType(node.value)
     exitLog(log, type)
     return type
@@ -1630,7 +1630,7 @@ export class TypeSystem {
    * @returns The inferred type description of the unary expression.
    */
   static inferTypeUnaryExpression(node: ast.UnaryExpression): TypeDescriptor {
-    const log = enterLog('inferTypeUnaryExpression', node.operator ? node.operator : '+')
+    const log = enterLog('inferTypeUnaryExpression', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (node.operator) {
       if (node.operator === 'typeof') type = new StringTypeDescriptor(node)
@@ -1670,7 +1670,7 @@ export class TypeSystem {
    * If the type cannot be inferred, an error type is returned.
    */
   static inferTypeBinaryExpression(node: ast.BinaryExpression): TypeDescriptor {
-    const log = enterLog('inferTypeBinaryExpression', node.operator)
+    const log = enterLog('inferTypeBinaryExpression', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('Could not infer type from binary expression', node)
     if (['and', 'or', '&&', '||', '<', '<=', '>', '>=', '==', '!='].includes(node.operator)) {
       type = new BooleanTypeDescriptor(node)
@@ -1697,7 +1697,7 @@ export class TypeSystem {
    * @returns The inferred type description of the return expression.
    */
   static inferTypeReturnExpression(node: ast.ReturnExpression): TypeDescriptor {
-    const log = enterLog('inferTypeReturnExpression')
+    const log = enterLog('inferTypeReturnExpression', node)
     let type: TypeDescriptor = new VoidTypeDescriptor()
     if (node.value) type = this.inferType(node.value)
     exitLog(log, type)
@@ -1706,7 +1706,7 @@ export class TypeSystem {
 
   /**
    * Infers the type of a spread expression node.
-   * 
+   *
    * Spread expression은 `...`을 사용해서 배열을 풀어서 사용하는 경우이다.
    * 예를들어 `a = [1, 2, 3]`이라고 할 때 `b = [...a, 4, 5]`와 같이 사용하는 경우이다.
    *
@@ -1714,7 +1714,7 @@ export class TypeSystem {
    * @returns The inferred type description of the return expression.
    */
   static inferTypeSpreadExpression(node: ast.SpreadExpression): TypeDescriptor {
-    const log = enterLog('inferTypeSpreadExpression', node.$cstNode?.text)
+    const log = enterLog('inferTypeSpreadExpression', node)
     let type: TypeDescriptor = new AnyTypeDescriptor()
     if (node.spread && node.spread.ref) {
       type = this.inferType(node.spread.ref)
@@ -1730,7 +1730,7 @@ export class TypeSystem {
    * @returns The inferred type description of the new expression.
    */
   static inferTypeNewExpression(node: ast.NewExpression): TypeDescriptor {
-    const log = enterLog('inferTypeNewExpression', node.class.$refText)
+    const log = enterLog('inferTypeNewExpression', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (node.class.ref) type = new ClassTypeDescriptor(node.class.ref)
 
@@ -1770,7 +1770,7 @@ export class TypeSystem {
    * @returns The inferred type description of the array value.
    */
   static inferTypeArrayValue(node: ast.ArrayValue): TypeDescriptor {
-    const log = enterLog('inferTypeArrayValue', `'${reduceLog(node.$cstNode?.text)}', item count= ${node.items.length}`)
+    const log = enterLog('inferTypeArrayValue', node, `item count= ${node.items.length}`)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     // item이 없는 경우 즉 [] 으로 표현되는 빈 배열의 경우 any type으로 취급한다.
     if (node.items.length > 0) {
@@ -1797,7 +1797,7 @@ export class TypeSystem {
    * @returns A TypeDescription object representing the inferred type.
    */
   static inferTypeObjectValue(node: ast.ObjectValue): TypeDescriptor {
-    const log = enterLog('inferTypeObjectValue', `'${reduceLog(node.$cstNode?.text)}'`)
+    const log = enterLog('inferTypeObjectValue', node)
     const type = new ObjectTypeDescriptor(node)
     exitLog(log, type)
     return type
@@ -1810,7 +1810,7 @@ export class TypeSystem {
    * @returns A `TypeDescription` representing the inferred type of the function value.
    */
   static inferTypeFunctionValue(node: ast.FunctionValue): TypeDescriptor {
-    const log = enterLog('inferTypeFunctionValue', `'${reduceLog(node.$cstNode?.text)}'`)
+    const log = enterLog('inferTypeFunctionValue', node)
     const type = this.createFunctionType(node)
     exitLog(log, type)
     return type
@@ -1823,7 +1823,7 @@ export class TypeSystem {
    * @returns The inferred type description of the literal node.
    */
   static inferTypeLiteral(node: ast.Literal): TypeDescriptor {
-    const log = enterLog('inferTypeLiteral', `'${node.$cstNode?.text}'`)
+    const log = enterLog('inferTypeLiteral', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (typeof node.value == 'string') {
       switch (node.value) {
@@ -1883,7 +1883,7 @@ export class TypeSystem {
       return result
     }
 
-    const log = enterLog('inferTypeBlock', reduceLog(node.$cstNode?.text))
+    const log = enterLog('inferTypeBlock', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (node.isBracket) {
       // Block이 여러 식으로 구성된 경우
@@ -1975,7 +1975,7 @@ export class TypeSystem {
       console.error(chalk.red('getFunctionInfo: node is null'))
       return undefined
     }
-    const log = enterLog('getFunctionInfo', `'${node.$cstNode?.text}'`)
+    const log = enterLog('getFunctionInfo', node)
 
     const gather = new LogGatherer('getFunctionInfo')
     gather.add('node.$type', chalk.green(node.$type))
