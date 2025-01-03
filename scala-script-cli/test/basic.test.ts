@@ -86,6 +86,29 @@ function diagnosticToString(d: Diagnostic) {
 
 describe('basic tests', () => {
   /**
+   * TestCase : assignment 테스트, 타입 검사 및 val 변수의 재할당 여부 검사.
+   */
+  test('test of assignment', async () => {
+    const code = `
+var s = 'string'
+s = 2 // type error
+val n = 1
+n = 2 // val cannot be reassigned
+// 하지만 배열의 경우는 val로 선언되어도 내부 값을 변경할 수 있다.
+val ary = [1, 2, 3]
+ary = [4, 5, 6] // error
+ary[0] = 4
+`
+    const document = await parse(code)
+    expect(
+      document.parseResult.parserErrors.length &&
+        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
+    ).toBe(0)
+    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
+    expect(document?.diagnostics?.length).toBe(3)
+  })
+
+  /**
    * TestCase : indent를 이용한 블럭 테스트
    */
   test('test of block with indent', async () => {
@@ -716,13 +739,20 @@ def Corp = {
     console.log('static process')
   }
 }
-// Corp.normalMethod()는 에러로 아래에서 테스트된다.
 Corp.staticMethod()
-
 var corp = new Corp()
 corp.normalMethod()
-//todo 타입스크립트에서 static 함수는 클래스명으로만 호출 가능하다. 따라서 이것은 에러로 처리되어야 하는데 아직 지원하지 않음
-corp.staticMethod()
+
+def Corp2 = {
+  private static var knownTech: string[]
+  static val getKnownTech = () -> string[] => {
+    return this.knownTech
+  }
+  static val getKnownTech2 = () -> string[] => {
+    val data = this.getKnownTech()
+    return data
+  }
+}
 `
     const document = await parse(code)
     expect(
@@ -748,38 +778,15 @@ normalMethod()
 staticMethod()
 Corp.normalMethod()
 
-//todo 타입스크립트에서 static 함수는 클래스명으로만 호출 가능하다. 따라서 이것은 에러로 처리되어야 하는데 아직 지원하지 않음
+// 타입스크립트에서 static 함수는 클래스명으로만 호출 가능하다.
 var corp = new Corp()
-corp.staticMethod()
-`
-    const document = await parse(code)
-    expect(
-      document.parseResult.parserErrors.length &&
-        s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
-    ).toBe(0)
-    expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(3)
-  })
-
-  /**
-   * TestCase : class name과 동일한 이름의 변수가 존재하는 경우
-   * 변수와 class name이 충돌하지 않고 static인 경우등이 정상적으로 동작해야 한다.
-   */
-  test('test class name and variable name are the same', async () => {
-    const code = `
-def Corp = {
-  val normalMethod = () => {
-    console.log('process')
-  }
-  static val staticMethod = () => {
-    console.log('static process')
-  }
-}
+corp.staticMethod() // error
 
 // 클래스명과 동일한 변수명 사용시
+// 변수와 class name이 충돌하지 않고 static인 경우등이 정상적으로 동작해야 한다.
 val f = (Corp: Corp) => {
   Corp.normalMethod()
-  Corp.staticMethod()
+  Corp.staticMethod() // error
 }
 `
     const document = await parse(code)
@@ -788,7 +795,7 @@ val f = (Corp: Corp) => {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length).toBe(5)
   })
 
   /**

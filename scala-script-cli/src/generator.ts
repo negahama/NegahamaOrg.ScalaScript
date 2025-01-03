@@ -286,7 +286,7 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
     const superClass = currClass.superClass.ref
     if (superClass && ast.isClassDef(superClass) && superClass.name == currClass.superClass.$refText) {
       // 부모 클래스에서 동일한 이름이 쓰이고 있는지를 확인한다.
-      let foundName: ast.FunctionDef | ast.VariableDef | ast.ClassDef | undefined
+      let foundName: ast.FunctionDef | ast.VariableDef | undefined
       // bypass는 name이 없으므로 제외하고 나머지 중에서 동일한 이름을 찾는다.
       // 하지만 아래에서 결국 ast.VariableDef인 경우만 처리하고 나머지는 에러로 처리한다.
       superClass.body.elements.forEach(e => {
@@ -393,7 +393,7 @@ function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMeth
     const superClass = currClass.superClass.ref
     if (superClass && ast.isClassDef(superClass) && superClass.name == currClass.superClass.$refText) {
       // 부모 클래스에서 동일한 이름이 쓰이고 있는지를 확인한다.
-      let foundName: ast.FunctionDef | ast.VariableDef | ast.ClassDef | undefined
+      let foundName: ast.FunctionDef | ast.VariableDef | undefined
       // bypass는 name이 없으므로 제외하고 나머지 중에서 동일한 이름을 찾는다.
       // 하지만 아래에서 결국 ast.FunctionDef인 경우만 처리하고 나머지는 에러로 처리한다.
       superClass.body.elements.forEach(e => {
@@ -487,9 +487,6 @@ function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
       result += applyIndent(indent + 1, transpileVariableDef(m, indent + 1, true))
     } else if (ast.isFunctionDef(m)) {
       result += applyIndent(indent + 1, transpileFunctionDef(m, indent + 1, true))
-    } else if (ast.isClassDef(m)) {
-      result += '\n'
-      result += applyIndent(indent + 1, transpileClassDef(m, indent + 1))
     } else if (ast.isBypass(m)) {
       result += generateStatement(m, indent + 1)
     } else {
@@ -626,7 +623,10 @@ function transpileBypass(stmt: ast.Bypass, indent: number): string {
       result += applyIndent(indent, stmt.bypass.replace('%%', ''))
     } else if (stmt.bypass.startsWith('%%/**')) {
       result += '\n' + applyIndent(indent, stmt.bypass.replaceAll('%%', ''))
-    } else result += '\n' + applyIndent(indent, stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', ''))
+    } else {
+      const t = stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', '')
+      result += '\n' + applyIndent(indent, t)
+    }
   }
   return result
 }
@@ -646,9 +646,43 @@ function transpileBypass(stmt: ast.Bypass, indent: number): string {
  * being replaced with `n += 1`).
  */
 function transpileAssignment(expr: ast.Assignment, indent: number): string {
+  /*
+    ```
+    var person: { name: string age: number } = {
+      name: 'no name'
+      age: 20
+    }
+    person = {
+      name: 'samuel'
+    }
+    ```
+    위의 코드는 스칼라스크립트에서는 정상적인 구문이지만 타입스크립트에서는 에러이다.
+    왜냐하면 person은 { name: string, age: number } 타입을 가지고 있는데 age가 없는 객체를 할당하고 있기 때문이다.
+    스칼라스크립트는 이런 경우에는 다음과 같이 변경한다. 즉 개별 항목별로 설정하도록 변경한다.
+    ```
+    person.name = 'samuel'
+    ```
+  */
   let result = ''
-  const name = generateExpression(expr.assign, indent)
-  result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`
+  let transpiled = false
+  const valueType = TypeSystem.inferType(expr.value)
+  if (TypeSystem.isObjectType(valueType)) {
+    const assignType = TypeSystem.inferType(expr.assign)
+    if (!valueType.isEqual(assignType)) {
+      const name = generateExpression(expr.assign, 0)
+      valueType.getElementList().forEach(e => {
+        result += '\n' + applyIndent(indent, `${name}.${e.name} = `)
+        if (ast.isBinding(e.node)) result += generateExpression(e.node.value, indent)
+        else console.log('internal error in transpileAssignment')
+      })
+      transpiled = true
+    }
+  }
+
+  if (!transpiled) {
+    const name = generateExpression(expr.assign, indent)
+    result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`
+  }
 
   // n++ 을 대신해서 n += 1 이 argument로 사용되거나 할 때는 semi colon을 표시하면 안되므로 지원하지 않는다
   // result += ast.isAssignment(expr.value) ? "" : ";"
@@ -1081,30 +1115,12 @@ function generateSimpleType(expr: ast.SimpleType, indent: number): string {
       // nil 만 undefined로 바꿔준다.
       if (expr.type == 'nil') result += 'undefined'
       else result += expr.type
-    } else if (ast.isTypeChain(expr)) {
-      result += generateTypeChain(expr, indent)
+    } else if (ast.isRefType(expr)) {
+      if (expr.reference) {
+        result += expr.reference.$refText
+        result += generateGeneric(expr.generic, indent)
+      }
     } else result += 'internal error in generateSimpleType(elementType)'
-  }
-  return result
-}
-
-/**
- * Transpiles a TypeChain expression into a string representation.
- *
- * @param expr - The TypeChain expression to transpile.
- * @param indent - The current indentation level.
- * @returns The string representation of the TypeChain expression.
- */
-function generateTypeChain(expr: ast.TypeChain, indent: number): string {
-  let result = ''
-  if (expr.previous) {
-    result += generateTypeChain(expr.previous, indent)
-    result += expr.reference ? '.' + expr.reference.$refText : ''
-  } else {
-    if (expr.reference) {
-      result += expr.reference.$refText
-      result += generateGeneric(expr.generic, indent)
-    }
   }
   return result
 }

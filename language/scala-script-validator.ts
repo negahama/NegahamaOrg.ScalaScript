@@ -21,31 +21,22 @@ export class ScalaScriptValidator {
    * - If neither type nor value is present, it reports an error indicating that variables require a type hint or an assignment at creation.
    */
   checkVariableDef(stmt: ast.VariableDef, accept: ValidationAcceptor): void {
+    // for debugging...
+    // if (stmt.name == 'a') {
+    // console.log(`Type of variable '${stmt.name}' is ${chalk.green(TypeSystem.inferType(stmt).toString())}`)
+    // }
+
     const log = enterLog('checkVariableDef', stmt)
     traceLog('- stmt.type :', `${stmt.type?.$type}, '${reduceLog(stmt.type?.$cstNode?.text)}'`)
     traceLog('- stmt.value:', `${stmt.value?.$type}, '${reduceLog(stmt.value?.$cstNode?.text)}'`)
 
     // val 로 선언된 변수는 초기화가 필요하다.
-    if (stmt.kind == 'val') {
-      if (!stmt.value) {
-        const msg = "checkVariableDef: 'val' need to be initialized in ScalaScript."
-        accept('error', msg, {
-          node: stmt,
-        })
-      }
-    }
-
-    // union type의 변수도 초기화가 필요하다.
-    if (stmt.type) {
-      const type = TypeSystem.inferType(stmt.type)
-      if (TypeSystem.isUnionType(type)) {
-        if (!stmt.value) {
-          const msg = 'checkVariableDef: Union type need to be initialized in ScalaScript.'
-          accept('error', msg, {
-            node: stmt,
-          })
-        }
-      }
+    if (stmt.kind == 'val' && !stmt.value) {
+      const msg = "checkVariableDef: 'val' declarations must be initialized."
+      accept('error', msg, {
+        node: stmt,
+        property: 'name',
+      })
     }
 
     // type과 value가 모두 있을 때 value는 type에 assignable이어야 한다.
@@ -56,13 +47,13 @@ export class ScalaScriptValidator {
       const right = TypeSystem.inferType(stmt.value)
       traceLog(`* checkVariableDef result: ${left.toString()} = ${right.toString()}`)
 
-      // val로 선언된 object type의 변수는 object의 모든 프로퍼티가 초기화되어야 하는데 그러기 위해서는 isEqual로 체크되어야 한다.
+      // object type의 변수는 object의 모든 프로퍼티가 초기화되어야 하는데 그러기 위해서는 isEqual로 체크되어야 한다.
       if (stmt.kind == 'val' && TypeSystem.isObjectType(left)) {
         if (!right.isEqual(left)) {
-          const msg = "checkVariableDef: 'val' need to be initialized in ScalaScript."
+          const msg = `checkVariableDef: Type '${right.toString()}' is not equal type '${left.toString()}'.`
           accept('error', msg, {
             node: stmt,
-            property: 'type',
+            property: 'value',
           })
         }
       } else {
@@ -100,6 +91,15 @@ export class ScalaScriptValidator {
    *    If not, it reports an error.
    */
   checkFunctionDef(stmt: ast.FunctionDef | ast.FunctionValue, accept: ValidationAcceptor): void {
+    // for debugging...
+    // if (ast.isFunctionDef(stmt) && stmt.name == 'main') {
+    //   const t = chalk.green(TypeSystem.inferType(stmt).toString())
+    //   console.log(`Type of function '${stmt.name}' is ${t}`)
+    // } else {
+    //   const t = chalk.green(TypeSystem.inferType(stmt).toString())
+    //   console.log(`Type of function '${reduceLog(stmt.$cstNode?.text)}' is ${t}`)
+    // }
+
     const log = enterLog('checkFunctionDef', stmt)
     traceLog(`- return: ${stmt.returnType?.$type}, '${reduceLog(stmt.returnType?.$cstNode?.text)}'`)
     traceLog(`- body  : ${stmt.body?.$type}, '${reduceLog(stmt.body?.$cstNode?.text)}'`)
@@ -263,6 +263,11 @@ export class ScalaScriptValidator {
       const funcName = expr.element?.$refText
 
       const type = TypeSystem.getFunctionInfo(expr)
+      // for debugging...
+      // if (funcName == 'main') {
+      //   console.log(`🚀 ~ checkCallChain: Type of function '${funcName}' is ${chalk.green(type?.toString())}`)
+      // }
+
       if (!type) {
         console.error(chalk.red('checkCallChain:'), funcName, reduceLog(expr.$cstNode?.text))
       } else if (TypeSystem.isFunctionType(type)) {
@@ -399,6 +404,18 @@ export class ScalaScriptValidator {
     const log = enterLog('checkAssignment', expr)
     traceLog(`- left : ${expr.assign.$type}, '${reduceLog(expr.assign.$cstNode?.text)}'`)
     traceLog(`- right: ${expr.value.$type}, '${reduceLog(expr.value.$cstNode?.text)}'`)
+
+    // val로 선언된 변수는 할당할 수 없어야 한다.
+    // 하지만 배열이나 맵과 같이 내부 값을 변경하는 것은 가능해야 한다.
+    if (ast.isCallChain(expr.assign) && !expr.assign.isArray) {
+      const ref = expr.assign.element?.ref
+      if (ast.isVariableDef(ref) && ref.kind == 'val') {
+        const msg = `checkAssignment: Cannot assign to ${expr.assign} because it is 'val'.`
+        accept('error', msg, {
+          node: expr.assign,
+        })
+      }
+    }
 
     traceLog('* checkAssignment infer left')
     const left = TypeSystem.inferType(expr.assign)

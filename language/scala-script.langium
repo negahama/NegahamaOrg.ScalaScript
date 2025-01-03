@@ -61,7 +61,7 @@ UnionType:
   ArrayType은 동일한 타입이 연속된 구조를 취하는 특수한 Compound 타입이다.
   ArrayType을 CompoundType과 구분해서 처리하는 것은 표기 방법과 처리가 매우 다르기 때문이다.
   현재 CompoundType은 ObjectType 밖에 없기 때문에 이를 별도로 구분하지 않고 ObjectType으로 사용한다.
-  이름이 있는 클래스 타입은 elementType의 TypeChain으로 표현된다.
+  이름이 있는 클래스 타입은 elementType의 RefType으로 표현된다.
 */
 SimpleType:
   ArrayType | ObjectType | ElementType;
@@ -75,7 +75,7 @@ SimpleType:
   현재 (() -> number)[] 와 같은 함수 타입의 배열은 지원하지 않는다. 
 */
 ArrayType:
-  elementType=(ObjectType | PrimitiveType | TypeChain) '[' ']';
+  elementType=(ObjectType | PrimitiveType | RefType) '[' ']';
 
 /*
   Object Definition
@@ -109,7 +109,7 @@ Property:
 ElementType:
   PrimitiveType
   | FunctionType
-  | TypeChain;
+  | RefType;
 
 PrimitiveType:
   type=('any' | 'nil' | 'void' | 'string' | 'number' | 'boolean');
@@ -122,28 +122,31 @@ PrimitiveType:
 FunctionType:
   '(' Parameters? ')' FunctionReturn;
 
-/*
-  //todo TypeChain은 다음과 같은 경우를 위한 것(ClassDef는 ClassDef를 포함할 수 있다)인데
-  실제로 이런 경우는 transpile되면 interface안에 inferface가 정의되는 것이기 때문에 error가 된다.
-  ```
-  def Corp = {
-    def Firm = {
-      var name: string
-    }
-    var firms: Firm[]
-  }
-  ```
-  generic은 var table: Map<string, number> 와 같은 구문에서 필요하다.
-*/
-TypeChain:
-  reference=[ClassDef:Id] (generic=GenericValue)? ({infer TypeChain.previous=current} "." reference=[ClassDef:Id] (generic=GenericValue)?)*;
+// generic은 var table: Map<string, number> 와 같은 구문에서 필요하다.
+RefType:
+  reference=[ClassDef:Id] (generic=GenericValue)?;
 
 /*
-  def Map<K, V> = { ... } 
+  Generic 처리
+  generic은 두가지 종류가 있다.
+  하나는 generic의 선언(GenericDef)이고 다른 하나는 generic의 사용(GenericValue)이다.
+  generic의 선언은 `def Box<T> = { var value: T }`와 같이 선언되어지는 것을 말하며 ClassDef에서 처리되고
+  generic의 사용은 `val box = new Box<number>()`와 같이 사용되어지는 것을 말하며 NewExpression에서 처리된다.
+  그래서 ClassDef와 NewExpression을 추론하면 동일한 ClassTypeDescriptor가 생성되지만 내부의 generic은 다르다.
+
   GenericDef의 Id는 [ClassDef:Id]가 아닌 일반 Id를 사용한다.
-  Generic은 val get: (key: K) -> V 와 같이 타입을 대신하는 K, V 와 같은 이니셜을 사용하는데 이것은 ClassDef가 아니다.
-  따라서 K, V의 reference는 ScopeProvider에서 직접 생성해 주어야 한다.
+  Generic은 `val get: (key: K) -> V`와 같이 타입을 대신하는 `K`, `V`와 같은 이니셜을 사용하는데 이것은 ClassDef가 아니다.
+  따라서 `K`, `V`의 reference는 ScopeProvider에서 직접 생성해 주어야 한다.
+
+  `getScope()`의 타입 처리 부분은 `T`가 유효한 Id라는 것을 알려줄 뿐 `T`의 실제 타입이 무엇인지를 결정하는 것은 아니며
+  `T`의 실제 타입은 `getFunctionInfo()`에서 함수를 호출한 주체가 무엇인지를 보고 계산한다.
+  ```
+  var table: Map<string, number>
+  var result = table.get(name)
+  ```
+  의 경우 `name`은 string, `result`는 number이어야 함을 `table`의 타입인 `Map<string, number>`을 보고 판단한다.
 */
+// def Map<K, V> = { ... } 
 GenericDef:
   '<' types+=Id (',' types+=Id)* '>';
 
@@ -322,7 +325,7 @@ ClassBody:
   '{' elements+=ClassBodyElement* '}';
 
 ClassBodyElement:
-  (Bypass | VariableDef | FunctionDef | ClassDef) (',')?;
+  (Bypass | VariableDef | FunctionDef) (',')?;
 
 // 기타
 //-----------------------------------------------------------------------------

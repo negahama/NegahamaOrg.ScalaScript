@@ -244,7 +244,7 @@ export class UnionTypeDescriptor extends TypeDescriptor {
     const compatibleType = (nt: TypeDescriptor, set: TypeDescriptor[]) => {
       if (set.some(e => nt.isEqual(e))) return true
 
-      //todo nil도 일단은 any와 같이 취급한다.
+      // nil type도 매우 빈번하게 발생하고 null check를 제외하면 처리에 큰 영향을 주지 않으므로 일단 제거한다.
       if (nt.$type == 'any') return true
       else if (nt.$type == 'nil') return true
       else if (nt.$type == 'array') {
@@ -268,6 +268,9 @@ export class UnionTypeDescriptor extends TypeDescriptor {
       if (t.$type == 'union') spread.push(...(t as UnionTypeDescriptor).elementTypes)
       else spread.push(t)
     })
+
+    // spread에 any type이 있으면 전체 타입은 any type이 된다.
+    if (spread.some(e => e.$type == 'any')) return [new AnyTypeDescriptor()]
 
     const set: TypeDescriptor[] = []
     spread.forEach(e => {
@@ -693,11 +696,8 @@ export class ClassTypeDescriptor extends TypeDescriptor {
    */
   constructor(public node: ast.ClassDef) {
     super('class')
-
-    this.generic = []
-    if (ast.isClassDef(node)) {
-      this.generic = node.generic?.types.map(name => new GenericTypeDescriptor(name)) ?? []
-    }
+    // 여기서 설정되는 generic은 generic의 선언이다. generic의 실제 타입은 NewExpression에서만 정의할 수 있다. 
+    this.generic = node.generic?.types.map(name => new GenericTypeDescriptor(name)) ?? []
   }
 
   /**
@@ -728,10 +728,8 @@ export class ClassTypeDescriptor extends TypeDescriptor {
   override isEqual(other: TypeDescriptor): boolean {
     if (other.$type !== 'class') return false
     const otherClass = other as ClassTypeDescriptor
-    if (ast.isClassDef(this.node) && ast.isClassDef(otherClass.node)) {
-      //todo 이름만 같으면 같다고 할 수 있을까?
-      if (this.node.name !== otherClass.node.name) return false
-    }
+    //todo 이름만 같으면 같다고 할 수 있을까?
+    if (this.node.name !== otherClass.node.name) return false
     return true
   }
 
@@ -750,12 +748,9 @@ export class ClassTypeDescriptor extends TypeDescriptor {
    */
   override compareTo(other: TypeDescriptor): string[] {
     const otherClass = other as ClassTypeDescriptor
-    if (ast.isClassDef(this.node) && ast.isClassDef(otherClass.node)) {
-      // 동일하거나 상속관계인 경우(자식이 부모 클래스에)만 assignable이다.
-      if (TypeSystem.getClassChain(this.node).includes(otherClass.node)) return []
-      else return [`Object ${otherClass.toString()} is not super class of ${this.toString()} in class chain`]
-    }
-    return ['internal error in ClassTypeDescriptor.compareTo']
+    // 동일하거나 상속관계인 경우(자식이 부모 클래스에)만 assignable이다.
+    if (TypeSystem.getClassChain(this.node).includes(otherClass.node)) return []
+    else return [`Object ${otherClass.toString()} is not super class of ${this.toString()} in class chain`]
   }
 
   /**
@@ -784,10 +779,8 @@ export class ClassTypeDescriptor extends TypeDescriptor {
   getElementType(elementName: string): TypeDescriptor | undefined {
     let type: TypeDescriptor | undefined = undefined
     this.node.body.elements.forEach(e => {
-      if (!ast.isBypass(e)) {
-        if (e.name == elementName) {
-          type = TypeSystem.inferType(e)
-        }
+      if (!ast.isBypass(e) && e.name == elementName) {
+        type = TypeSystem.inferType(e)
       }
     })
     return type
@@ -1066,7 +1059,7 @@ export class TypeSystem {
       // Types와 SimpleType은 분리되어져 있다.
       // SimpleType은 ArrayType | ObjectType | ElementType와 같이 UnionType이며 타입들의 단순한 집합이지만
       // Types는 types+=SimpleType ('|' types+=SimpleType)*와 같이 SimpleType의 배열로 단순히 타입이 아니다.
-      // 일례로 TypeChain은 ElementType이고 SimpleType이긴 하지만 Types는 아니다.
+      // 일례로 RefType은 ElementType이고 SimpleType이긴 하지만 Types는 아니다.
       type = this.inferTypeSimpleType(node)
     } else if (ast.isVariableDef(node)) {
       type = this.inferTypeVariableDef(node)
@@ -1193,7 +1186,7 @@ export class TypeSystem {
           type = new ErrorTypeDescriptor(`Unknown primitive type: ${node.type}`)
           break
       }
-    } else if (ast.isTypeChain(node)) {
+    } else if (ast.isRefType(node)) {
       traceLog('Type is reference')
       if (node.reference.ref) {
         const ref = node.reference.ref
@@ -1203,7 +1196,11 @@ export class TypeSystem {
       }
       if (this.isErrorType(type)) {
         // type 중에 ref가 없는 것은 Generic일 가능성이 있다.
-        const container = AstUtils.getContainerOfType(node, ast.isClassDef)
+        // 이 부분은 타입을 추론하는 과정에서 호출되는 것이다.
+        // 따라서 `val goods: Goods[]`와 같이 타입이 명확한 구문에서는 호출되지 않는다.
+        // 오히려 `goods.every(...)`와 같이 결국은 generic을 포함하는 함수까지 추론하게 되는 그런 구문들에서 호출된다.
+        // 즉 위의 구문이 처리되면서 `every()`함수에 있는 `T`라는 제네릭을 처리할때 이 부분이 호출되는 것이다.
+       const container = AstUtils.getContainerOfType(node, ast.isClassDef)
         if (container && container.generic?.types.includes(node.reference.$refText)) {
           type = new GenericTypeDescriptor(node.reference.$refText)
         } else console.error(chalk.red(`${node.reference.$refText} is not valid type`))
@@ -1399,7 +1396,7 @@ export class TypeSystem {
       if (node.previous) {
         const previousType = this.inferType(node.previous)
         console.log(chalk.red('여기는 정확히 어떨 때 호출되는가?', id))
-        console.log(chalk.green(`  previous: ${node.previous?.$cstNode?.text}'s type: ${previousType.$type}`))
+        console.log(chalk.green(`  previous '${node.previous?.$cstNode?.text}'s type: ${previousType.toString()}`))
         if (this.isFunctionType(previousType)) type = previousType.returnType
         else if (this.isArrayType(previousType)) type = previousType.elementType
         else type = new ErrorTypeDescriptor('Could not infer type for element ' + node.element?.$refText, node)
@@ -1731,12 +1728,18 @@ export class TypeSystem {
    */
   static inferTypeNewExpression(node: ast.NewExpression): TypeDescriptor {
     const log = enterLog('inferTypeNewExpression', node)
-    let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
-    if (node.class.ref) type = new ClassTypeDescriptor(node.class.ref)
+
+    // 실제 class가 존재하지 않으면 에러로 처리한다.
+    if (!node.class.ref) {
+      const type = new ErrorTypeDescriptor('internal error', node)
+      exitLog(log, type)
+      return type
+    }
 
     // new Array<number>()와 같은 경우에는 ArrayTypeDescription으로 변경해 준다.
     // generic이 있으면 generic의 타입을 element type으로 사용하고 없으면 any type으로 처리한다.
-    if (this.isClassType(type) && node.class.$refText === 'Array') {
+    if (node.class.$refText === 'Array') {
+      let type: TypeDescriptor
       if (node.generic) {
         assert(node.generic.types.length === 1, 'Array type must have one generic type')
         const t = this.inferType(node.generic.types[0])
@@ -1746,9 +1749,10 @@ export class TypeSystem {
       return type
     }
 
-    // 생성시 generic정보가 있으면 오브젝트의 타입에 이를 추가한다.
+    // 생성시 generic정보가 있으면 Class의 타입에 이를 추가한다.
     // new Set<string>(), new Set<number>()와 같은 경우에도 ClassTypeDescription은 동일하지 않기 때문에 상관없다.
-    if (node.generic && this.isClassType(type)) {
+    const type = new ClassTypeDescriptor(node.class.ref)
+    if (node.generic) {
       type.generic = node.generic.types.map((g, index) => {
         const t = this.inferType(g)
         return new GenericTypeDescriptor(index.toString(), t)
@@ -1888,12 +1892,20 @@ export class TypeSystem {
     if (node.isBracket) {
       // Block이 여러 식으로 구성된 경우
       // 함수의 바디에 명시된 return 문이 없으면 void type으로 간주한다.
+      // return문이 하나라도 있으면 void type과의 union type일 수도 있기 때문에 주의가 필요하다.
+      // void type과의 union인지의 여부는 가장 마지막 문이 return인지 아닌지로 판단한다.
       const returns = extractReturns(node)
       if (returns.length == 0) type = new VoidTypeDescriptor()
-      else if (returns.length == 1) type = this.inferType(returns[0])
       else {
-        // 여러 개의 return문이 있으면 각각의 타입을 union type으로 처리한다.
+        // 여러 개의 return문이 있으면 각각의 타입을 union type으로 처리한다. 하나인 경우에도 union type으로 처리한다.
+        // 블럭의 마지막에 return문이 없으면 void와 union되어야 하고 있으면 이미 returns에 포함된 상태이므로 union으로 처리가능
+        // 문제는 이렇게 구성했을때 type narrowing을 지원해야 한다는 것이다.
+        // 스칼라스크립트는 타입스크립트의 type narrowing을 처리하기 위해서 타입스크립트와는 반대로 처리한다.
+        // 실제 타입스크립트의 type narrowing을 그대로 구현하는 것은 매우 어려운 일일 뿐만 아니라 그렇게까지 할 필요가 없다.
+        // 어떤 타입이 A, B 타입으로 구성되어져 있을 때 A인 경우와 B인 경우를 모두 처리하고 둘 중 하나라도 맞으면 그걸 사용하는 것이다.
         const types: TypeDescriptor[] = returns.map(r => this.inferType(r))
+        const isReturnAtLast = ast.isReturnExpression(node.codes[node.codes.length - 1]) ? true : false
+        if (!isReturnAtLast) types.push(new VoidTypeDescriptor())
         type = this.createUnionType(types)
         if (this.isErrorType(type)) {
           type = new VoidTypeDescriptor()

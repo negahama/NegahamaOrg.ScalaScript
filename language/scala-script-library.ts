@@ -121,9 +121,9 @@ export const ScalaScriptBuiltinLibrary = `
   // 배열 끝에 하나 이상의 요소를 추가하고, 배열의 새 length를 반환합니다.
   var push: (...element: T[]) -> number
   // 배열의 각 요소(왼쪽에서 오른쪽으로)에 대해 사용자가 제공한 "리듀서" 콜백 함수를 실행하여 하나의 값으로 줄입니다.
-  var reduce: (callbackFn: (arg: T, index?: number) -> T) -> T
+  var reduce: (callbackFn: (accumulator: any, currentValue: T, currentIndex?: number) -> any, initialValue?: any) -> any
   // 배열의 각 요소(오른쪽에서 왼쪽으로)에 대해 사용자가 제공한 "리듀서" 콜백 함수를 실행하여 하나의 값으로 줄입니다.
-  var reduceRight: (callbackFn: (arg: T, index?: number) -> T) -> T
+  var reduceRight: (callbackFn: (accumulator: any, currentValue: T, currentIndex?: number) -> any, initialValue?: any) -> any
   // 배열 요소의 순서를 반대로 바꿉니다. (첫 번째가 마지막이 되고, 마지막이 첫 번째가 됩니다.)
   var reverse: () -> T[]
   // 배열에서 첫 번째 요소를 제거하고 해당 요소를 반환합니다.
