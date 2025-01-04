@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.6 - January 4, 2025
+
+- bug fix
+
 ### 0.6.5 - January 4, 2025
 
 1. adjust grammar

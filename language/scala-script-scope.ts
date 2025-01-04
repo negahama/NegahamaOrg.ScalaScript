@@ -63,8 +63,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     // 이것은 generic과 같이 타입이라고 되어진 Id(예: T, K, V)가 ClassDef의 이름이 아닌 경우를 처리하기 위한 것이다.
     // generic의 Id는 `RefType`과 동일하지만 reference가 없기 때문에 새로운 scope를 제공해줘야 에러가 아닌 걸로 인식이 된다.
     // superScope에는 타입으로써 사용될 수 있는 모든 이름들이 포함되어져 있으며 superScope에 이미 있으면
-    // `scopeRefType()`를 처리하지 않도록 하였으나 오히려 살짝 느려졌다.  
-    if (ast.isRefType(context.container) && !superScope.getElement(context.reference.$refText)) {
+    // `scopeRefType()`를 처리하지 않도록 하였으나 오히려 살짝 느려졌다.
+    if (ast.isRefType(context.container)) {
+      // && !superScope.getElement(context.reference.$refText)) {
       const scope = this.scopeRefType(context)
       exitLog(scopeLog, undefined, 'Exit(type-chain)')
       return scope ? scope : superScope
