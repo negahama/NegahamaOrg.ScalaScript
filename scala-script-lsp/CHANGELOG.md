@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.5 - January 4, 2025
+
+1. adjust grammar
+- remove type chaining
+- remove the feature included ClassDef in ClassDef
+2. refactoring scope provider
+3. bug fix
+4. tidy codes up
+
 ### 0.6.4 - December 30, 2024
 
 - refactoring grammar and logic
