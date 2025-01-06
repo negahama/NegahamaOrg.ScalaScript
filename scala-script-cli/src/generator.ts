@@ -665,9 +665,9 @@ function transpileAssignment(expr: ast.Assignment, indent: number): string {
   */
   let result = ''
   let transpiled = false
-  const valueType = TypeSystem.inferType(expr.value)
+  const valueType = TypeSystem.inferType(expr.value).actual
   if (TypeSystem.isObjectType(valueType)) {
-    const assignType = TypeSystem.inferType(expr.assign)
+    const assignType = TypeSystem.inferType(expr.assign).actual
     if (!valueType.isEqual(assignType)) {
       const name = generateExpression(expr.assign, 0)
       valueType.getElementList().forEach(e => {
@@ -811,8 +811,8 @@ function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
     (expr.elif == undefined || expr.elif.length == 0)
   ) {
     // 위 조건으로 처리할 경우 console.log()와 같은 값이 없는 expression이 포함될 수 있다.
-    const thenType = TypeSystem.inferType(expr.then.codes[0])
-    const elseType = TypeSystem.inferType(expr.else.codes[0])
+    const thenType = TypeSystem.inferType(expr.then.codes[0]).actual
+    const elseType = TypeSystem.inferType(expr.else.codes[0]).actual
 
     // nil 여부는 검사하지 않는다.  nil은 의도적으로 리턴할 수 있기 때문이다.
     if (!TypeSystem.isVoidType(thenType) && !TypeSystem.isVoidType(elseType)) {
@@ -834,8 +834,8 @@ function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
     (expr.elif == undefined || expr.elif.length == 0) &&
     (ast.isExpression(expr.$container) || ast.isAssignment(expr.$container) || ast.isVariableDef(expr.$container))
   ) {
-    const thenType = TypeSystem.inferType(expr.then)
-    const elseType = TypeSystem.inferType(expr.else)
+    const thenType = TypeSystem.inferType(expr.then).actual
+    const elseType = TypeSystem.inferType(expr.else).actual
 
     // nil 여부는 검사하지 않는다.  nil은 의도적으로 리턴할 수 있기 때문이다.
     if (!TypeSystem.isVoidType(thenType) && !TypeSystem.isVoidType(elseType)) {

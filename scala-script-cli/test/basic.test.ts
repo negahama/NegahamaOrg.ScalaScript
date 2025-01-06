@@ -239,7 +239,7 @@ var f2: () -> number[] = () => [1, 2, 3]
     expect(document?.diagnostics?.length).toBe(0)
 
     const code0 = document.parseResult.value.codes[0]
-    const type0 = TypeSystem.inferType(code0) as FunctionTypeDescriptor
+    const type0 = TypeSystem.inferType(code0).actual as FunctionTypeDescriptor
     expect(type0.$type).toBe('function')
     expect(type0.returnType.$type).toBe('void')
     expect(type0.parameters.length).toBe(1)
@@ -247,9 +247,9 @@ var f2: () -> number[] = () => [1, 2, 3]
     expect(type0.parameters[0].type.toString()).toBe('string')
 
     const code1 = document.parseResult.value.codes[1]
-    const type1 = TypeSystem.inferType(code1) as FunctionTypeDescriptor
+    const type1 = TypeSystem.inferType(code1).actual as FunctionTypeDescriptor
     expect(type1.$type).toBe('function')
-    expect(type1.returnType.toString()).toBe('array<number>')
+    expect(type1.returnType.toString()).toBe('number[]')
     expect(type1.parameters.length).toBe(0)
   })
 
@@ -293,11 +293,11 @@ n2.push(1)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
 
     const code1 = document.parseResult.value.codes[1]
-    const type1 = TypeSystem.inferType(code1) as UnionTypeDescriptor
+    const type1 = TypeSystem.inferType(code1).actual as UnionTypeDescriptor
     expect(type1.$type).toBe('array')
     // expect(type1.$type).toBe('union')
-    // expect(type1.elementTypes[0].toString()).toBe('array<string>')
-    // expect(type1.elementTypes[1].toString()).toBe('array<number>')
+    // expect(type1.elementTypes[0].toString()).toBe('string[]')
+    // expect(type1.elementTypes[1].toString()).toBe('number[]')
 
     expect(document?.diagnostics?.length).toBe(2)
   })

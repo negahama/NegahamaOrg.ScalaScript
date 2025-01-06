@@ -23,7 +23,7 @@ export class ScalaScriptValidator {
   checkVariableDef(stmt: ast.VariableDef, accept: ValidationAcceptor): void {
     // for debugging...
     // if (stmt.name == 'a') {
-    // console.log(`Type of variable '${stmt.name}' is ${chalk.green(TypeSystem.inferType(stmt).toString())}`)
+    // console.log(`Type of variable '${stmt.name}' is ${chalk.green(TypeSystem.inferType(stmt).actual.toString())}`)
     // }
 
     const log = enterLog('checkVariableDef', stmt)
@@ -42,9 +42,9 @@ export class ScalaScriptValidator {
     // type과 value가 모두 있을 때 value는 type에 assignable이어야 한다.
     if (stmt.type && stmt.value) {
       traceLog('* checkVariableDef infer type')
-      const left = TypeSystem.inferType(stmt.type)
+      const left = TypeSystem.inferType(stmt.type).actual
       traceLog('* checkVariableDef infer value')
-      const right = TypeSystem.inferType(stmt.value)
+      const right = TypeSystem.inferType(stmt.value).actual
       traceLog(`* checkVariableDef result: ${left.toString()} = ${right.toString()}`)
 
       // object type의 변수는 object의 모든 프로퍼티가 초기화되어야 하는데 그러기 위해서는 isEqual로 체크되어야 한다.
@@ -92,11 +92,11 @@ export class ScalaScriptValidator {
    */
   checkFunctionDef(stmt: ast.FunctionDef | ast.FunctionValue, accept: ValidationAcceptor): void {
     // for debugging...
-    // if (ast.isFunctionDef(stmt) && stmt.name == 'main') {
-    //   const t = chalk.green(TypeSystem.inferType(stmt).toString())
+    // if (ast.isFunctionDef(stmt)) { // && stmt.name == 'main') {
+    //   const t = chalk.green(TypeSystem.inferType(stmt).actual.toString())
     //   console.log(`Type of function '${stmt.name}' is ${t}`)
     // } else {
-    //   const t = chalk.green(TypeSystem.inferType(stmt).toString())
+    //   const t = chalk.green(TypeSystem.inferType(stmt).actual.toString())
     //   console.log(`Type of function '${reduceLog(stmt.$cstNode?.text)}' is ${t}`)
     // }
 
@@ -106,9 +106,9 @@ export class ScalaScriptValidator {
 
     if (stmt.body && stmt.returnType) {
       traceLog('* checkFunctionDef infer return')
-      const retType = TypeSystem.inferType(stmt.returnType)
+      const retType = TypeSystem.inferType(stmt.returnType).actual
       traceLog('* checkFunctionDef infer body')
-      const bodyType = TypeSystem.inferType(stmt.body)
+      const bodyType = TypeSystem.inferType(stmt.body).actual
 
       const tr = retType.toString()
       const tb = bodyType.toString()
@@ -160,7 +160,7 @@ export class ScalaScriptValidator {
 
     let type: TypeDescriptor
     expr.items.forEach((item, index) => {
-      const itemType = TypeSystem.inferType(item)
+      const itemType = TypeSystem.inferType(item).actual
       if (!type) {
         type = itemType
       } else if (!type.isEqual(itemType)) {
@@ -194,7 +194,7 @@ export class ScalaScriptValidator {
           })
         } else {
           const checkNumberType = (e: ast.Expression, property: 'e1' | 'e2') => {
-            let type = TypeSystem.inferType(e)
+            let type = TypeSystem.inferType(e).actual
             if (!TypeSystem.isNumberType(type)) {
               const msg =
                 'checkForStatement: For-statement allow the number type for expression. ' +
@@ -262,10 +262,10 @@ export class ScalaScriptValidator {
     if (expr.isFunction) {
       const funcName = expr.element?.$refText
 
-      const type = TypeSystem.getFunctionInfo(expr)
+      const type = TypeSystem.inferType(expr).formal
       // for debugging...
       // if (funcName == 'main') {
-      //   console.log(`🚀 ~ checkCallChain: Type of function '${funcName}' is ${chalk.green(type?.toString())}`)
+      // console.log(`🚀 ~ checkCallChain: Type of function '${funcName}' is ${chalk.green(type?.toString())}`)
       // }
 
       if (!type) {
@@ -306,9 +306,35 @@ export class ScalaScriptValidator {
           return
         }
 
+        const paramCount = type.parameters.length
+
+        // rest parameter가 없으면 파라미터의 개수를 체크해 준다.
+        if (!hasRestParam) {
+          let errorMsg = ''
+          // 최소한의 인수는 있어야 한다.
+          if (expr.args.length < needParamNum) {
+            errorMsg = `checkCallChain: Function '${funcName}' requires at least ${needParamNum} arguments.`
+          }
+          // 인수가 파라미터보다 많을 때
+          if (expr.args.length > paramCount) {
+            errorMsg =
+              `checkCallChain: Function '${funcName}' has too many arguments.` +
+              `type: ${type.toString()}, expr.args: ${expr.args.length}, paramCount: ${paramCount}`
+          }
+
+          if (errorMsg) {
+            accept('error', errorMsg, {
+              node: expr,
+              property: 'args',
+            })
+            exitLog(log)
+            return
+          }
+        }
+
         // argument의 타입을 검사하고 문제가 있으면 에러 메시지를 리턴한다.
         const checkArg = (index: number, arg: ast.Expression, param: FunctionParameter) => {
-          const argType = TypeSystem.inferType(arg)
+          const argType = TypeSystem.inferType(arg).actual
           let paramType = param.type
           if (param.spread) {
             if (TypeSystem.isArrayType(param.type)) {
@@ -330,30 +356,6 @@ export class ScalaScriptValidator {
           return ''
         }
 
-        const paramCount = type.parameters.length
-
-        // rest parameter가 없으면 파라미터의 개수를 체크해 준다.
-        if (!hasRestParam) {
-          let errorMsg = ''
-          // 최소한의 인수는 있어야 한다.
-          if (expr.args.length < needParamNum) {
-            errorMsg = `checkCallChain: Function '${funcName}' requires at least ${needParamNum} arguments.`
-          }
-          // 인수가 파라미터보다 많을 때
-          if (expr.args.length > paramCount) {
-            errorMsg = `checkCallChain: Function '${funcName}' has too many arguments.`
-          }
-
-          if (errorMsg) {
-            accept('error', errorMsg, {
-              node: expr,
-              property: 'args',
-            })
-            exitLog(log)
-            return
-          }
-        }
-
         // rest parameter가 있을 경우에는 인수의 갯수는 체크하지 않지만 타입 체크는 한다.
         expr.args.forEach((arg, index) => {
           if (index < paramCount) {
@@ -373,7 +375,7 @@ export class ScalaScriptValidator {
                 })
               }
             } else {
-              const errorMsg = `checkCallChain: Function '${funcName}' has too many arguments.`
+              const errorMsg = `checkCallChain: Function '${funcName}' has internal error.`
               accept('error', errorMsg, {
                 node: arg,
               })
@@ -383,11 +385,11 @@ export class ScalaScriptValidator {
       } else if (TypeSystem.isAnyType(type)) {
         // do nothing
       } else {
-        console.error(chalk.red('internal error in checkCallChain'))
+        // console.error(chalk.red('internal error in checkCallChain'), funcName, type.toString())
       }
     } else {
       // 이름과 타입이 제대로 되어져 있는지 확인용으로 남겨둔다.
-      // const type = TypeSystem.inferType(expr)
+      // const type = TypeSystem.inferType(expr).actual
       // console.log('🚀 ~ checkCallChain: type:', expr.element?.$refText, chalk.green(type.toString()))
     }
 
@@ -418,9 +420,9 @@ export class ScalaScriptValidator {
     }
 
     traceLog('* checkAssignment infer left')
-    const left = TypeSystem.inferType(expr.assign)
+    const left = TypeSystem.inferType(expr.assign).actual
     traceLog('* checkAssignment infer right')
-    const right = TypeSystem.inferType(expr.value)
+    const right = TypeSystem.inferType(expr.value).actual
 
     const tl = left.toString()
     const tr = right.toString()
@@ -459,7 +461,7 @@ export class ScalaScriptValidator {
 
     if (unary.operator) {
       traceLog('* checkUnaryExpression infer value')
-      const item = TypeSystem.inferType(unary.value)
+      const item = TypeSystem.inferType(unary.value).actual
       if (!this.isLegalOperation(unary.operator, item)) {
         const msg =
           'checkUnaryExpression: Cannot perform operation ' +
@@ -494,9 +496,9 @@ export class ScalaScriptValidator {
     traceLog(`- right: ${binary.right.$type}, '${reduceLog(binary.right.$cstNode?.text)}'`)
 
     traceLog('* checkBinaryExpression infer left')
-    const left = TypeSystem.inferType(binary.left)
+    const left = TypeSystem.inferType(binary.left).actual
     traceLog('* checkBinaryExpression infer right')
-    const right = TypeSystem.inferType(binary.right)
+    const right = TypeSystem.inferType(binary.right).actual
 
     const tl = left.toString()
     const tr = right.toString()

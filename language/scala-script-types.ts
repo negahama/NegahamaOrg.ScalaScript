@@ -305,7 +305,7 @@ export class ArrayTypeDescriptor extends TypeDescriptor {
    * @returns {string} A string in the format `(<param1>: <type1>, <param2>: <type2>, ...) -> <returnType>`.
    */
   override toString(): string {
-    return `${this.$type}<${this.elementType.toString()}>`
+    return `${this.elementType.toString()}[]`
   }
 
   /**
@@ -665,8 +665,8 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
     if (!found) return `Element '${name}' does not exist`
 
     // 동일한 이름이 있으면 타입도 같아야 한다.
-    const t1 = TypeSystem.inferType(node)
-    const t2 = TypeSystem.inferType(found.node)
+    const t1 = TypeSystem.inferType(node).actual
+    const t2 = TypeSystem.inferType(found.node).actual
     const result = checkingType == 'isEqual' ? t1.isEqual(t2) : t1.isAssignableTo(t2)
     if (!result) return `Element '${name}'s types are different(${t1.toString()}, ${t2.toString()})`
     return undefined
@@ -696,7 +696,7 @@ export class ClassTypeDescriptor extends TypeDescriptor {
    */
   constructor(public node: ast.ClassDef) {
     super('class')
-    // 여기서 설정되는 generic은 generic의 선언이다. generic의 실제 타입은 NewExpression에서만 정의할 수 있다. 
+    // 여기서 설정되는 generic은 generic의 선언이다. generic의 실제 타입은 NewExpression에서만 정의할 수 있다.
     this.generic = node.generic?.types.map(name => new GenericTypeDescriptor(name)) ?? []
   }
 
@@ -780,7 +780,7 @@ export class ClassTypeDescriptor extends TypeDescriptor {
     let type: TypeDescriptor | undefined = undefined
     this.node.body.elements.forEach(e => {
       if (!ast.isBypass(e) && e.name == elementName) {
-        type = TypeSystem.inferType(e)
+        type = TypeSystem.inferType(e).actual
       }
     })
     return type
@@ -799,8 +799,8 @@ export class ClassTypeDescriptor extends TypeDescriptor {
     if (!found) return `Element '${name}' does not exist`
 
     // 동일한 이름이 있으면 타입도 같아야 한다.
-    const t1 = TypeSystem.inferType(node)
-    const t2 = TypeSystem.inferType(found.node)
+    const t1 = TypeSystem.inferType(node).actual
+    const t2 = TypeSystem.inferType(found.node).actual
     const result = checkingType == 'isEqual' ? t1.isEqual(t2) : t1.isAssignableTo(t2)
     if (!result) return `Element '${name}'s types are different(${t1.toString()}, ${t2.toString()})`
     return undefined
@@ -824,6 +824,44 @@ export class ErrorTypeDescriptor extends TypeDescriptor {
   override toString(): string {
     return `{${chalk.red(this.$type)}: ${this.message}, '${reduceLog(this.source?.$cstNode?.text)}'}`
   }
+}
+
+/**
+ * Options for inferring types in ScalaScript.
+ *
+ * @property {Map<AstNode, InferResult>} [cache] - A map to cache type descriptors for AST nodes.
+ */
+export type InferOptions = {
+  cache?: Map<AstNode, InferResult>
+}
+
+/**
+ * Represents the result of an inference operation.
+ *
+ * 타입을 추론할 때는 context가 중요하다.
+ * 예를들어 `var n: number = f()`는 `f`의 타입이 `() -> number` 라는 것이 중요한 것이 아니라
+ * number를 리턴한다는 것이 중요하다. 하지만 좌변에 있을 경우에는 예를 들어 `var f: () -> number`와 같은 경우에는
+ * f의 타입은 `number`가 아니라 `() -> number` 이어야 한다.
+ *
+ * 이와 같은 차이는 값을 사용하는 것인지 아니면 형식을 사용하는 것인지에 달려있다.
+ * 즉 첫번째 경우처럼 함수를 호출하는 경우는 함수의 값을 사용하므로 함수의 리턴 타입이 중요하고
+ * 두번째 경우처럼 f의 형식을 참조하는 경우는 함수 자체의 타입이 중요하다.
+ *
+ * 이러한 차이를 지원하기 위해서 InferResult에는 동일한 node를 추론한 결과를
+ * actual과 formal로 구분하고 모두 제공하는 것으로 처리하고 있다.
+ *
+ * 두 가지 모두 지원해야 하는 경우는 대입문, 함수등이 있다.
+ * 그 외에는 actual, formal 모두 동일하다.
+ *
+ * @typedef {Object} InferResult
+ * @property {TypeDescriptor} actual - The actual type descriptor inferred.
+ * @property {TypeDescriptor} [formal] - The formal type descriptor, if available.
+ */
+export type InferResult = {
+  // 값에 근거하는 실제적인 타입
+  actual: TypeDescriptor
+  // 형식에 근거하는 타입
+  formal?: TypeDescriptor
 }
 
 /**
@@ -864,14 +902,14 @@ export class TypeSystem {
     // 명시된 리턴 타입도 없으면 함수의 바디를 근거로 한다.
     // 명시된 리턴 타입도 없고 함수의 바디도 없으면 void type으로 간주한다
     type.returnType = new VoidTypeDescriptor()
-    if (node.returnType) type.returnType = this.inferType(node.returnType)
+    if (node.returnType) type.returnType = this.inferType(node.returnType).actual
     else if ((ast.isFunctionDef(node) || ast.isFunctionValue(node)) && node.body)
-      type.returnType = this.inferType(node.body)
+      type.returnType = this.inferType(node.body).actual
     traceLog(`* return type: ${type.returnType.toString()}`)
 
     type.parameters = node.params.map(e => ({
       name: e.name,
-      type: this.inferType(e),
+      type: this.inferType(e).actual,
       spread: e.spread,
       nullable: e.nullable,
       defaultValue: e.value,
@@ -1022,7 +1060,8 @@ export class TypeSystem {
    * Infers the type of a given AST node.
    *
    * @param node - The AST node for which the type is to be inferred. Can be undefined.
-   * @returns The inferred type description of the given node.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    *
    * This function performs type inference based on the type of the AST node. It handles various node types such as
    * types, element types, primitive types, variable definitions, function definitions, object definitions, call chains,
@@ -1033,131 +1072,146 @@ export class TypeSystem {
    *
    * The function logs the entry and exit points for debugging purposes.
    */
-  static inferType(node: AstNode | undefined): TypeDescriptor {
+  static inferType(node: AstNode | undefined, options?: InferOptions): InferResult {
     const log = enterLog('inferType', undefined, `${chalk.green(node?.$type)}, '${reduceLog(node?.$cstNode?.text)}'`)
 
     if (!node) {
       const type = new ErrorTypeDescriptor('Could not infer type for undefined', node)
       exitLog(log, type, 'Exit(node is undefined)')
-      return type
+      return { actual: type, formal: type }
     }
 
-    const existing = ScalaScriptCache.get(node)
+    let existing: InferResult | undefined
+    if (options?.cache) {
+      existing = options.cache.get(node)
+    } else {
+      existing = ScalaScriptCache.get(node)
+    }
     if (existing) {
-      exitLog(log, existing, 'Exit(node is cached)')
+      exitLog(log, existing.actual, 'Exit(node is cached)')
       return existing
     }
 
     // Prevent recursive inference errors
-    ScalaScriptCache.set(node, new ErrorTypeDescriptor('Recursive definition', node))
+    if (options?.cache) {
+      options.cache.set(node, { actual: new ErrorTypeDescriptor('Recursive definition', node) })
+    } else {
+      ScalaScriptCache.set(node, { actual: new ErrorTypeDescriptor('Recursive definition', node) })
+    }
 
-    let type: TypeDescriptor | undefined
+    let result: InferResult | undefined
 
     if (ast.isTypes(node)) {
-      type = this.inferTypeTypes(node)
+      result = this.inferTypeTypes(node, options)
     } else if (ast.isSimpleType(node)) {
       // Types와 SimpleType은 분리되어져 있다.
       // SimpleType은 ArrayType | ObjectType | ElementType와 같이 UnionType이며 타입들의 단순한 집합이지만
       // Types는 types+=SimpleType ('|' types+=SimpleType)*와 같이 SimpleType의 배열로 단순히 타입이 아니다.
       // 일례로 RefType은 ElementType이고 SimpleType이긴 하지만 Types는 아니다.
-      type = this.inferTypeSimpleType(node)
+      result = this.inferTypeSimpleType(node, options)
     } else if (ast.isVariableDef(node)) {
-      type = this.inferTypeVariableDef(node)
+      result = this.inferTypeVariableDef(node, options)
     } else if (ast.isFunctionDef(node)) {
-      type = this.inferTypeFunctionDef(node)
+      result = this.inferTypeFunctionDef(node, options)
     } else if (ast.isClassDef(node)) {
-      type = this.inferTypeClassDef(node)
+      result = this.inferTypeClassDef(node, options)
     } else if (ast.isCallChain(node)) {
-      type = this.inferTypeCallChain(node)
+      result = this.inferTypeCallChain(node, options)
     } else if (ast.isParameter(node)) {
-      type = this.inferTypeParameter(node)
+      result = this.inferTypeParameter(node, options)
     } else if (ast.isProperty(node)) {
-      type = this.inferTypeProperty(node)
+      result = this.inferTypeProperty(node, options)
     } else if (ast.isBinding(node)) {
-      type = this.inferTypeBinding(node)
+      result = this.inferTypeBinding(node, options)
     } else if (ast.isForOf(node)) {
-      type = this.inferTypeForOf(node)
+      result = this.inferTypeForOf(node, options)
     } else if (ast.isForTo(node)) {
-      type = this.inferTypeForTo(node)
+      result = this.inferTypeForTo(node, options)
     } else if (ast.isAssignment(node)) {
-      type = this.inferTypeAssignment(node)
+      result = this.inferTypeAssignment(node, options)
     } else if (ast.isIfExpression(node)) {
-      type = this.inferTypeIfExpression(node)
+      result = this.inferTypeIfExpression(node, options)
     } else if (ast.isMatchExpression(node)) {
-      type = this.inferTypeMatchExpression(node)
+      result = this.inferTypeMatchExpression(node, options)
     } else if (ast.isGroupExpression(node)) {
-      type = this.inferTypeGroupExpression(node)
+      result = this.inferTypeGroupExpression(node, options)
     } else if (ast.isUnaryExpression(node)) {
-      type = this.inferTypeUnaryExpression(node)
+      result = this.inferTypeUnaryExpression(node, options)
     } else if (ast.isBinaryExpression(node)) {
-      type = this.inferTypeBinaryExpression(node)
+      result = this.inferTypeBinaryExpression(node, options)
     } else if (ast.isReturnExpression(node)) {
-      type = this.inferTypeReturnExpression(node)
+      result = this.inferTypeReturnExpression(node, options)
     } else if (ast.isSpreadExpression(node)) {
-      type = this.inferTypeSpreadExpression(node)
+      result = this.inferTypeSpreadExpression(node, options)
     } else if (ast.isNewExpression(node)) {
-      type = this.inferTypeNewExpression(node)
+      result = this.inferTypeNewExpression(node, options)
     } else if (ast.isArrayValue(node)) {
-      type = this.inferTypeArrayValue(node)
+      result = this.inferTypeArrayValue(node, options)
     } else if (ast.isObjectValue(node)) {
-      type = this.inferTypeObjectValue(node)
+      result = this.inferTypeObjectValue(node, options)
     } else if (ast.isFunctionValue(node)) {
-      type = this.inferTypeFunctionValue(node)
+      result = this.inferTypeFunctionValue(node, options)
     } else if (ast.isLiteral(node)) {
-      type = this.inferTypeLiteral(node)
+      result = this.inferTypeLiteral(node, options)
     } else if (ast.isBlock(node)) {
-      type = this.inferTypeBlock(node)
+      result = this.inferTypeBlock(node, options)
     }
 
-    if (!type) {
-      type = new ErrorTypeDescriptor('Could not infer type for ' + node.$type, node)
+    if (!result) {
+      result = { actual: new ErrorTypeDescriptor('Could not infer type for ' + node.$type, node) }
     }
 
     // for debugging...
-    if (this.isErrorType(type)) {
-      console.error(chalk.red('inferType Error:'), `${type.toString()}, '${node.$cstNode?.text}'`)
+    if (this.isErrorType(result.actual)) {
+      console.error(chalk.red('inferType Error:'), `${result.toString()}, '${node.$cstNode?.text}'`)
     }
 
-    ScalaScriptCache.set(node, type)
-    exitLog(log, type)
-    return type
+    if (options?.cache) {
+      options.cache.set(node, result)
+    } else {
+      ScalaScriptCache.set(node, result)
+    }
+    exitLog(log, result?.actual)
+    return result
   }
 
   /**
    * Infers the type of the given AST node and returns a TypeDescription.
    *
    * @param node - The AST node representing the types to infer.
-   * @returns A TypeDescription representing the inferred type.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    *
    * The function processes the types within the node and simplifies the result:
    * - If there are no types, it returns an error type.
    * - If there is only one type, it returns that type.
    * - If there are multiple types, it returns a union type.
    */
-  static inferTypeTypes(node: ast.Types): TypeDescriptor {
+  static inferTypeTypes(node: ast.Types, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeTypes', node)
-    const ts = node.types.map(t => this.inferType(t))
+    const ts = node.types.map(t => this.inferType(t, options).actual)
     // 실제 Union 타입이 아니면 처리를 단순화하기 위해 개별 타입으로 리턴한다.
     const type = this.createUnionType(ts)
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a given SimpleType node.
    *
    * @param node - The SimpleType node to infer the type for.
-   * @returns The inferred TypeDescription for the given SimpleType node.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    *
    * This function determines the type of the provided SimpleType node by checking its specific kind.
    * It handles array types, object types, function types, primitive types, and reference types.
    * If the type cannot be determined, it returns an error type.
    */
-  static inferTypeSimpleType(node: ast.SimpleType): TypeDescriptor {
+  static inferTypeSimpleType(node: ast.SimpleType, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeSimpleType', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (ast.isArrayType(node)) {
-      type = new ArrayTypeDescriptor(this.inferType(node.elementType))
+      type = new ArrayTypeDescriptor(this.inferType(node.elementType, options).actual)
     } else if (ast.isObjectType(node)) {
       type = new ObjectTypeDescriptor(node)
     } else if (ast.isFunctionType(node)) {
@@ -1200,14 +1254,14 @@ export class TypeSystem {
         // 따라서 `val goods: Goods[]`와 같이 타입이 명확한 구문에서는 호출되지 않는다.
         // 오히려 `goods.every(...)`와 같이 결국은 generic을 포함하는 함수까지 추론하게 되는 그런 구문들에서 호출된다.
         // 즉 위의 구문이 처리되면서 `every()`함수에 있는 `T`라는 제네릭을 처리할때 이 부분이 호출되는 것이다.
-       const container = AstUtils.getContainerOfType(node, ast.isClassDef)
+        const container = AstUtils.getContainerOfType(node, ast.isClassDef)
         if (container && container.generic?.types.includes(node.reference.$refText)) {
           type = new GenericTypeDescriptor(node.reference.$refText)
         } else console.error(chalk.red(`${node.reference.$refText} is not valid type`))
       }
     }
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /*
@@ -1237,20 +1291,21 @@ export class TypeSystem {
    * Infers the type of a variable definition node.
    *
    * @param node - The variable definition node to infer the type for.
-   * @returns The inferred type description of the variable definition.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeVariableDef(node: ast.VariableDef): TypeDescriptor {
+  static inferTypeVariableDef(node: ast.VariableDef, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeVariableDef', undefined, node.name)
     let type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
     if (node.type) {
-      type = this.inferType(node.type)
+      type = this.inferType(node.type, options).actual
       // 명시된 타입만 있고 값이 없는 경우 명시된 타입을 사용한다.
       if (node.value) {
         // 명시된 타입도 있고 값도 있는 경우
         // 값의 타입을 사용하는 경우를 union으로 선언되어진 경우와 primitive type인 경우만으로 한정한다.
         // isAssignableTo()를 호출하지 않아도 deep한 추론을 하지 않기 때문에 위에서 말한 문제점을 줄일 수 있다.
         if (this.isUnionType(type)) {
-          const valueType = this.inferType(node.value)
+          const valueType = this.inferType(node.value, options).actual
           traceLog(`명시된 타입: ${type.toString()}, 값의 타입: ${valueType.toString()}`)
           if (this.isAnyType(valueType)) {
             // do nothing
@@ -1261,43 +1316,45 @@ export class TypeSystem {
             //   console.error(chalk.red(msg))
           } else type = valueType
         } else if (this.isStringType(type) || this.isNumberType(type) || this.isBooleanType(type)) {
-          type = this.inferType(node.value)
+          type = this.inferType(node.value, options).actual
         }
       }
     }
     // 명시된 타입없이 값만 있는 경우 값을 보고 타입을 추론한다.
     else if (node.value) {
-      type = this.inferType(node.value)
+      type = this.inferType(node.value, options).actual
       traceLog('명시된 타입없이 value만으로 추론:', type.toString())
     }
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a function definition node.
    *
    * @param node - The function definition AST node to infer the type for.
-   * @returns A `TypeDescription` object representing the inferred type of the function.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeFunctionDef(node: ast.FunctionDef): TypeDescriptor {
+  static inferTypeFunctionDef(node: ast.FunctionDef, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeFunctionDef', undefined, node.name)
     const type = this.createFunctionType(node)
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type description for an object definition node.
    *
    * @param node - The AST node representing the object definition.
-   * @returns The inferred type description for the object.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeClassDef(node: ast.ClassDef): TypeDescriptor {
+  static inferTypeClassDef(node: ast.ClassDef, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeClassDef', undefined, node.name)
     const type = new ClassTypeDescriptor(node)
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
@@ -1308,9 +1365,10 @@ export class TypeSystem {
    * It uses the provided cache to optimize type inference and logs the process for debugging purposes.
    *
    * @param node - The call chain node to infer the type for.
-   * @returns The inferred type description of the call chain node.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeCallChain(node: ast.CallChain): TypeDescriptor {
+  static inferTypeCallChain(node: ast.CallChain, options?: InferOptions): InferResult {
     const id = `element='${node.element?.$refText}', cst='${node?.$cstNode?.text}'`
     const log = enterLog('inferTypeCallChain', undefined, id)
     traceLog(chalk.redBright('ref 참조전:'), id)
@@ -1318,49 +1376,137 @@ export class TypeSystem {
     traceLog(chalk.green('ref 참조후:'), id)
 
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
+    let actual = type
+    let formal = type
     if (element) {
-      type = this.inferType(element)
+      type = this.inferType(element, options).actual
 
       // CallChain은 변수, 함수, 배열등을 모두 포함할 수 있다.
       // 이것의 타입이 무엇인가를 결정할 때는 context가 중요하다.
-      // 예를들어 `var n: number = f()`는 `f`의 타입이 `() -> number` 라는 것이 중요한 것이 아니라
-      // number를 리턴한다는 것이 중요하다. 하지만 좌변에 있을 경우에는 예를들어 아래와 같은 경우에는
-      // f의 타입은 `number`가 아니라 `() -> number` 이어야 한다.
-      // var f: () -> number
-      // f = () => { return 1 }
-      // 이와 같은 차이는 해당 CallChain이 함수 호출인가 아닌가에 달려있다.
-      // 즉 ()을 사용해서 함수가 호출되는 경우는 함수의 리턴 타입이 중요하고
-      // 그렇지 않으면 함수 자체의 타입이 중요하다.
+      // 이에 대한 자세한 설명은 InferResult의 주석을 참조한다.
 
-      // 배열 호출이면 배열 요소가 리턴되어야 한다.
       if (this.isArrayType(type) && node.isArray) {
-        traceLog('배열 호출이면 배열 요소가 리턴되어야 한다', type.elementType.toString())
-        type = type.elementType
-      }
+        // 배열 호출이면 배열 요소가 리턴되어야 한다.
+        // 즉 `ary[0]`의 타입은 `array<number>`가 아니라 `number`이어야 한다.
+        traceLog('배열 호출', type.elementType.toString())
+        actual = type.elementType
+        formal = type
+      } else if (this.isFunctionType(type) && node.isFunction) {
+        const detectGeneric = (type: TypeDescriptor): boolean => {
+          if (this.isGenericType(type)) return true
+          else if (this.isArrayType(type)) return detectGeneric(type.elementType)
+          else if (this.isFunctionType(type)) {
+            for (const param of type.parameters) {
+              if (detectGeneric(param.type)) return true
+            }
+            return detectGeneric(type.returnType)
+          }
+          return false
+        }
+        // 인수 t에 Generic이 있으면 t가 실제 어떤 타입이어야 하는지를 g를 통해 판단한다.
+        const replaceGeneric = (
+          t: TypeDescriptor,
+          g: {
+            name: string
+            type: TypeDescriptor
+          }[]
+        ) => {
+          if (this.isGenericType(t)) {
+            const m = g.find(e => e.name == t.name)
+            return m?.type || new AnyTypeDescriptor()
+          } else if (this.isArrayType(t)) {
+            if (this.isGenericType(t.elementType) && g.length > 0) return new ArrayTypeDescriptor(g[0].type)
+            else return new ArrayTypeDescriptor(t.elementType)
+          } else if (this.isFunctionType(t)) {
+            const desc = new FunctionTypeDescriptor()
+            desc.changeReturnType(replaceGeneric(t.returnType, g))
+            t.parameters.forEach(p => {
+              const type = replaceGeneric(p.type, g)
+              desc.addParameterType({
+                name: p.name,
+                type,
+                spread: p.spread,
+                nullable: p.nullable,
+                defaultValue: p.defaultValue,
+              })
+            })
+            return desc
+          } else return t
+        }
 
-      // 함수 호출이면 함수 리턴 타입이 리턴되어야 한다
-      if (this.isFunctionType(type) && node.isFunction) {
-        traceLog('함수 호출이면 함수 리턴 타입이 리턴되어야 한다', type.returnType.toString())
-        // 일반적인 함수 호출이면 함수의 리턴 타입을 리턴하고
-        // 함수형 메서드 호출인 경우에는 return type을 조정해 준다.
-        // 이때 if (fmt) type.returnType = fmt 같이 하면 정의된 함수의 리턴 타입이 변경되므로 주의해야 한다.
-        const fmt = this.getFunctionInfo(node)
-        if (fmt && this.isFunctionType(fmt)) {
-          // console.log('After getFunctionInfo():', node.$cstNode?.text, fmt.returnType.toString())
-          type = fmt.returnType
-        } else type = type.returnType
+        // 추론된 타입에 generic이 있으면 이를 resolve하기 위해서 previous를 사용한다.
+        if (detectGeneric(type)) {
+          // 처리 과정 중에 name에는 T, K, V와 같은 것들이, type에는 실제 타입이 들어온다.
+          // name은 함수형 메서드들이 선언되어진 곳에서 가져오고 실제 타입은 이전 노드나 new expression에서 가져온다.
+          let generic: {
+            name: string
+            type: TypeDescriptor
+          }[] = []
+
+          if (!node.previous) {
+            console.error(chalk.red('inferTypeCallChain: generic has been used but previous is empty'))
+          } else {
+            let previous = this.inferType(node.previous, options).actual
+            // for debugging...
+            // console.log(
+            //   `node '${node.$cstNode?.text}'s previous '${node.previous?.$cstNode?.text}'s type: ${previous.toString()}`
+            // )
+
+            if (this.isArrayType(previous)) {
+              // array이기 때문에 generic이 하나일 것으로 가정하고 있다.
+              // Array.map()인 경우에는 타입이 변경될 수 있으므로 any type으로 처리한다.
+              if (element.name == 'map') {
+                type = new AnyTypeDescriptor()
+              } else {
+                generic.push({ name: 'T', type: previous.elementType })
+                type = replaceGeneric(type, generic)
+              }
+            } else if (this.isClassType(previous) && (previous.toString() == 'Map' || previous.toString() == 'Set')) {
+              let funcType: TypeDescriptor | undefined
+              funcType = this.inferType(element, options).actual
+              assert.ok(ast.isVariableDef(element) || ast.isFunctionDef(element), 'it is not valid definition')
+              assert.ok(this.isFunctionType(funcType), `'${element.name}' is not function`)
+
+              // Map, Set은 previous에 NewExpression에서 설정된 generic 정보가 있다.
+              let genericIds: string[] = []
+              const grandContainer = element.$container?.$container
+              if (grandContainer && ast.isClassDef(grandContainer)) {
+                genericIds = grandContainer.generic?.types.map(name => name) ?? []
+              }
+              if (genericIds && previous.generic && genericIds.length == previous.generic.length) {
+                previous.generic.forEach((g, index) => {
+                  generic.push({ name: genericIds[index], type: g.type })
+                })
+              }
+              type = replaceGeneric(type, generic)
+            } else {
+              console.error(chalk.red('inferTypeCallChain: previous is not array, map, set'), previous.toString())
+            }
+            // for debugging...
+            // console.log('replaceGeneric:', chalk.green(type.toString()))
+            actual = formal = type
+            if (this.isFunctionType(type)) actual = type.returnType
+          }
+        } else {
+          // 일반적인 함수 호출이면 함수의 리턴 타입을 리턴
+          traceLog('함수 호출', element.name, type.toString())
+          actual = type.returnType
+          formal = type
+        }
+      } else {
+        // for debugging...
+        // console.log(`inferTypeCallChain: ${element.name}, '${node.$cstNode?.text}'`, chalk.green(type.toString()))
+        actual = formal = type
       }
     }
 
     // this, super인 경우
     else if (node.$cstNode?.text == 'this' || node.$cstNode?.text == 'super') {
-      let foundClass = false
       const classItem = AstUtils.getContainerOfType(node, ast.isClassDef)
       if (classItem) {
         if (node.$cstNode?.text == 'this') {
           traceLog(`'this' refers ${classItem.name}`)
           type = new ClassTypeDescriptor(classItem)
-          foundClass = true
         } else if (node.$cstNode?.text == 'super') {
           // super는 현재 클래스의 부모 클래스를 찾는다.
           //todo 문제는 조부모 클래스인데... 일단은 부모만 사용한다.
@@ -1369,14 +1515,13 @@ export class TypeSystem {
             const superClass = classChain[0]
             traceLog(`'super' refers ${superClass.name}`)
             type = new ClassTypeDescriptor(superClass)
-            foundClass = true
             // console.log(`'super' refers ${superClass.name}`)
             // classChain.forEach(c => console.log(`  - ${c.name}`))
+          } else {
+            console.error(chalk.red('super is empty in types.ts'))
           }
         }
-      }
-
-      if (!foundClass) {
+      } else {
         console.error(chalk.red('this or super is empty in types.ts'))
         // for debugging...
         let item: AstNode | undefined = node
@@ -1386,6 +1531,8 @@ export class TypeSystem {
           item = item.$container
         }
       }
+
+      actual = formal = type
     }
 
     // node.element.ref가 없는 경우
@@ -1394,40 +1541,47 @@ export class TypeSystem {
       // previous가 함수이면 이것의 리턴 타입을 자신의 타입으로 리턴하게 하고
       // previous가 배열이면 배열의 element 타입을 자신의 타입으로 취한다.
       if (node.previous) {
-        const previousType = this.inferType(node.previous)
+        const previousType = this.inferType(node.previous, options).actual
         console.log(chalk.red('여기는 정확히 어떨 때 호출되는가?', id))
         console.log(chalk.green(`  previous '${node.previous?.$cstNode?.text}'s type: ${previousType.toString()}`))
-        if (this.isFunctionType(previousType)) type = previousType.returnType
-        else if (this.isArrayType(previousType)) type = previousType.elementType
-        else type = new ErrorTypeDescriptor('Could not infer type for element ' + node.element?.$refText, node)
+        actual = formal = previousType
+        if (this.isFunctionType(previousType)) actual = previousType.returnType
+        else if (this.isArrayType(previousType)) actual = previousType.elementType
+        else actual = new ErrorTypeDescriptor('Could not infer type for element ' + node.element?.$refText, node)
         exitLog(log, type)
-        return type
+        return { actual, formal }
       }
 
-      type = new ErrorTypeDescriptor('Could not infer type for element ' + node.element?.$refText, node)
+      actual = formal = new ErrorTypeDescriptor('Could not infer type for element ' + node.element?.$refText, node)
     }
 
     exitLog(log, type)
-    return type
+    return { actual, formal }
   }
 
   /**
-   * Infers the type of a given parameter node. If the type of the parameter
-   * cannot be determined from its type or value, it defaults to `any` type.
+   * Infers the type of a given parameter node.
    *
-   * @param node - The parameter node to infer the type for.
-   * @returns The inferred type description of the parameter.
+   * This function attempts to determine the type of a parameter by examining its type annotation,
+   * its value, or by analyzing the function it belongs to if neither is available.
+   *
+   * @param node - The parameter node whose type is to be inferred.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeParameter(node: ast.Parameter): TypeDescriptor {
+  static inferTypeParameter(node: ast.Parameter, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeParameter', undefined, node.name)
     let type: TypeDescriptor = new AnyTypeDescriptor()
-    if (node.type) type = this.inferType(node.type)
-    else if (node.value) type = this.inferType(node.value)
+    if (node.type) type = this.inferType(node.type, options).actual
+    else if (node.value) type = this.inferType(node.value, options).actual
     else {
-      // getFunctionInfo()는 함수 자체에 대한 정보를 리턴하기 때문에 파라미터와 함수의 인수들을 매치하는 작업이 필요하다.
+      // 파라미터의 타입이 명시되어 있지 않고 값도 없는 경우
+      // 파라미터의 타입을 추론하기 위해서는 함수 자체에 대한 정보가 필요하다.
+      // inferType()를 호출할때 cache를 사용하지 않으면 recursive definition이 발생할 수 있다.
+      // inferType().formal은 함수 자체에 대한 정보를 리턴하기 때문에 파라미터와 함수의 인수들을 매치하는 작업이 필요하다.
       // node.$container.$container가 쓰인 이유는 [이 문서](/.prism/docs/d064613466b71eae97f19e05193accdf.md)을 참고한다.
       const funcNode = node.$container.$container
-      const funcType = this.getFunctionInfo(funcNode)
+      const funcType = this.inferType(funcNode, { ...options, cache: new Map() }).formal
       if (!funcType) {
         // for debugging...
         console.error(
@@ -1436,7 +1590,7 @@ export class TypeSystem {
           chalk.green(funcNode?.$type),
           reduceLog(funcNode?.$cstNode?.text)
         )
-      } else if (this.isArrayType(funcType)) {
+      } else if (this.isAnyType(funcType)) {
         type = funcType
       } else if (this.isFunctionType(funcType)) {
         // for debugging...
@@ -1444,6 +1598,11 @@ export class TypeSystem {
         // funcType.showDetailInfo()
 
         if (!ast.isBinding(funcNode)) {
+          // 함수 `f`이 `(callback: (arg: Corp, index?: number) -> void, thisArg?: any) -> void`와 같이 정의되어져 있고
+          // `f(corp => corp.process())`가 호출된다고 할 때 파라미터 `corp`를 `callback`의 `arg`에 매칭해야 한다.
+          // 보다 효과적인 예로써 `this.getCell(columnName, (column) => { ... })`의 경우
+          // `column`은 `getCell()`의 두번째 파라미터의 첫번째 파라미터이다.
+          // 이렇게 node가 함수의 몇번째 파라미터인지를 확인하기 위해서는 node만으로는 안된다.
           // 현재 노드에서 CallChain까지 올라간 다음 CallChain의 args를 검사해서 파라미터의 위치를 찾는다.
           // 처음에는 노드로 찾고 람다 함수가 있으면 람다 함수의 파라미터 인덱스는 이름으로 찾는다.
           const callchain = AstUtils.getContainerOfType(node, ast.isCallChain)
@@ -1452,9 +1611,9 @@ export class TypeSystem {
             const funcArg = callchain?.args[funcParamIndex]
             const argType = funcType.parameters[funcParamIndex].type
             if (ast.isFunctionValue(funcArg) && argType && this.isFunctionType(argType)) {
-              let lambdaParamIndex = node.$container.params.findIndex(param => param.name == node.name)
-              if (lambdaParamIndex != -1) {
-                type = argType.parameters[lambdaParamIndex].type
+              let nodeIndex = node.$container.params.findIndex(param => param.name == node.name)
+              if (nodeIndex != -1) {
+                type = argType.parameters[nodeIndex].type
                 // console.log('new type:', type.toString())
               }
             }
@@ -1466,23 +1625,26 @@ export class TypeSystem {
           // for debugging...
           // console.log('BINDING:', node.$cstNode?.text, node.name, type.toString())
         }
+      } else {
+        console.error(chalk.red('inferTypeParameter:'), 'funcType is not valid type')
       }
     }
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a given property node.
    *
-   * @param node - The AST property node for which the type needs to be inferred.
-   * @returns The inferred type descriptor for the given property node.
+   * @param node - The property node for which the type is to be inferred.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeProperty(node: ast.Property): TypeDescriptor {
+  static inferTypeProperty(node: ast.Property, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeProperty', undefined, node.name)
-    const type = this.inferType(node.type)
+    const type = this.inferType(node.type, options).actual
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
@@ -1494,16 +1656,51 @@ export class TypeSystem {
    * value, it assigns a 'nil' type to the node.
    *
    * @param node - The assignment binding node to infer the type for.
-   * @returns The inferred type description of the assignment binding node.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeBinding(node: ast.Binding): TypeDescriptor {
+  static inferTypeBinding(node: ast.Binding, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeBinding', node)
     // Binding에는 value가 없을수는 없지만 없으면 nil type으로 취급한다.
     //todo 타입스크립트에서는 name과 value가 동일하면 하나만 사용할 수 있는데 스칼라스크립트에서는 아직 그렇지 않다.
     let type: TypeDescriptor = new NilTypeDescriptor()
-    if (node.value) type = this.inferType(node.value)
+    if (node.value) type = this.inferType(node.value, options).actual
+
+    // Binding 되어진 람다 함수 처리 부분
+    const findBindingRootDef = (node: AstNode): TypeDescriptor | undefined => {
+      const property = ast.isBinding(node) ? node.element : ''
+      if (!property) {
+        console.error(chalk.red('findBindingRootDef: property is null'))
+        return undefined
+      }
+
+      const object = AstUtils.getContainerOfType(node, ast.isObjectValue)
+      if (object && object.$container) {
+        if (ast.isVariableDef(object.$container)) {
+          const container = object.$container
+          const containerType = this.inferType(container, options).actual
+          // 해당 Binding이 소속된 ClassDef를 찾아서 해당 항목의 타입을 찾아야 한다.
+          if (this.isClassType(containerType)) {
+            return containerType.getElementType(property)
+          }
+        } else if (ast.isBinding(object.$container)) {
+          const result = findBindingRootDef(object.$container)
+          if (result && this.isClassType(result)) {
+            return result.getElementType(property)
+          }
+        }
+      }
+      return undefined
+    }
+
+    const propType = findBindingRootDef(node)
+    if (propType && this.isFunctionType(propType)) {
+      // propType.showDetailInfo()
+      if (propType) type = propType
+    }
+
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
@@ -1511,14 +1708,15 @@ export class TypeSystem {
    * 이 함수는 for(a <- ary)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
    *
    * @param node - The AST node representing the `for...of` loop.
-   * @returns The inferred type of the elements being iterated over.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeForOf(node: ast.ForOf): TypeDescriptor {
+  static inferTypeForOf(node: ast.ForOf, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeForOf', node)
-    let type = this.inferType(node.of)
+    let type = this.inferType(node.of, options).actual
     if (this.isArrayType(type)) type = type.elementType
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
@@ -1526,19 +1724,20 @@ export class TypeSystem {
    * 이 함수는 for(a <- 1 (to | until) 10)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
    *
    * @param node - The `ForTo` AST node to infer the type for.
-   * @returns The inferred type description.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeForTo(node: ast.ForTo): TypeDescriptor {
+  static inferTypeForTo(node: ast.ForTo, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeForTo', node)
-    let e1 = this.inferType(node.e1)
-    let e2 = this.inferType(node.e1)
+    let e1 = this.inferType(node.e1, options).actual
+    let e2 = this.inferType(node.e1, options).actual
     if (this.isNumberType(e1) && this.isNumberType(e2)) {
       exitLog(log, e1)
-      return e1
+      return { actual: e1, formal: e1 }
     }
     const type = new ErrorTypeDescriptor('ForTo loop must have number types', node)
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
@@ -1549,84 +1748,89 @@ export class TypeSystem {
    * 따라서 이 함수가 호출되는 경우는 다중 대입문인 경우(`a = b = 0`)이거나 복합 대입문인 경우(`n += 1`)이다.
    *
    * @param node - The assignment node to infer the type for.
-   * @returns The inferred type description of the assignment node.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeAssignment(node: ast.Assignment): TypeDescriptor {
+  static inferTypeAssignment(node: ast.Assignment, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeAssignment', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
-    if (node.assign) type = this.inferType(node.assign)
-    else if (node.value) type = this.inferType(node.value)
+    if (node.assign) type = this.inferType(node.assign, options).actual
+    else if (node.value) type = this.inferType(node.value, options).actual
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of an IfExpression node.
    *
    * @param node - The IfExpression AST node to infer the type for.
-   * @returns The inferred type description of the IfExpression node.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeIfExpression(node: ast.IfExpression): TypeDescriptor {
+  static inferTypeIfExpression(node: ast.IfExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeIfExpression', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (!node.then) {
       console.error(chalk.red('IfExpression has no then node'))
       exitLog(log, type)
-      return type
+      return { actual: type, formal: type }
     }
-    type = this.inferType(node.then)
+    type = this.inferType(node.then, options).actual
 
     // IfExpression에 else가 있으면 then과 else의 타입을 비교해서 union type으로 만든다.
     // 그렇지 않은 모든 경우는 then의 타입을 그대로 사용한다.
     if (node.else) {
-      const elseType = this.inferType(node.else)
+      const elseType = this.inferType(node.else, options).actual
       if (!type.isEqual(elseType)) {
         type = this.createUnionType([type, elseType])
       }
     }
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a MatchExpression node.
    *
    * @param node - The MatchExpression AST node to infer the type for.
-   * @returns The inferred type description of the MatchExpression node.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeMatchExpression(node: ast.MatchExpression): TypeDescriptor {
+  static inferTypeMatchExpression(node: ast.MatchExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeMatchExpression', node)
     const types: TypeDescriptor[] = []
     node.cases.forEach(c => {
-      if (c.body) types.push(this.inferType(c.body))
+      if (c.body) types.push(this.inferType(c.body, options).actual)
     })
     // type이 없으면 void type으로 처리한다.
     let type: TypeDescriptor = this.createUnionType(types)
     if (this.isErrorType(type)) type = new VoidTypeDescriptor()
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a function value node.
    *
    * @param node - The function value AST node to infer the type for.
-   * @returns The inferred type description of the function value.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeGroupExpression(node: ast.GroupExpression): TypeDescriptor {
+  static inferTypeGroupExpression(node: ast.GroupExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeGroupExpression', node)
-    const type = this.inferType(node.value)
+    const type = this.inferType(node.value, options).actual
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a unary expression node.
    *
    * @param node - The unary expression AST node to infer the type for.
-   * @returns The inferred type description of the unary expression.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeUnaryExpression(node: ast.UnaryExpression): TypeDescriptor {
+  static inferTypeUnaryExpression(node: ast.UnaryExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeUnaryExpression', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (node.operator) {
@@ -1634,9 +1838,9 @@ export class TypeSystem {
       else if (node.operator === '-' || node.operator === '+') type = new NumberTypeDescriptor(node)
       else if (node.operator === '!' || node.operator === 'not') type = new BooleanTypeDescriptor(node)
       else type = new ErrorTypeDescriptor(`Unknown unary operator: ${node.operator}`)
-    } else type = this.inferType(node.value)
+    } else type = this.inferType(node.value, options).actual
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
@@ -1656,7 +1860,8 @@ export class TypeSystem {
    * 경우에 이 함수는 꼭 필요하며 여기서 적절한 타입을 리턴하지 않으면 Validator에서 바로 에러가 되어 버린다.
    *
    * @param node - The binary expression AST node to infer the type for.
-   * @returns The inferred type description of the binary expression.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    *
    * The function handles different binary operators and infers the type based on the operator:
    * - Logical operators (`and`, `or`, `&&`, `||`, `<`, `<=`, `>`, `>=`, `==`, `!=`) result in a boolean type.
@@ -1666,7 +1871,7 @@ export class TypeSystem {
    *
    * If the type cannot be inferred, an error type is returned.
    */
-  static inferTypeBinaryExpression(node: ast.BinaryExpression): TypeDescriptor {
+  static inferTypeBinaryExpression(node: ast.BinaryExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeBinaryExpression', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('Could not infer type from binary expression', node)
     if (['and', 'or', '&&', '||', '<', '<=', '>', '>=', '==', '!='].includes(node.operator)) {
@@ -1674,8 +1879,8 @@ export class TypeSystem {
     } else if (['-', '+', '**', '*', '/', '%'].includes(node.operator)) {
       type = new NumberTypeDescriptor(node)
     } else if (['..'].includes(node.operator)) {
-      const left = this.inferType(node.left)
-      const right = this.inferType(node.right)
+      const left = this.inferType(node.left, options).actual
+      const right = this.inferType(node.right, options).actual
       if (this.isStringType(left) || this.isStringType(right)) {
         type = new StringTypeDescriptor()
       }
@@ -1684,21 +1889,22 @@ export class TypeSystem {
       type = new AnyTypeDescriptor()
     }
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a return expression node.
    *
    * @param node - The return expression node to infer the type from.
-   * @returns The inferred type description of the return expression.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeReturnExpression(node: ast.ReturnExpression): TypeDescriptor {
+  static inferTypeReturnExpression(node: ast.ReturnExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeReturnExpression', node)
     let type: TypeDescriptor = new VoidTypeDescriptor()
-    if (node.value) type = this.inferType(node.value)
+    if (node.value) type = this.inferType(node.value, options).actual
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
@@ -1708,32 +1914,34 @@ export class TypeSystem {
    * 예를들어 `a = [1, 2, 3]`이라고 할 때 `b = [...a, 4, 5]`와 같이 사용하는 경우이다.
    *
    * @param node - The return expression node to infer the type from.
-   * @returns The inferred type description of the return expression.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeSpreadExpression(node: ast.SpreadExpression): TypeDescriptor {
+  static inferTypeSpreadExpression(node: ast.SpreadExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeSpreadExpression', node)
     let type: TypeDescriptor = new AnyTypeDescriptor()
     if (node.spread && node.spread.ref) {
-      type = this.inferType(node.spread.ref)
+      type = this.inferType(node.spread.ref, options).actual
     }
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a new expression node.
    *
    * @param node - The AST node representing the new expression.
-   * @returns The inferred type description of the new expression.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeNewExpression(node: ast.NewExpression): TypeDescriptor {
+  static inferTypeNewExpression(node: ast.NewExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeNewExpression', node)
 
     // 실제 class가 존재하지 않으면 에러로 처리한다.
     if (!node.class.ref) {
       const type = new ErrorTypeDescriptor('internal error', node)
       exitLog(log, type)
-      return type
+      return { actual: type, formal: type }
     }
 
     // new Array<number>()와 같은 경우에는 ArrayTypeDescription으로 변경해 준다.
@@ -1742,11 +1950,11 @@ export class TypeSystem {
       let type: TypeDescriptor
       if (node.generic) {
         assert(node.generic.types.length === 1, 'Array type must have one generic type')
-        const t = this.inferType(node.generic.types[0])
+        const t = this.inferType(node.generic.types[0], options).actual
         type = new ArrayTypeDescriptor(t)
       } else type = new ArrayTypeDescriptor(new AnyTypeDescriptor())
       exitLog(log, type)
-      return type
+      return { actual: type, formal: type }
     }
 
     // 생성시 generic정보가 있으면 Class의 타입에 이를 추가한다.
@@ -1754,13 +1962,13 @@ export class TypeSystem {
     const type = new ClassTypeDescriptor(node.class.ref)
     if (node.generic) {
       type.generic = node.generic.types.map((g, index) => {
-        const t = this.inferType(g)
+        const t = this.inferType(g, options).actual
         return new GenericTypeDescriptor(index.toString(), t)
       })
     }
 
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
@@ -1771,9 +1979,10 @@ export class TypeSystem {
    * and creates an array type based on that.
    *
    * @param node - The AST node representing the array value.
-   * @returns The inferred type description of the array value.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeArrayValue(node: ast.ArrayValue): TypeDescriptor {
+  static inferTypeArrayValue(node: ast.ArrayValue, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeArrayValue', node, `item count= ${node.items.length}`)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     // item이 없는 경우 즉 [] 으로 표현되는 빈 배열의 경우 any type으로 취급한다.
@@ -1782,51 +1991,54 @@ export class TypeSystem {
       node.items.forEach(item => {
         // 배열 안에서 spread가 사용되면 spread를 풀어서 처리해야 한다.
         if (ast.isSpreadExpression(item)) {
-          const spreadType = this.inferType(item)
+          const spreadType = this.inferType(item, options).actual
           if (this.isClassType(spreadType)) types.push(new AnyTypeDescriptor())
           else if (this.isArrayType(spreadType)) types.push(spreadType.elementType)
           else types.push(spreadType)
-        } else types.push(this.inferType(item))
+        } else types.push(this.inferType(item, options).actual)
       })
       type = new ArrayTypeDescriptor(this.createUnionType(types))
     } else type = new AnyTypeDescriptor()
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of an object value from the given AST node.
    *
    * @param node - The AST node representing the object value.
-   * @returns A TypeDescription object representing the inferred type.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeObjectValue(node: ast.ObjectValue): TypeDescriptor {
+  static inferTypeObjectValue(node: ast.ObjectValue, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeObjectValue', node)
     const type = new ObjectTypeDescriptor(node)
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a given function value node.
    *
    * @param node - The function value node to infer the type for.
-   * @returns A `TypeDescription` representing the inferred type of the function value.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeFunctionValue(node: ast.FunctionValue): TypeDescriptor {
+  static inferTypeFunctionValue(node: ast.FunctionValue, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeFunctionValue', node)
     const type = this.createFunctionType(node)
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a given literal node.
    *
    * @param node - The AST literal node to infer the type from.
-   * @returns The inferred type description of the literal node.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
-  static inferTypeLiteral(node: ast.Literal): TypeDescriptor {
+  static inferTypeLiteral(node: ast.Literal, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeLiteral', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (typeof node.value == 'string') {
@@ -1853,14 +2065,15 @@ export class TypeSystem {
       type = new BooleanTypeDescriptor(node)
     }
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   /**
    * Infers the type of a given block node.
    *
    * @param node - The AST block node to infer the type from.
-   * @returns The inferred type description of the block node.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
    *
    * This function handles two cases:
    * 1. If the block is composed of multiple expressions (isBracket is true):
@@ -1871,7 +2084,7 @@ export class TypeSystem {
    *
    * Logs the process of type inference and any errors encountered.
    */
-  static inferTypeBlock(node: ast.Block): TypeDescriptor {
+  static inferTypeBlock(node: ast.Block, options?: InferOptions): InferResult {
     const extractReturns = (node: AstNode) => {
       // return AstUtils.streamAllContents(node).filter(ast.isReturnExpression).toArray()
       const result: ast.ReturnExpression[] = []
@@ -1903,7 +2116,7 @@ export class TypeSystem {
         // 스칼라스크립트는 타입스크립트의 type narrowing을 처리하기 위해서 타입스크립트와는 반대로 처리한다.
         // 실제 타입스크립트의 type narrowing을 그대로 구현하는 것은 매우 어려운 일일 뿐만 아니라 그렇게까지 할 필요가 없다.
         // 어떤 타입이 A, B 타입으로 구성되어져 있을 때 A인 경우와 B인 경우를 모두 처리하고 둘 중 하나라도 맞으면 그걸 사용하는 것이다.
-        const types: TypeDescriptor[] = returns.map(r => this.inferType(r))
+        const types: TypeDescriptor[] = returns.map(r => this.inferType(r, options).actual)
         const isReturnAtLast = ast.isReturnExpression(node.codes[node.codes.length - 1]) ? true : false
         if (!isReturnAtLast) types.push(new VoidTypeDescriptor())
         type = this.createUnionType(types)
@@ -1913,11 +2126,11 @@ export class TypeSystem {
       }
     } else {
       // Block이 단일 식인 경우 이 식의 타입을 리턴한다.
-      if (node.codes.length == 1) type = this.inferType(node.codes[0])
+      if (node.codes.length == 1) type = this.inferType(node.codes[0], options).actual
       else console.error(chalk.red('Block is not bracket but has multiple codes'))
     }
     exitLog(log, type)
-    return type
+    return { actual: type, formal: type }
   }
 
   //-----------------------------------------------------------------------------
@@ -1927,13 +2140,13 @@ export class TypeSystem {
   /**
    * Retrieves the chain of superclasses for a given class item.
    *
-   * @param classItem - The class item for which to retrieve the superclass chain.
+   * @param node - The class item for which to retrieve the superclass chain.
    * @returns An array of `ast.ClassDef` representing the chain of superclasses,
    *          starting from the given class item and following the `superClass` references.
    */
-  static getClassChain(classItem: ast.ClassDef): ast.ClassDef[] {
+  static getClassChain(node: ast.ClassDef): ast.ClassDef[] {
     const set = new Set<ast.ClassDef>()
-    let value: ast.ClassDef | undefined = classItem
+    let value: ast.ClassDef | undefined = node
     while (value && !set.has(value)) {
       set.add(value)
       value = value.superClass?.ref
@@ -2017,14 +2230,14 @@ export class TypeSystem {
       }[] = []
 
       if (node.previous) {
-        const prevType = this.inferType(node.previous)
+        const prevType = this.inferType(node.previous).actual
 
         gather.add('node.prev', node.previous.$cstNode?.text)
         gather.add('prevType', prevType.toString())
 
         if (this.isArrayType(prevType)) {
           // find는 변수나 함수로 정의되어져 있다.
-          funcType = this.inferType(nodeRef)
+          funcType = this.inferType(nodeRef).actual
           assert.ok(ast.isVariableDef(nodeRef) || ast.isFunctionDef(nodeRef), 'it is not valid definition')
           assert.ok(this.isFunctionType(funcType), `'${nodeName}' is not function`)
 
@@ -2041,7 +2254,7 @@ export class TypeSystem {
           } else gather.add('error1', `'${nodeName}'s grandContainer is not object`)
         } else if (this.isClassType(prevType)) {
           if (prevType.toString() == 'Map' || prevType.toString() == 'Set') {
-            funcType = this.inferType(nodeRef)
+            funcType = this.inferType(nodeRef).actual
             assert.ok(ast.isVariableDef(nodeRef) || ast.isFunctionDef(nodeRef), 'it is not valid definition')
             assert.ok(this.isFunctionType(funcType), `'${nodeName}' is not function`)
 
@@ -2063,7 +2276,7 @@ export class TypeSystem {
 
       // Array, Map, Set의 함수형 메서드가 아닌 일반 함수의 경우
       if (!isProcessed) {
-        const type = this.inferType(nodeRef)
+        const type = this.inferType(nodeRef).actual
 
         gather.add('isProcessed', 'now procesing')
         gather.add('type', type.toString())
@@ -2170,7 +2383,7 @@ export class TypeSystem {
         if (object && object.$container) {
           if (ast.isVariableDef(object.$container)) {
             const container = object.$container
-            const containerType = this.inferType(container)
+            const containerType = this.inferType(container).actual
             gather.add('fd.container.$type', container.$type)
             gather.add('fd.container.type', containerType.toString())
             // 해당 Binding이 소속된 ClassDef를 찾아서 해당 항목의 타입을 찾아야 한다.

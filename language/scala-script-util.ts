@@ -1,13 +1,13 @@
-import { AstNode, AstUtils } from 'langium'
+import { AstNode, isAstNode, AstUtils } from 'langium'
 import * as ast from './generated/ast.js'
-import { TypeDescriptor, TypeSystem } from './scala-script-types.js'
+import { InferResult, TypeDescriptor, TypeSystem } from './scala-script-types.js'
 import chalk from 'chalk'
 
 /**
  *
  */
 export namespace ScalaScriptCache {
-  const cache = new Map<AstNode, TypeDescriptor>()
+  const cache = new Map<AstNode, InferResult>()
 
   export function get(node: AstNode) {
     // for debugging...
@@ -15,7 +15,7 @@ export namespace ScalaScriptCache {
     return cache.get(node)
   }
 
-  export function set(node: AstNode, type: TypeDescriptor) {
+  export function set(node: AstNode, type: InferResult) {
     cache.set(node, type)
   }
 }
@@ -265,6 +265,24 @@ export function Dump(node: AstNode | undefined) {
 }
 
 /**
+ * Dumps the properties of an AST node to the console.
+ *
+ * @param node - The AST node to dump. If the node is undefined, the function returns immediately.
+ * 
+ * The function iterates over the entries of the node object. If a value is an object and is an AST node,
+ * it logs the name of the property, the type of the AST node, and the text of the CST node if available.
+ * Otherwise, it logs the name of the property and its value.
+ */
+export function Dump2(node: AstNode | undefined) {
+  if (!node) return
+  for (const [name, value] of Object.entries(node)) {
+    if (typeof value === 'object' && isAstNode(value)) {
+      console.log(`${name}: ${value?.$type}, '${value?.$cstNode?.text}'`)
+    } else console.log(`${name}: ${value}`)
+  }
+}
+
+/**
  * Finds a variable definition or parameter with the specified name within the given AST node and its ancestors.
  *
  * ClassDef의 name으로 property를 호출하면 static property만을 대상으로 해야 한다.
@@ -310,7 +328,7 @@ export function findFunctionDefWithName(node: AstNode | undefined, name: string 
   while (item) {
     const found = AstUtils.streamContents(item).find(i => {
       if (ast.isFunctionDef(i) && i.name === name) return true
-      if (ast.isVariableDef(i) && i.name === name && TypeSystem.isFunctionType(TypeSystem.inferType(i.value)))
+      if (ast.isVariableDef(i) && i.name === name && TypeSystem.isFunctionType(TypeSystem.inferType(i.value).actual))
         return true
       return false
     })

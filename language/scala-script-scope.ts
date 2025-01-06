@@ -122,13 +122,13 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
     //     return superScope
     //   }
     //   //console.log(chalk.blue(ref.name, ref.$cstNode?.text))
-    //   prevTypeDesc = TypeSystem.inferType(ref)
+    //   prevTypeDesc = TypeSystem.inferType(ref).actual
     // } else {
-    //   prevTypeDesc = TypeSystem.inferType(previous)
+    //   prevTypeDesc = TypeSystem.inferType(previous).actual
     // }
 
     // previous 의 타입을 추론한 결과가...
-    const prevTypeDesc = TypeSystem.inferType(previous)
+    const prevTypeDesc = TypeSystem.inferType(previous).actual
 
     let scope: Scope | undefined
     if (TypeSystem.isAnyType(prevTypeDesc)) {
