@@ -318,7 +318,7 @@ export class ScalaScriptValidator {
           // 인수가 파라미터보다 많을 때
           if (expr.args.length > paramCount) {
             errorMsg =
-              `checkCallChain: Function '${funcName}' has too many arguments.` +
+              `checkCallChain: Function '${funcName}' has too many arguments. ` +
               `type: ${type.toString()}, expr.args: ${expr.args.length}, paramCount: ${paramCount}`
           }
 
@@ -428,6 +428,7 @@ export class ScalaScriptValidator {
     const tr = right.toString()
     traceLog(`* checkAssignment result: ${tl} = ${tr}`)
 
+    // 할당문의 오른쪽이 왼쪽에 할당될 수 있는지 확인한다.
     if (!right.isAssignableTo(left)) {
       const msg = `checkAssignment: Type '${tr}' is not assignable to type '${tl}'.`
       accept('error', msg, {

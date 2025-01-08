@@ -90,14 +90,27 @@ describe('basic tests', () => {
    */
   test('test of assignment', async () => {
     const code = `
-var s = 'string'
-s = 2 // type error
-val n = 1
-n = 2 // val cannot be reassigned
+val n1              // error 2개
+val n2: number      // init error
+val n3: string = 1  // type error
+n1 = 1  // val cannot be reassigned, no hint error
+n2 = 1  // val cannot be reassigned
+n3 = 1  // val cannot be reassigned, type error
+var s1  // no hint error
+var s2: number
+var s3: string = 1  // type error
+s1 = 1  // type error
+s2 = 1
+s3 = 1  // type error
 // 하지만 배열의 경우는 val로 선언되어도 내부 값을 변경할 수 있다.
 val ary = [1, 2, 3]
 ary = [4, 5, 6] // error
 ary[0] = 4
+// tokens는 split의 리턴타입인 string[]이 자신의 타입이며 할당이 가능해야 한다. 
+var tokens = 'command'.split(' ')
+tokens = tokens.filter(token => token != '')
+val tokens2 = 'command'.split(' ')
+tokens2 = tokens.filter(token => token != '') // error
 `
     const document = await parse(code)
     expect(
@@ -105,7 +118,8 @@ ary[0] = 4
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(3)
+    // expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(15)
+    expect(document?.diagnostics?.length).toBe(15)
   })
 
   /**
@@ -150,7 +164,7 @@ let f = (a: number) => {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
 
     expect(
       document.parseResult?.value.codes
@@ -199,7 +213,7 @@ let n = function() {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
 
     expect(
       document.parseResult?.value.codes
@@ -236,7 +250,7 @@ var f2: () -> number[] = () => [1, 2, 3]
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
 
     const code0 = document.parseResult.value.codes[0]
     const type0 = TypeSystem.inferType(code0).actual as FunctionTypeDescriptor
@@ -348,7 +362,7 @@ val getAllTech = () => {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 
   test('test of array, map, set - error cases', async () => {
@@ -477,7 +491,7 @@ vehicle.run = () => console.log('fast run on the rail')`
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
 
     expect(
       document.parseResult?.value.codes
@@ -563,7 +577,7 @@ val 보유기술: ChainPrompt = {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 
   /**
@@ -645,7 +659,7 @@ printSaleDetail('01-01', (corp, sale) => {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 
   test('test of function parameter type check - error cases', async () => {
@@ -715,7 +729,7 @@ class ToClass {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
 
     expect(
       document.parseResult?.value.codes
@@ -760,7 +774,7 @@ def Corp2 = {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 
   test('test of static method - error cases', async () => {
@@ -815,7 +829,7 @@ def Corp = {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 
   /**
@@ -847,7 +861,7 @@ def child extends parents = {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 
   /**
@@ -906,7 +920,7 @@ val TC04 = () => {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 
   test('test of class comparison - error cases', async () => {
@@ -1018,7 +1032,7 @@ console.log(overrideTest.get32())
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 
   /**
@@ -1053,6 +1067,6 @@ static val smartlog = (msg: string = '') => {
         s`Parser errors: ${document.parseResult.parserErrors.map(e => e.message).join('\n')}`
     ).toBe(0)
     expect(document.parseResult.value === undefined && `ParseResult is 'undefined'.`).not.toBeUndefined()
-    expect(document?.diagnostics?.length).toBe(0)
+    expect(document?.diagnostics?.length && document?.diagnostics?.map(diagnosticToString)?.join('\n')).toBe(0)
   })
 })

@@ -899,7 +899,7 @@ export class TypeSystem {
     const type = new FunctionTypeDescriptor(node)
 
     // 명시된 리턴 타입이 있으면 이를 근거로 한다.
-    // 명시된 리턴 타입도 없으면 함수의 바디를 근거로 한다.
+    // 명시된 리턴 타입이 없으면 함수의 바디를 근거로 한다.
     // 명시된 리턴 타입도 없고 함수의 바디도 없으면 void type으로 간주한다
     type.returnType = new VoidTypeDescriptor()
     if (node.returnType) type.returnType = this.inferType(node.returnType).actual
@@ -1172,6 +1172,7 @@ export class TypeSystem {
       ScalaScriptCache.set(node, result)
     }
     exitLog(log, result?.actual)
+    // console.log(chalk.yellow(`inferType(${node.$type}): ${result?.actual.toString()}, ${result?.formal?.toString()}`))
     return result
   }
 
@@ -1189,11 +1190,13 @@ export class TypeSystem {
    */
   static inferTypeTypes(node: ast.Types, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeTypes', node)
-    const ts = node.types.map(t => this.inferType(t, options).actual)
+    const al = node.types.map(t => this.inferType(t, options).actual)
+    const fl = node.types.map(t => this.inferType(t, options).formal ?? this.inferType(t, options).actual)
     // 실제 Union 타입이 아니면 처리를 단순화하기 위해 개별 타입으로 리턴한다.
-    const type = this.createUnionType(ts)
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    const actual = this.createUnionType(al)
+    const formal = this.createUnionType(fl)
+    exitLog(log, actual)
+    return { actual, formal }
   }
 
   /**
@@ -1264,69 +1267,78 @@ export class TypeSystem {
     return { actual: type, formal: type }
   }
 
-  /*
-    타입이 명시되어진 경우라도 값에서 더 유용한 타입을 추론할 수 있다.
-    예를 들면 명시된 타입이 union인 경우 실제 값의 타입이 union 자체보다 유용하다.
-    하지만 항상 그런 것은 아니다. 값의 타입이 any인 경우나 유효하지 않은 경우에는 명시된 타입을 더 유용하다.
-
-    값의 타입을 추론하는 것은 신중하게 처리되어야 한다. 왜냐하면 값으로 방대하고 복잡한 오브젝트가
-    올 수도 있는데 때때로 이것은 recursive definition을 유발할 수도 있기 때문이다.
-    ```
-    val 보유기술: ChainPrompt = {
-      prompt: '추가할 기술?'
-      callback: (corp, options) => { console.log(corp.name, options) }
-      nextChain: { prompt: '기술수준?' }
-    }
-    ```
-    위 코드에서 `corp.name`에서 `corp`의 타입을 추론하려고 parameter인 `corp`를 추론하려고 하는데
-    이 parameter `corp`는 `callback`을 알아야 하고 `callback`은 `ChainPrompt`를 알아야 해결될 수 있다.
-    여기까지는 문제가 안되는데 `VariableDef`인 `val 보유기술: ChainPrompt = {...}` 에서 `value`를 추론하면
-    `callback`의 parameter `corp`에 대해 다시 알아야 하고 처음 과정이 아직 끝난 상태가 아니기 때문에
-    recursive definition이 발생한다.
-
-    아울러 값이 있는 경우에는 값 자체를 TypeDescriptor의 node로 사용하는 것이 더 유용하다.
-    이것은 해당 변수에 값이 할당되어졌는지를 확인할 때도 유용하고 변수의 실제 값을 나중에 참조할 수 있다.
-  */
   /**
    * Infers the type of a variable definition node.
-   *
+   * 
+   * 타입이 명시되어진 경우라도 값에서 더 유용한 타입을 추론할 수 있다.
+   * 예를 들면 명시된 타입이 union인 경우 실제 값의 타입이 union 자체보다 유용하다.
+   * 하지만 항상 그런 것은 아니다. 값의 타입이 any인 경우나 유효하지 않은 경우에는 명시된 타입을 더 유용하다.
+   * 
+   * 값의 타입을 추론하는 것은 신중하게 처리되어야 한다. 왜냐하면 값으로 방대하고 복잡한 오브젝트가
+   * 올 수도 있는데 때때로 이것은 recursive definition을 유발할 수도 있기 때문이다.
+   * ```
+   * val 보유기술: ChainPrompt = {
+   *   prompt: '추가할 기술?'
+   *   callback: (corp, options) => { console.log(corp.name, options) }
+   *   nextChain: { prompt: '기술수준?' }
+   * }
+   * ```
+   * 위 코드에서 `corp.name`에서 `corp`의 타입을 추론하려고 parameter인 `corp`를 추론하려고 하는데
+   * 이 parameter `corp`는 `callback`을 알아야 하고 `callback`은 `ChainPrompt`를 알아야 해결될 수 있다.
+   * 여기까지는 문제가 안되는데 `VariableDef`인 `val 보유기술: ChainPrompt = {...}` 에서 `value`를 추론하면
+   * `callback`의 parameter `corp`에 대해 다시 알아야 하고 처음 과정이 아직 끝난 상태가 아니기 때문에
+   * recursive definition이 발생한다.
+   * 
+   * 아울러 값이 있는 경우에는 값 자체를 TypeDescriptor의 node로 사용하는 것이 더 유용하다.
+   * 이것은 해당 변수에 값이 할당되어졌는지를 확인할 때도 유용하고 변수의 실제 값을 나중에 참조할 수 있다.
+   * 
    * @param node - The variable definition node to infer the type for.
    * @param options - Optional inference options that may influence the type inference process.
    * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
   static inferTypeVariableDef(node: ast.VariableDef, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeVariableDef', undefined, node.name)
-    let type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
+    const type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
+    let result: InferResult = { actual: type, formal: type }
     if (node.type) {
-      type = this.inferType(node.type, options).actual
+      result = this.inferType(node.type, options)
       // 명시된 타입만 있고 값이 없는 경우 명시된 타입을 사용한다.
       if (node.value) {
         // 명시된 타입도 있고 값도 있는 경우
         // 값의 타입을 사용하는 경우를 union으로 선언되어진 경우와 primitive type인 경우만으로 한정한다.
         // isAssignableTo()를 호출하지 않아도 deep한 추론을 하지 않기 때문에 위에서 말한 문제점을 줄일 수 있다.
-        if (this.isUnionType(type)) {
+        // 아울러 위에서 설정된 result의 actual, formal을 변경하면 node.type 자체의 정보가 변경되기 때문에 주의해야 한다.
+        result = { actual: result.actual, formal: result.formal }
+        if (this.isUnionType(result.actual)) {
           const valueType = this.inferType(node.value, options).actual
-          traceLog(`명시된 타입: ${type.toString()}, 값의 타입: ${valueType.toString()}`)
+          traceLog(`명시된 타입: ${result.actual.toString()}, 값의 타입: ${valueType.toString()}`)
           if (this.isAnyType(valueType)) {
             // do nothing
-            // } else if (!valueType.isAssignableTo(type)) {
+            // } else if (!valueType.isAssignableTo(result.actual)) {
             //   const msg =
             //     `Variable '${node.name}' value '${valueType.toString()}' is not assignable to ` +
-            //     `type '${type.toString()}'`
+            //     `type '${result.actual.toString()}'`
             //   console.error(chalk.red(msg))
-          } else type = valueType
-        } else if (this.isStringType(type) || this.isNumberType(type) || this.isBooleanType(type)) {
-          type = this.inferType(node.value, options).actual
+          } else result.actual = valueType
         }
       }
     }
     // 명시된 타입없이 값만 있는 경우 값을 보고 타입을 추론한다.
     else if (node.value) {
-      type = this.inferType(node.value, options).actual
-      traceLog('명시된 타입없이 value만으로 추론:', type.toString())
+      result = this.inferType(node.value, options)
+      traceLog('명시된 타입없이 value만으로 추론:', node.name)
+      traceLog(`  actual: ${result.actual.toString()}`)
+      traceLog(`  formal: ${result.formal?.toString()}`)
+
+      // FunctionValue는 formal을 사용해야 하므로 그대로 두고 나머지는 formal을 actual로 대체한다.
+      if (ast.isFunctionValue(node.value)) {
+        // do nothing
+      } else {
+        result = { actual: result.actual, formal: result.actual }
+      }
     }
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    exitLog(log, result.actual)
+    return result
   }
 
   /**
@@ -1379,18 +1391,24 @@ export class TypeSystem {
     let actual = type
     let formal = type
     if (element) {
-      type = this.inferType(element, options).actual
+      // 이 함수에서 InferResult 객체를 직접 사용하지 않고 actual과 formal을 사용하는 이유는
+      // InferResult 객체를 사용하면 `result.actual = type.elementType`와 같이 할당할 때
+      // element의 타입이 변경되기 때문이다.
+      const result = this.inferType(element, options)
+      actual = result.actual
+      formal = result.formal || result.actual
+      type = result.actual
 
       // CallChain은 변수, 함수, 배열등을 모두 포함할 수 있다.
       // 이것의 타입이 무엇인가를 결정할 때는 context가 중요하다.
-      // 이에 대한 자세한 설명은 InferResult의 주석을 참조한다.
+      // 이에 대한 자세한 설명은 InferResult의 주석 [[al=0bdb2c40b449f29baae9fee9ce472d96]]을 참조한다.
 
       if (this.isArrayType(type) && node.isArray) {
         // 배열 호출이면 배열 요소가 리턴되어야 한다.
         // 즉 `ary[0]`의 타입은 `array<number>`가 아니라 `number`이어야 한다.
         traceLog('배열 호출', type.elementType.toString())
         actual = type.elementType
-        formal = type
+        formal = type.elementType
       } else if (this.isFunctionType(type) && node.isFunction) {
         const detectGeneric = (type: TypeDescriptor): boolean => {
           if (this.isGenericType(type)) return true
@@ -1482,21 +1500,17 @@ export class TypeSystem {
             } else {
               console.error(chalk.red('inferTypeCallChain: previous is not array, map, set'), previous.toString())
             }
-            // for debugging...
-            // console.log('replaceGeneric:', chalk.green(type.toString()))
-            actual = formal = type
-            if (this.isFunctionType(type)) actual = type.returnType
           }
-        } else {
-          // 일반적인 함수 호출이면 함수의 리턴 타입을 리턴
-          traceLog('함수 호출', element.name, type.toString())
-          actual = type.returnType
-          formal = type
         }
-      } else {
-        // for debugging...
-        // console.log(`inferTypeCallChain: ${element.name}, '${node.$cstNode?.text}'`, chalk.green(type.toString()))
+        // Generic, 일반 함수 모두 actual은 함수의 리턴 타입을 리턴하고 formal은 함수의 자체 타입을 리턴한다.
+        // console.log(`함수: ${element.name}, '${node.$cstNode?.text}'`, chalk.green(type.toString()))
         actual = formal = type
+        if (this.isFunctionType(type)) actual = type.returnType
+      } else {
+        // 배열과 함수가 아닌 나머지 CallChain의 처리
+        // console.log(`나머지: ${element.name}, '${node.$cstNode?.text}'`, chalk.green(type.toString()))
+        actual = type
+        // formal = type
       }
     }
 
@@ -1571,15 +1585,17 @@ export class TypeSystem {
    */
   static inferTypeParameter(node: ast.Parameter, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeParameter', undefined, node.name)
-    let type: TypeDescriptor = new AnyTypeDescriptor()
-    if (node.type) type = this.inferType(node.type, options).actual
-    else if (node.value) type = this.inferType(node.value, options).actual
+    const any: TypeDescriptor = new AnyTypeDescriptor()
+    let result: InferResult = { actual: any, formal: any }
+    if (node.type) result = this.inferType(node.type, options)
+    else if (node.value) result = this.inferType(node.value, options)
     else {
       // 파라미터의 타입이 명시되어 있지 않고 값도 없는 경우
       // 파라미터의 타입을 추론하기 위해서는 함수 자체에 대한 정보가 필요하다.
       // inferType()를 호출할때 cache를 사용하지 않으면 recursive definition이 발생할 수 있다.
       // inferType().formal은 함수 자체에 대한 정보를 리턴하기 때문에 파라미터와 함수의 인수들을 매치하는 작업이 필요하다.
       // node.$container.$container가 쓰인 이유는 [이 문서](/.prism/docs/d064613466b71eae97f19e05193accdf.md)을 참고한다.
+      let type: TypeDescriptor = new AnyTypeDescriptor()
       const funcNode = node.$container.$container
       const funcType = this.inferType(funcNode, { ...options, cache: new Map() }).formal
       if (!funcType) {
@@ -1628,9 +1644,10 @@ export class TypeSystem {
       } else {
         console.error(chalk.red('inferTypeParameter:'), 'funcType is not valid type')
       }
+      result = { actual: type, formal: type }
     }
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    exitLog(log, result.actual)
+    return result
   }
 
   /**
@@ -1642,9 +1659,9 @@ export class TypeSystem {
    */
   static inferTypeProperty(node: ast.Property, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeProperty', undefined, node.name)
-    const type = this.inferType(node.type, options).actual
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    const result = this.inferType(node.type, options)
+    exitLog(log, result.actual)
+    return result
   }
 
   /**
@@ -1663,10 +1680,33 @@ export class TypeSystem {
     const log = enterLog('inferTypeBinding', node)
     // Binding에는 value가 없을수는 없지만 없으면 nil type으로 취급한다.
     //todo 타입스크립트에서는 name과 value가 동일하면 하나만 사용할 수 있는데 스칼라스크립트에서는 아직 그렇지 않다.
-    let type: TypeDescriptor = new NilTypeDescriptor()
-    if (node.value) type = this.inferType(node.value, options).actual
+    const type: TypeDescriptor = new NilTypeDescriptor()
+    let result: InferResult = { actual: type, formal: type }
+    if (node.value) result = this.inferType(node.value, options)
 
     // Binding 되어진 람다 함수 처리 부분
+    // Binding 내부에 Binding이 포함될 수 있다.
+    // 따라서 `findBindingRootDef()`는 중첩된 Binding을 따라가면서 Binding이 정의된 definition을 찾는다.
+    // 간단히 아래와 같이 한번만 Binding되어진 경우는 비교적 간단하다.
+    // ```
+    // var prompt: ChainPrompt = {
+    //   prompt: (options) => { return options }
+    // }
+    // ```
+    // 이 경우는 인수로 전달되는 node는 `prompt: (options) => { return options }` 으로
+    // `options`의 타입을 추론하기 위해서는 `inferTypeParameter()`에서 `options`의 $container.$container인
+    // (여기서는 FunctionValue의 container인 Binding임)을 이 함수에 전달하고 다시 그것의 container가
+    // 변수 선언인 경우이다.
+    // 하지만 다음과 같이 상위 노드가 또 다른 Binding인 경우에는
+    // ```
+    // nextChain: {
+    //   prompt: (options) => { return options }
+    // }
+    // ```
+    // node에서 시작해서 VariableDef가 나올때까지 node의 타입이 무엇인지를 검사해야 한다.
+    // 상위 노드로 가면 node는 달라질 수 있다. 즉 위에서 처음 시작은 prompt이지만
+    // prompt를 포함하는 상위 binding의 이름이 nextChain이면
+    // 다음번 찾기는 nextChain으로 찾는다는 의미이다.
     const findBindingRootDef = (node: AstNode): TypeDescriptor | undefined => {
       const property = ast.isBinding(node) ? node.element : ''
       if (!property) {
@@ -1696,16 +1736,17 @@ export class TypeSystem {
     const propType = findBindingRootDef(node)
     if (propType && this.isFunctionType(propType)) {
       // propType.showDetailInfo()
-      if (propType) type = propType
+      if (propType) result = { actual: propType, formal: propType }
     }
 
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    exitLog(log, result.actual)
+    return result
   }
 
   /**
    * Infers the type of the elements in a `for...of` loop.
-   * 이 함수는 for(a <- ary)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
+   * 
+   * 이 함수는 `for(a <- ary)`와 같이 정의되어진 후 `a`를 참조하게 되면 `a`의 타입을 추론할때 사용된다.
    *
    * @param node - The AST node representing the `for...of` loop.
    * @param options - Optional inference options that may influence the type inference process.
@@ -1713,15 +1754,18 @@ export class TypeSystem {
    */
   static inferTypeForOf(node: ast.ForOf, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeForOf', node)
-    let type = this.inferType(node.of, options).actual
-    if (this.isArrayType(type)) type = type.elementType
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    const result = this.inferType(node.of, options)
+    let actual = result.actual
+    let formal = result.formal
+    if (this.isArrayType(actual)) actual = actual.elementType
+    exitLog(log, actual)
+    return { actual, formal }
   }
 
   /**
    * Infers the type for a `ForTo` node.
-   * 이 함수는 for(a <- 1 (to | until) 10)와 같이 정의되어진 후 a를 참조하게 되면 a의 타입을 추론할때 사용된다.
+   * 
+   * 이 함수는 `for(a <- 1 (to | until) 10)`와 같이 정의되어진 후 `a`를 참조하게 되면 `a`의 타입을 추론할때 사용된다.
    *
    * @param node - The `ForTo` AST node to infer the type for.
    * @param options - Optional inference options that may influence the type inference process.
@@ -1729,11 +1773,11 @@ export class TypeSystem {
    */
   static inferTypeForTo(node: ast.ForTo, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeForTo', node)
-    let e1 = this.inferType(node.e1, options).actual
-    let e2 = this.inferType(node.e1, options).actual
-    if (this.isNumberType(e1) && this.isNumberType(e2)) {
-      exitLog(log, e1)
-      return { actual: e1, formal: e1 }
+    const e1 = this.inferType(node.e1, options)
+    const e2 = this.inferType(node.e2, options)
+    if (this.isNumberType(e1.actual) && this.isNumberType(e2.actual)) {
+      exitLog(log, e1.actual)
+      return e1
     }
     const type = new ErrorTypeDescriptor('ForTo loop must have number types', node)
     exitLog(log, type)
@@ -1753,11 +1797,12 @@ export class TypeSystem {
    */
   static inferTypeAssignment(node: ast.Assignment, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeAssignment', node)
-    let type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
-    if (node.assign) type = this.inferType(node.assign, options).actual
-    else if (node.value) type = this.inferType(node.value, options).actual
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    const type: TypeDescriptor = new ErrorTypeDescriptor('No type hint for this element', node)
+    let result: InferResult = { actual: type, formal: type }
+    if (node.assign) result = this.inferType(node.assign, options)
+    else if (node.value) result = this.inferType(node.value, options)
+    exitLog(log, result.actual)
+    return result
   }
 
   /**
@@ -1769,24 +1814,26 @@ export class TypeSystem {
    */
   static inferTypeIfExpression(node: ast.IfExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeIfExpression', node)
-    let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     if (!node.then) {
+      const type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
       console.error(chalk.red('IfExpression has no then node'))
       exitLog(log, type)
       return { actual: type, formal: type }
     }
-    type = this.inferType(node.then, options).actual
+    const result = this.inferType(node.then, options)
+    let actual = result.actual
+    let formal = result.formal
 
     // IfExpression에 else가 있으면 then과 else의 타입을 비교해서 union type으로 만든다.
     // 그렇지 않은 모든 경우는 then의 타입을 그대로 사용한다.
     if (node.else) {
       const elseType = this.inferType(node.else, options).actual
-      if (!type.isEqual(elseType)) {
-        type = this.createUnionType([type, elseType])
+      if (!actual.isEqual(elseType)) {
+        actual = this.createUnionType([actual, elseType])
       }
     }
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    exitLog(log, actual)
+    return { actual, formal }
   }
 
   /**
@@ -1818,9 +1865,9 @@ export class TypeSystem {
    */
   static inferTypeGroupExpression(node: ast.GroupExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeGroupExpression', node)
-    const type = this.inferType(node.value, options).actual
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    const result = this.inferType(node.value, options)
+    exitLog(log, result.actual)
+    return result
   }
 
   /**
@@ -1838,15 +1885,17 @@ export class TypeSystem {
       else if (node.operator === '-' || node.operator === '+') type = new NumberTypeDescriptor(node)
       else if (node.operator === '!' || node.operator === 'not') type = new BooleanTypeDescriptor(node)
       else type = new ErrorTypeDescriptor(`Unknown unary operator: ${node.operator}`)
-    } else type = this.inferType(node.value, options).actual
-    exitLog(log, type)
-    return { actual: type, formal: type }
+
+      exitLog(log, type)
+      return { actual: type, formal: type }
+    }
+    return this.inferType(node.value, options)
   }
 
   /**
    * Infers the type of a binary expression node.
    * 
-   * `inferAssignment()`와 마찬가지로 이 함수도 `Validator`의 `CheckBinaryExpression()`에서 좌변과 우변을 따로
+   * `inferAssignment()`와 마찬가지로 이 함수도 validator의 `CheckBinaryExpression()`에서 좌변과 우변을 따로
    * 추론하기 때문에 `1 + 2 * 3` 같이 이항 연산자가 연속적인 경우에만 호출되며 심지어 실제 타입을 리턴하지도 않는다.
    * 실제 타입을 리턴하지 않는 이유는 실제 타입을 힘들게(경우에 따라서는 이것은 비용이 많이 들수도 있고 심지어 
    * 재귀호출 문제를 발생시킬 수도 있다) 구할 필요가 없기 때문이다.
@@ -1857,7 +1906,7 @@ export class TypeSystem {
 
    * 연산자에 적합한 타입인지의 여부를 검사하는 것은 validator에서 하고 최종적으로 연산의 각 항목(`1 + 2`에서 `1`, `2`)은
    * unary, literal, callchain등으로 표현되기 때문에 사실 이 함수 자체가 거의 무의미하다. 하지만 이항 연산자가 연속인
-   * 경우에 이 함수는 꼭 필요하며 여기서 적절한 타입을 리턴하지 않으면 Validator에서 바로 에러가 되어 버린다.
+   * 경우에 이 함수는 꼭 필요하며 여기서 적절한 타입을 리턴하지 않으면 validator에서 바로 에러가 되어 버린다.
    *
    * @param node - The binary expression AST node to infer the type for.
    * @param options - Optional inference options that may influence the type inference process.
@@ -1901,10 +1950,11 @@ export class TypeSystem {
    */
   static inferTypeReturnExpression(node: ast.ReturnExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeReturnExpression', node)
-    let type: TypeDescriptor = new VoidTypeDescriptor()
-    if (node.value) type = this.inferType(node.value, options).actual
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    const type: TypeDescriptor = new VoidTypeDescriptor()
+    let result: InferResult = { actual: type, formal: type }
+    if (node.value) result = this.inferType(node.value, options)
+    exitLog(log, result.actual)
+    return result
   }
 
   /**
@@ -1919,12 +1969,11 @@ export class TypeSystem {
    */
   static inferTypeSpreadExpression(node: ast.SpreadExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeSpreadExpression', node)
-    let type: TypeDescriptor = new AnyTypeDescriptor()
-    if (node.spread && node.spread.ref) {
-      type = this.inferType(node.spread.ref, options).actual
-    }
-    exitLog(log, type)
-    return { actual: type, formal: type }
+    const type: TypeDescriptor = new AnyTypeDescriptor()
+    let result: InferResult = { actual: type, formal: type }
+    if (node.spread && node.spread.ref) result = this.inferType(node.spread.ref, options)
+    exitLog(log, result.actual)
+    return result
   }
 
   /**
