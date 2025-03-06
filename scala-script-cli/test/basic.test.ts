@@ -90,22 +90,22 @@ describe('basic tests', () => {
    */
   test('test of assignment', async () => {
     const code = `
-val n1              // error 2개
+val n1              // no hint error, init error
 val n2: number      // init error
 val n3: string = 1  // type error
-n1 = 1  // val cannot be reassigned, no hint error
-n2 = 1  // val cannot be reassigned
-n3 = 1  // val cannot be reassigned, type error
-var s1  // no hint error
+n1 = 1              // val cannot be reassigned, no hint error
+n2 = 1              // val cannot be reassigned
+n3 = 1              // val cannot be reassigned, type error
+var s1              // no hint error
 var s2: number
 var s3: string = 1  // type error
-s1 = 1  // type error
+s1 = 1              // type error
 s2 = 1
-s3 = 1  // type error
-// 하지만 배열의 경우는 val로 선언되어도 내부 값을 변경할 수 있다.
+s3 = 1              // type error
+// 배열의 경우는 val로 선언되어도 내부 값을 변경할 수 있다.
 val ary = [1, 2, 3]
-ary = [4, 5, 6] // error
-ary[0] = 4
+ary = [4, 5, 6]     // error
+ary[0] = 4          // possible
 // tokens는 split의 리턴타입인 string[]이 자신의 타입이며 할당이 가능해야 한다. 
 var tokens = 'command'.split(' ')
 tokens = tokens.filter(token => token != '')

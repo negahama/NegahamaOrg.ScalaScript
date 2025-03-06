@@ -80,6 +80,8 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
     result += transpileThrowStatement(stmt, indent)
   } else if (ast.isTryCatchStatement(stmt)) {
     result += transpileTryCatchStatement(stmt, indent)
+  } else if (ast.isImportStatement(stmt)) {
+    result += transpileImportStatement(stmt, indent)
   } else if (ast.isContinue(stmt)) {
     result += 'continue'
   } else if (ast.isBreak(stmt)) {
@@ -465,17 +467,16 @@ function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
   if (stmt.annotate == 'NotTrans') return result
   if (stmt.export) result += 'export '
 
-  // body 에 함수나 할당문, 초기값을 가지는 변수 선언문이 있으면 class가 된다.
+  // body에 내용을 가지는 함수나 초기값을 가지는 변수 선언문이 있으면 class가 된다.
   let isInterface = true
   stmt.body.elements.forEach(m => {
-    if (ast.isFunctionDef(m) || ast.isAssignment(m)) isInterface = false
-    if (ast.isVariableDef(m) && m.value) isInterface = false
+    if ((ast.isFunctionDef(m) && m.body) || (ast.isVariableDef(m) && m.value)) isInterface = false
   })
 
   if (isInterface) {
     result += `interface ${stmt.name}`
-    result += generateGeneric(stmt.generic, indent)
-    result += ' {\n'
+    result += generateGeneric(stmt.generic, indent) + ' '
+    result += '{\n'
   } else {
     result += `class ${stmt.name}`
     result += generateGeneric(stmt.generic, indent) + ' '
@@ -494,6 +495,7 @@ function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
     }
     result += '\n'
   })
+
   result += '}'
   return result
 }
@@ -521,10 +523,9 @@ function transpileForStatement(stmt: ast.ForStatement, indent: number): string {
   let forIndent = indent
   stmt.iterators.forEach((iter, idx) => {
     const name = iter.name
+    let text = ''
     if (ast.isForOf(iter)) {
-      const text = `for (const ${name} of ${generateExpression(iter.of, indent)}) `
-      if (idx == 0) result += text
-      else result += applyIndent(forIndent, text)
+      text = `for (const ${name} of ${generateExpression(iter.of, indent)}) `
     } else {
       const e1 = generateExpression(iter.e1, indent)
       const e2 = generateExpression(iter.e2, indent)
@@ -537,10 +538,9 @@ function transpileForStatement(stmt: ast.ForStatement, indent: number): string {
           step = `${name} -= ${-iter.stepValue}`
         }
       }
-      const text = `for (let ${name} = ${e1}; ${name} ${mark} ${e2}; ${step}) `
-      if (idx == 0) result += text
-      else result += applyIndent(forIndent, text)
+      text = `for (let ${name} = ${e1}; ${name} ${mark} ${e2}; ${step}) `
     }
+    result += applyIndent(idx == 0 ? 0 : forIndent, text)
     if (idx < stmt.iterators.length - 1) {
       result += '{\n'
       forIndent++
@@ -608,6 +608,20 @@ function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number)
 }
 
 /**
+ * Transpiles an import statement from an abstract syntax tree (AST) node into a TypeScript import statement string.
+ *
+ * @param stmt - The import statement AST node to transpile.
+ * @param indent - The number of indentation levels to apply to the generated import statement.
+ * @returns The transpiled import statement as a string.
+ */
+function transpileImportStatement(stmt: ast.ImportStatement, indent: number): string {
+  let result = 'import '
+  result += '{ ' + stmt.import.map(e => e).join(', ') + ' } '
+  result += 'from ' + stmt.path
+  return result
+}
+
+/**
  * Transpiles a bypass statement by removing specific patterns from the bypass string.
  *
  * @param stmt - The bypass statement to be transpiled.
@@ -657,7 +671,7 @@ function transpileAssignment(expr: ast.Assignment, indent: number): string {
     }
     ```
     위의 코드는 스칼라스크립트에서는 정상적인 구문이지만 타입스크립트에서는 에러이다.
-    왜냐하면 person은 { name: string, age: number } 타입을 가지고 있는데 age가 없는 객체를 할당하고 있기 때문이다.
+    왜냐하면 `person`은 `{ name: string, age: number }` 타입을 가지고 있는데 `age`가 없는 객체를 할당하고 있기 때문이다.
     스칼라스크립트는 이런 경우에는 다음과 같이 변경한다. 즉 개별 항목별로 설정하도록 변경한다.
     ```
     person.name = 'samuel'
@@ -679,6 +693,7 @@ function transpileAssignment(expr: ast.Assignment, indent: number): string {
     }
   }
 
+  // 위 경우가 아니라면 간단하다.
   if (!transpiled) {
     const name = generateExpression(expr.assign, indent)
     result += `${name} ${expr.operator} ${generateExpression(expr.value, indent)}`
@@ -1031,7 +1046,7 @@ function transpileObjectValue(expr: ast.ObjectValue, indent: number): string {
     if (item.spread) {
       value = `${item.$cstNode?.text},\n`
     } else {
-      value = item.element + ': ' + (item.value ? generateExpression(item.value, indent + 1) : '') + ',\n'
+      value = item.name + ': ' + (item.value ? generateExpression(item.value, indent + 1) : '') + ',\n'
     }
     result += applyIndent(indent + 1, value)
   })
@@ -1103,25 +1118,23 @@ function generateSimpleType(expr: ast.SimpleType, indent: number): string {
       result += '\n'
     })
     result += applyIndent(indent, '}')
-  } else if (ast.isElementType(expr)) {
-    if (ast.isFunctionType(expr)) {
-      result += generateFunction({
-        params: expr.params,
-        returnType: expr.returnType,
-        returnDelimiter: '=>',
-        indent,
-      })
-    } else if (ast.isPrimitiveType(expr)) {
-      // nil 만 undefined로 바꿔준다.
-      if (expr.type == 'nil') result += 'undefined'
-      else result += expr.type
-    } else if (ast.isRefType(expr)) {
-      if (expr.reference) {
-        result += expr.reference.$refText
-        result += generateGeneric(expr.generic, indent)
-      }
-    } else result += 'internal error in generateSimpleType(elementType)'
-  }
+  } else if (ast.isFunctionType(expr)) {
+    result += generateFunction({
+      params: expr.params,
+      returnType: expr.returnType,
+      returnDelimiter: '=>',
+      indent,
+    })
+  } else if (ast.isPrimitiveType(expr)) {
+    // nil 만 undefined로 바꿔준다.
+    if (expr.type == 'nil') result += 'undefined'
+    else result += expr.type
+  } else if (ast.isRefType(expr)) {
+    if (expr.reference) {
+      result += expr.reference.$refText
+      result += generateGeneric(expr.generic, indent)
+    }
+  } else result += 'internal error in generateSimpleType(elementType)'
   return result
 }
 

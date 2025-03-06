@@ -268,7 +268,7 @@ export function Dump(node: AstNode | undefined) {
  * Dumps the properties of an AST node to the console.
  *
  * @param node - The AST node to dump. If the node is undefined, the function returns immediately.
- * 
+ *
  * The function iterates over the entries of the node object. If a value is an object and is an AST node,
  * it logs the name of the property, the type of the AST node, and the text of the CST node if available.
  * Otherwise, it logs the name of the property and its value.

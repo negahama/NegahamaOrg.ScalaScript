@@ -21,7 +21,7 @@ import {
 import { CancellationToken } from 'vscode-languageserver'
 import { ScalaScriptAstType } from '../../language/generated/ast.js'
 import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from '../../language/generated/module.js'
-import { ScalaScriptScopeProvider } from '../../language/scala-script-scope.js'
+import { ScalaScriptScopeComputation, ScalaScriptScopeProvider } from '../../language/scala-script-scope.js'
 import { ScalaScriptValidator } from '../../language/scala-script-validator.js'
 import { ScalaScriptWorkspaceManager } from './scala-script-workspace.js'
 
@@ -76,6 +76,7 @@ export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServic
   },
   references: {
     ScopeProvider: services => new ScalaScriptScopeProvider(services),
+    ScopeComputation: services => new ScalaScriptScopeComputation(services),
   },
 }
 
@@ -130,6 +131,7 @@ export function registerValidationChecks(services: ScalaScriptServices) {
     ObjectValue: validator.checkClassDef,
     ArrayValue: validator.checkArrayValue,
     ForStatement: validator.checkForStatement,
+    ImportStatement: validator.checkImportStatement,
     CallChain: validator.checkCallChain,
     Assignment: validator.checkAssignment,
     IfExpression: validator.checkIfExpression,

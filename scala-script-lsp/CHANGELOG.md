@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.7 - March 6, 2025
+
+- support import statement
+- refactoring and bug fix
+- allow comma to append in end of array 
+
 ### 0.6.6 - January 4, 2025
 
 - bug fix

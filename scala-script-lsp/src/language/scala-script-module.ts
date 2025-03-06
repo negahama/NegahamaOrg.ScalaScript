@@ -29,7 +29,7 @@ import {
 } from 'langium/lsp'
 import { ScalaScriptAstType } from '../../../language/generated/ast.js'
 import { ScalaScriptGeneratedModule, ScalaScriptGeneratedSharedModule } from '../../../language/generated/module.js'
-import { ScalaScriptScopeProvider } from '../../../language/scala-script-scope.js'
+import { ScalaScriptScopeComputation, ScalaScriptScopeProvider } from '../../../language/scala-script-scope.js'
 import { ScalaScriptValidator } from '../../../language/scala-script-validator.js'
 import { ScalaScriptWorkspaceManager } from './scala-script-workspace.js'
 import { ScalaScriptSemanticTokenProvider } from './scala-script-semantic.js'
@@ -84,6 +84,7 @@ export const ScalaScriptModule: Module<ScalaScriptServices, PartialLangiumServic
   },
   references: {
     ScopeProvider: services => new ScalaScriptScopeProvider(services),
+    ScopeComputation: services => new ScalaScriptScopeComputation(services),
     // References: services => new ScalaScriptReferences(services),
   },
   lsp: {
@@ -142,6 +143,7 @@ export function registerValidationChecks(services: ScalaScriptServices) {
     ObjectValue: validator.checkClassDef,
     ArrayValue: validator.checkArrayValue,
     ForStatement: validator.checkForStatement,
+    ImportStatement: validator.checkImportStatement,
     CallChain: validator.checkCallChain,
     Assignment: validator.checkAssignment,
     IfExpression: validator.checkIfExpression,

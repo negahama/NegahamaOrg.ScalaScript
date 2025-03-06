@@ -1,4 +1,16 @@
-import { AstNode, AstUtils, DefaultScopeProvider, MapScope, ReferenceInfo, Scope, stream, StreamScope } from 'langium'
+import {
+  AstNode,
+  AstUtils,
+  DefaultScopeComputation,
+  DefaultScopeProvider,
+  LangiumDocument,
+  MapScope,
+  PrecomputedScopes,
+  ReferenceInfo,
+  Scope,
+  stream,
+  StreamScope,
+} from 'langium'
 import * as ast from './generated/ast.js'
 import { LangiumServices } from 'langium/lsp'
 import { AnyTypeDescriptor, TypeDescriptor, TypeSystem, UnionTypeDescriptor } from './scala-script-types.js'
@@ -183,27 +195,28 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       return scope
     }
     // undefined를 리턴하면 superScope로 처리된다.
+    exitLog(log)
     return undefined
   }
 
-  /*
-    스칼라스크립트는 아직 몇몇 경우에 any type을 사용한다.
-    `JSON.parse()`과 같이 타입스크립트에서도 any type을 사용하는 함수들도 있지만 아직 완벽하게 처리되지 않은 몇몇 부분에서
-    any type을 사용함으로써 타입 검사를 회피하고 있다. any type을 사용하는 경우는 `scala-script-library.ts`를 참고한다.
-
-    `scopeAny()`는 `DefaultScopeProvider`의 `createScopeForNodes()`와 거의 동일하다.
-    차이점은 원래 코드는 이름이 없으면 undefined를 리턴하지만 여기서는 이름이 없으면 이름을 생성해서 리턴한다.
-    주의할 점은 이름이 있는지를 확인하는 대상은 previous이지만 이름이 없을 때 생성하는 대상은 current라는 것이다.
-    예를들어 `corp.process()`에서 `process`의 scope를 검사할때 `corp`가 any type이면 previous인 `corp`의 이름이 있으면
-    있는 걸 사용하고, 없으면 `corp`라는 이름을 생성하는 것이 아니라 `context.reference.$refText`인 `process`라는
-    이름을 생성해서 리턴한다. 즉 `corp`가 any type이기 때문에 member 검사를 하지 않고 무조건 멤버가 있다고
-    보고 처리하는 것이다.
-
-    문제는 이름이 있는 경우이다. 발생한 적이 없는 것 같긴 한데 이름이 있는 경우에는 `corp`를 넘기고 그렇지 않은 경우
-    `process`를 넘기는 것 자체가 잘못되어져 있고 이름이 있을 경우 `process`를 다시 확인하는 코드도 없어 문제가 될 수 있다.
-  */
   /**
    * Creates a scope for any type based on the provided context and previous expression.
+   *
+   * 스칼라스크립트는 아직 몇몇 경우에 any type을 사용한다.
+   * `JSON.parse()`과 같이 타입스크립트에서도 any type을 사용하는 함수들도 있지만 아직 완벽하게 처리되지 않은 몇몇 부분에서
+   * any type을 사용함으로써 타입 검사를 회피하고 있다. any type을 사용하는 경우는 `scala-script-library.ts`를 참고한다.
+   *
+   * `scopeAny()`는 `DefaultScopeProvider`의 `createScopeForNodes()`와 거의 동일하다.
+   * 차이점은 원래 코드는 이름이 없으면 undefined를 리턴하지만 여기서는 이름이 없으면 이름을 생성해서 리턴한다.
+   *
+   * 주의할 점은 이름이 있는지를 확인하는 대상은 previous이지만 이름이 없을 때 생성하는 대상은 current라는 것이다.
+   * 예를들어 `corp.process()`에서 `process`의 scope를 검사할때 `corp`가 any type이면 previous인 `corp`의 이름이 있으면
+   * 있는 걸 사용하고, 없으면 `corp`라는 이름을 생성하는 것이 아니라 `context.reference.$refText`인 `process`라는
+   * 이름을 생성해서 리턴한다. 즉 `corp`가 any type이기 때문에 member 검사를 하지 않고 무조건 멤버가 있다고
+   * 보고 처리하는 것이다.
+   *
+   * 문제는 이름이 있는 경우이다. 발생한 적이 없는 것 같긴 한데 이름이 있는 경우에는 `corp`를 넘기고 그렇지 않은 경우
+   * `process`를 넘기는 것 자체가 잘못되어져 있고 이름이 있을 경우 `process`를 다시 확인하는 코드도 없어 문제가 될 수 있다.
    *
    * @param context - The reference information used to create the scope.
    * @param previous - The previous AST expression used as a starting point.
@@ -327,6 +340,9 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       return result
     }
 
+    const log = enterLog('getCandidatesByType', undefined, type.toString(), context.reference.$refText)
+    let candidates: AstNode[] = []
+
     if (TypeSystem.isClassType(type)) {
       /*
         ClassDef에서 static method 호출에 대해서...
@@ -394,7 +410,7 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
       }
 
       // getGlobalClass()는 전역적인 ClassDef만을 대상으로 하므로 className을 사용한다.
-      return getCandidates(className, type.node, staticOnly)
+      candidates = getCandidates(className, type.node, staticOnly)
     } else if (TypeSystem.isObjectType(type)) {
       /*
         previous의 추론 타입이 object일 때는 다른 것과 처리 과정이 사뭇 다르다.
@@ -411,19 +427,130 @@ export class ScalaScriptScopeProvider extends DefaultScopeProvider {
         result.revenue += 1
         ```
       */
-      // ObjectType만을 대상으로 한다.
+      // ObjectType, ObjectValue 모두를 대상으로 한다.
       if (ast.isObjectValue(type.node)) {
-        console.log(chalk.red('scopeObjectType: internal error, ObjectValue'))
+        // console.log(chalk.red('scopeObjectType: internal error, ObjectValue'))
+        // console.log(`> previous '${previous.$cstNode?.text}'s type: ${type.toString()}`)
+        candidates = type.node.elements.filter(e => !ast.isBypass(e))
       } else {
-        return type.node.elements.filter(e => !ast.isBypass(e))
+        candidates = type.node.elements.filter(e => !ast.isBypass(e))
       }
     } else if (TypeSystem.isStringType(type)) {
-      return getCandidates('$string$')
+      candidates = getCandidates('$string$')
     } else if (TypeSystem.isNumberType(type)) {
-      return getCandidates('$number$')
+      candidates = getCandidates('$number$')
     } else if (TypeSystem.isArrayType(type)) {
-      return getCandidates('$array$')
+      candidates = getCandidates('$array$')
     }
-    return []
+
+    // for debugging...
+    // candidates.forEach((e, i) => {
+    //   console.log(`> candidate #${i}: '${e.$cstNode?.text}' (${e.$type})`)
+    // })
+
+    exitLog(log)
+    return candidates
+  }
+}
+
+/**
+ *
+ */
+export class ScalaScriptScopeComputation extends DefaultScopeComputation {
+  constructor(services: LangiumServices) {
+    super(services)
+  }
+
+  // override async computeExports(
+  //   document: LangiumDocument,
+  //   cancelToken = CancellationToken.None
+  // ): Promise<AstNodeDescription[]> {
+  //   const parentNode: AstNode = document.parseResult.value;
+  //   const children: (root: AstNode) => Iterable<AstNode> = AstUtils.streamContents;
+  //   const exports: AstNodeDescription[] = [];
+
+  //   console.log("computeExports:");
+  //   this.exportNode(parentNode, exports, document);
+  //   for (const node of children(parentNode)) {
+  //     await interruptAndCheck(cancelToken);
+  //     this.exportNode(node, exports, document);
+  //   }
+  //   return exports;
+  // }
+
+  /**
+   * Add a single node to the list of exports if it has a name. Override this method to change how
+   * symbols are exported, e.g. by modifying their exported name.
+   */
+  // override exportNode(node: AstNode, exports: AstNodeDescription[], document: LangiumDocument): void {
+  //   const name = this.nameProvider.getName(node);
+  //   console.log("  node:", node.$type, name);
+  //   if (name) {
+  //     exports.push(this.descriptions.createDescription(node, name, document));
+  //   }
+  // }
+
+  // override async computeLocalScopes(
+  //   document: LangiumDocument,
+  //   cancelToken = CancellationToken.None
+  // ): Promise<PrecomputedScopes> {
+  //   const rootNode = document.parseResult.value;
+  //   const scopes = new MultiMap<AstNode, AstNodeDescription>();
+
+  //   console.log("computeLocalScopes:");
+  //   // Here we navigate the full AST - local scopes shall be available in the whole document
+  //   for (const node of AstUtils.streamAllContents(rootNode)) {
+  //     await interruptAndCheck(cancelToken);
+  //     this.processNode(node, document, scopes);
+  //   }
+  //   return scopes;
+  // }
+
+  /**
+   * Process a single node during scopes computation. The default implementation makes the node visible
+   * in the subtree of its container (if the node has a name). Override this method to change this,
+   * e.g. by increasing the visibility to a higher level in the AST.
+   *
+   * 이 함수는 위의 computeLocalScopes()에서 rootNode부터 모든 contents에 대해서 호출된다.
+   * 디폴트 동작은 NameProvider에서 해당 AstNode의 이름을 받아서 기타 정보들과 함께 description을 구성하고
+   * 이를 precomputedScopes에 추가해 주는 것이다.
+   *
+   * 내 경우는 다중 대입문 지원으로 인해 변수 선언시 이름이 names에 있기 때문에 Langium의 디폴트 처리로는
+   * 변수명을 인식하지 못하기 때문에 여기서 names에 있는 모든 이름을 등록해 주고, 매서드나 클래스 구문 중에서
+   * 확장 함수가 있으면 이를 확장 함수 테이블에 등록해 준다.
+   *
+   * @param node
+   * @param document
+   * @param scopes
+   */
+  override processNode(node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes): void {
+    const defaultProcess = (node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes) => {
+      const container = node.$container
+      if (container) {
+        const name = this.nameProvider.getName(node)
+        // traceLog(`node: ${node.$type} '${name}'`)
+        if (name) {
+          scopes.add(container, this.descriptions.createDescription(node, name, document))
+        }
+      }
+    }
+
+    const container = node.$container
+    if (!container) return
+    let isProcessed = false
+
+    // Import 문에서의 이름을 처리한다
+    if (ast.isImportStatement(node)) {
+      const log = enterLog('ScopeComputation.processNode', node)
+      node.import.forEach(e => {
+        scopes.add(container, this.descriptions.createDescription(node, e, document))
+      })
+      exitLog(log)
+      isProcessed = true
+    }
+
+    if (!isProcessed) {
+      defaultProcess(node, document, scopes)
+    }
   }
 }

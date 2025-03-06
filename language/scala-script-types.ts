@@ -639,8 +639,8 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
       })
     } else if (ast.isObjectValue(this.node)) {
       this.node.elements.forEach(e => {
-        if (e.element && e.value) {
-          list.push({ name: e.element, node: e })
+        if (e.name && e.value) {
+          list.push({ name: e.name, node: e })
         } else {
           //todo spread 처리
           console.error(
@@ -719,11 +719,6 @@ export class ClassTypeDescriptor extends TypeDescriptor {
    * The comparison is based on the following criteria:
    * - If the `other` type is not an class, returns `false`.
    * - If both types are class definitions, their names must be the same.
-   * - Otherwise, it compares the elements of both types:
-   *   - Each element in the current type must have a corresponding element with the same name in the `other` type.
-   *   - The types of corresponding elements must also be equal.
-   *
-   * Logs differences in names and types to the console for debugging purposes.
    */
   override isEqual(other: TypeDescriptor): boolean {
     if (other.$type !== 'class') return false
@@ -1105,9 +1100,9 @@ export class TypeSystem {
       result = this.inferTypeTypes(node, options)
     } else if (ast.isSimpleType(node)) {
       // Types와 SimpleType은 분리되어져 있다.
-      // SimpleType은 ArrayType | ObjectType | ElementType와 같이 UnionType이며 타입들의 단순한 집합이지만
-      // Types는 types+=SimpleType ('|' types+=SimpleType)*와 같이 SimpleType의 배열로 단순히 타입이 아니다.
-      // 일례로 RefType은 ElementType이고 SimpleType이긴 하지만 Types는 아니다.
+      // SimpleType은 ArrayType | ObjectType | ... 와 같이 타입들의 단순한 집합이지만
+      // Types는 types+=SimpleType ('|' types+=SimpleType)*와 같이 SimpleType의 배열이다.
+      // 일례로 RefType은 SimpleType이긴 하지만 Types는 아니다.
       result = this.inferTypeSimpleType(node, options)
     } else if (ast.isVariableDef(node)) {
       result = this.inferTypeVariableDef(node, options)
@@ -1163,7 +1158,7 @@ export class TypeSystem {
 
     // for debugging...
     if (this.isErrorType(result.actual)) {
-      console.error(chalk.red('inferType Error:'), `${result.toString()}, '${node.$cstNode?.text}'`)
+      console.error(chalk.red('inferType Error:'), `${result.actual.toString()}, '${node.$cstNode?.text}'`)
     }
 
     if (options?.cache) {
@@ -1269,11 +1264,11 @@ export class TypeSystem {
 
   /**
    * Infers the type of a variable definition node.
-   * 
+   *
    * 타입이 명시되어진 경우라도 값에서 더 유용한 타입을 추론할 수 있다.
    * 예를 들면 명시된 타입이 union인 경우 실제 값의 타입이 union 자체보다 유용하다.
    * 하지만 항상 그런 것은 아니다. 값의 타입이 any인 경우나 유효하지 않은 경우에는 명시된 타입을 더 유용하다.
-   * 
+   *
    * 값의 타입을 추론하는 것은 신중하게 처리되어야 한다. 왜냐하면 값으로 방대하고 복잡한 오브젝트가
    * 올 수도 있는데 때때로 이것은 recursive definition을 유발할 수도 있기 때문이다.
    * ```
@@ -1288,10 +1283,10 @@ export class TypeSystem {
    * 여기까지는 문제가 안되는데 `VariableDef`인 `val 보유기술: ChainPrompt = {...}` 에서 `value`를 추론하면
    * `callback`의 parameter `corp`에 대해 다시 알아야 하고 처음 과정이 아직 끝난 상태가 아니기 때문에
    * recursive definition이 발생한다.
-   * 
+   *
    * 아울러 값이 있는 경우에는 값 자체를 TypeDescriptor의 node로 사용하는 것이 더 유용하다.
    * 이것은 해당 변수에 값이 할당되어졌는지를 확인할 때도 유용하고 변수의 실제 값을 나중에 참조할 수 있다.
-   * 
+   *
    * @param node - The variable definition node to infer the type for.
    * @param options - Optional inference options that may influence the type inference process.
    * @returns An object containing the inferred type as both `actual` and `formal` properties.
@@ -1390,7 +1385,7 @@ export class TypeSystem {
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
     let actual = type
     let formal = type
-    if (element) {
+    if (element && !ast.isImportStatement(element)) {
       // 이 함수에서 InferResult 객체를 직접 사용하지 않고 actual과 formal을 사용하는 이유는
       // InferResult 객체를 사용하면 `result.actual = type.elementType`와 같이 할당할 때
       // element의 타입이 변경되기 때문이다.
@@ -1514,6 +1509,13 @@ export class TypeSystem {
       }
     }
 
+    // import인 경우
+    else if (element && ast.isImportStatement(element)) {
+      // console.log(chalk.green('import is always any type in ScalaScript'))
+      type = new AnyTypeDescriptor()
+      actual = formal = type
+    }
+
     // this, super인 경우
     else if (node.$cstNode?.text == 'this' || node.$cstNode?.text == 'super') {
       const classItem = AstUtils.getContainerOfType(node, ast.isClassDef)
@@ -1557,16 +1559,16 @@ export class TypeSystem {
       if (node.previous) {
         const previousType = this.inferType(node.previous, options).actual
         console.log(chalk.red('여기는 정확히 어떨 때 호출되는가?', id))
-        console.log(chalk.green(`  previous '${node.previous?.$cstNode?.text}'s type: ${previousType.toString()}`))
+        console.log(`> previous '${node.previous?.$cstNode?.text}'s type: ${previousType.toString()}`)
         actual = formal = previousType
         if (this.isFunctionType(previousType)) actual = previousType.returnType
         else if (this.isArrayType(previousType)) actual = previousType.elementType
-        else actual = new ErrorTypeDescriptor('Could not infer type for element ' + node.element?.$refText, node)
+        else actual = new ErrorTypeDescriptor(`Could not infer type for element '${node.element?.$refText}'`, node)
         exitLog(log, type)
         return { actual, formal }
       }
 
-      actual = formal = new ErrorTypeDescriptor('Could not infer type for element ' + node.element?.$refText, node)
+      actual = formal = new ErrorTypeDescriptor(`Could not infer type for element '${node.element?.$refText}'`, node)
     }
 
     exitLog(log, type)
@@ -1614,7 +1616,7 @@ export class TypeSystem {
         // funcType.showDetailInfo()
 
         if (!ast.isBinding(funcNode)) {
-          // 함수 `f`이 `(callback: (arg: Corp, index?: number) -> void, thisArg?: any) -> void`와 같이 정의되어져 있고
+          // 함수 `f`가 `(callback: (arg: Corp, index?: number) -> void, thisArg?: any) -> void`와 같이 정의되어져 있고
           // `f(corp => corp.process())`가 호출된다고 할 때 파라미터 `corp`를 `callback`의 `arg`에 매칭해야 한다.
           // 보다 효과적인 예로써 `this.getCell(columnName, (column) => { ... })`의 경우
           // `column`은 `getCell()`의 두번째 파라미터의 첫번째 파라미터이다.
@@ -1689,42 +1691,47 @@ export class TypeSystem {
     // 따라서 `findBindingRootDef()`는 중첩된 Binding을 따라가면서 Binding이 정의된 definition을 찾는다.
     // 간단히 아래와 같이 한번만 Binding되어진 경우는 비교적 간단하다.
     // ```
-    // var prompt: ChainPrompt = {
-    //   prompt: (options) => { return options }
+    // var variable: ChainPrompt = {
+    //   prompt: 'what do you want?',
+    //   callback: (options) => { return options }
     // }
     // ```
-    // 이 경우는 인수로 전달되는 node는 `prompt: (options) => { return options }` 으로
-    // `options`의 타입을 추론하기 위해서는 `inferTypeParameter()`에서 `options`의 $container.$container인
-    // (여기서는 FunctionValue의 container인 Binding임)을 이 함수에 전달하고 다시 그것의 container가
-    // 변수 선언인 경우이다.
+    // 위 경우에서 `prompt`의 타입은 간단히 위의 `inferType(node.value, ...)`으로 구할 수 있다.
+    // (`prompt`의 경우도 `findBindingRootDef()`를 거치긴 하지만 이때 구한 값은 사용되지 않는다)
+    // 하지만 `callback: (options) => { return options }` 의 타입은 함수이지만 `options`의 정확한 타입을
+    // 구하기 위해서는 `ChainPrompt`를 참조해야만 한다.
+    // 그래서 `inferTypeBinding()`에서 `options`의 타입을 추출하기 위해서 `inferTypeParameter()`가 호출되는데
+    // `inferTypeParameter()`에서 `options`의 $container.$container인, 여기서는 FunctionValue의 container인 Binding으로
+    // 다시 이 함수가 호출된다. 이것은 순환 호출이 되어 에러로 처리되고 `findBindingRootDef()`가 호출된다.
+    // 이 함수에서 그것의 container인 VariableDef를 찾고 거기서 callback의 타입을 이용해서 Binding의 타입을 구한다.
     // 하지만 다음과 같이 상위 노드가 또 다른 Binding인 경우에는
     // ```
     // nextChain: {
-    //   prompt: (options) => { return options }
+    //   callback: (options) => { return options }
     // }
     // ```
     // node에서 시작해서 VariableDef가 나올때까지 node의 타입이 무엇인지를 검사해야 한다.
-    // 상위 노드로 가면 node는 달라질 수 있다. 즉 위에서 처음 시작은 prompt이지만
-    // prompt를 포함하는 상위 binding의 이름이 nextChain이면
+    // 상위 노드로 가면 node는 달라질 수 있다. 즉 위에서 처음 시작은 callback이지만
+    // callback를 포함하는 상위 binding의 이름이 nextChain이면
     // 다음번 찾기는 nextChain으로 찾는다는 의미이다.
     const findBindingRootDef = (node: AstNode): TypeDescriptor | undefined => {
-      const property = ast.isBinding(node) ? node.element : ''
+      const property = ast.isBinding(node) ? node.name : ''
       if (!property) {
         console.error(chalk.red('findBindingRootDef: property is null'))
         return undefined
       }
 
       const object = AstUtils.getContainerOfType(node, ast.isObjectValue)
-      if (object && object.$container) {
-        if (ast.isVariableDef(object.$container)) {
-          const container = object.$container
+      const container = object ? object.$container : undefined
+      if (object && container) {
+        if (ast.isVariableDef(container)) {
           const containerType = this.inferType(container, options).actual
           // 해당 Binding이 소속된 ClassDef를 찾아서 해당 항목의 타입을 찾아야 한다.
           if (this.isClassType(containerType)) {
             return containerType.getElementType(property)
           }
-        } else if (ast.isBinding(object.$container)) {
-          const result = findBindingRootDef(object.$container)
+        } else if (ast.isBinding(container)) {
+          const result = findBindingRootDef(container)
           if (result && this.isClassType(result)) {
             return result.getElementType(property)
           }
@@ -1736,7 +1743,7 @@ export class TypeSystem {
     const propType = findBindingRootDef(node)
     if (propType && this.isFunctionType(propType)) {
       // propType.showDetailInfo()
-      if (propType) result = { actual: propType, formal: propType }
+      result = { actual: propType, formal: propType }
     }
 
     exitLog(log, result.actual)
@@ -1745,7 +1752,7 @@ export class TypeSystem {
 
   /**
    * Infers the type of the elements in a `for...of` loop.
-   * 
+   *
    * 이 함수는 `for(a <- ary)`와 같이 정의되어진 후 `a`를 참조하게 되면 `a`의 타입을 추론할때 사용된다.
    *
    * @param node - The AST node representing the `for...of` loop.
@@ -1764,7 +1771,7 @@ export class TypeSystem {
 
   /**
    * Infers the type for a `ForTo` node.
-   * 
+   *
    * 이 함수는 `for(a <- 1 (to | until) 10)`와 같이 정의되어진 후 `a`를 참조하게 되면 `a`의 타입을 추론할때 사용된다.
    *
    * @param node - The `ForTo` AST node to infer the type for.
@@ -2422,7 +2429,7 @@ export class TypeSystem {
       // prompt를 포함하는 상위 binding의 이름이 nextChain이면
       // 다음번 찾기는 nextChain으로 찾는다는 의미이다.
       const findBindingRootDef = (node: AstNode): TypeDescriptor | undefined => {
-        const property = ast.isBinding(node) ? node.element : ''
+        const property = ast.isBinding(node) ? node.name : ''
         if (!property) {
           console.error(chalk.red('findBindingRootDef: property is null'))
           return undefined

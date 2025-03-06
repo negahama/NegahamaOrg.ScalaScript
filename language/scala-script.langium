@@ -8,36 +8,48 @@ Code: Statement | Expression;
   ScalaScript를 이해하기 위해서는 형(type)과 값(value), 문(statement)과 식(expression)을 구분하는 것이 매우 중요하다.
 
   변수
-  변수는 타입이나 값이 아니다. 값을 가질 수 있는 상자이다. 값의 종류(타입)에 따라서 사용법이 달라진다.
-  VariableDef   | Definition | var n: number = 3
-  VariableType  | X          | 변수의 타입은 primitive, function, object, array 등이 type이 될 수 있다.
-  VariableValue | X          | 변수의 값도 타입들의 값이다.
-  VariableCall  | Name       | 변수 이름만으로 변수 사용
+  변수는 타입과 값을 가지는 상자이다.
+  변수 자체는 값을 변경할 수 없는 val과 값을 변경할 수 있는 var 두가지 종류가 있다.
+  변수의 타입으로 primitive, function, array, object, class 타입만 사용할 수 있으나
+  primitive를 제외한 각각의 타입들은 자신의 세부 타입을 정의할 수 있다.
+  이 기본 타입을 구분하는 것은 타입에 따라서 사용법이 달라지기 때문이다.
+  VariableDef   | Definition | val(또는 var) 변수명 : 타입 = 값 예) var n: number = 3
+  VariableType  | X          | 변수의 타입 자체는 새로 정의할 수 없다.
+  VariableValue | X          | 변수의 값도 새로 정의할 수 없다. 해당 타입들의 값이 사용된다.
+  VariableCall  | Name       | 타입이 primitive인 경우 변수 이름만으로 변수 사용
                 | Name(...)  | 타입이 함수인 경우 예) f(msg)
                 | Name[...]  | 타입이 배열인 경우 예) ary[1]
                 | Name.name  | 타입이 오브젝트나 클래스인 경우 예) obj.name
 
   함수
+  함수는 파라미터, 리턴타입과 바디를 가진다.
+  함수는 예외적으로 함수 자체를 정의하는 문법이 있지만 매우 예외적인 것이다.
   FunctionDef   | Definition | fun f = (msg: string) -> void => { ... } 이것은 함수의 정의이다.
-                |            | val f = (msg: string) -> void => { ... } 이것은 함수형 변수의 정의이다.  
-                |            | def f = (msg: string) -> void            이것은 함수 타입에 대한 별칭 선언이다.  
+                |            | val f = (msg: string) -> void => { ... } 이것은 함수형 변수의 정의이다.
+                |            | def f = (msg: string) -> void            이것은 함수 타입에 대한 별칭 선언이다.(미구현)
   FunctionType  | Type       | (msg: string) -> void
   FunctionValue | Expression | (msg: string) -> void => { ... }
 
   배열
+  배열 자체를 정의할 순 없다. 배열은 단지 특정 타입을 가지는 타입으로만 존재한다.
+  배열의 타입으로 primitive, function, object, class 모두를 사용할 수 있다.
+  (아직 함수 타입의 배열은 지원하지 않음)
   ArrayDef      | X          | 배열 자체를 정의하지는 않는다.
   ArrayType     | Type       | number[]
   ArrayValue    | Expression | [ 1, 2, 3 ]
 
   오브젝트
+  오브젝트 자체를 정의할 순 없다. 오브젝트도 다수의 특정 property를 가지는 타입으로만 존재한다.
+  이 타입에 대한 별칭을 지정할 순 있지만 이것이 오브젝트에 대한 정의는 아니다.
   ObjectDef     | X          | 오브젝트 자체를 정의하지는 않는다.
-                |            | val object: { name: stirng, age: number}   이것은 오브젝트형 변수 정의이다.  
-                |            | def objType = { name: stirng, age: number} 이것은 오브젝트 타입에 대한 별칭 선언이다.  
+                |            | val object: { name: string, age: number}   이것은 오브젝트형 변수 정의이다.
+                |            | def objType = { name: string, age: number} 이것은 오브젝트 타입에 대한 별칭 선언이다.(미구현)
   ObjectType    | Type       | { name: string, age: number }
   ObjectValue   | Expression | { name: "samuel", age: 20 }
 
   Class
-  Class Def     | Definition | def Person = { var name: string, var age: number }
+  오브젝트와 동일한 개념이다. 단지 클래스는 좀 더 복잡하다. 
+  ClassDef      | Definition | def Person = { var name: string, var age: number }
 */
 
 //-----------------------------------------------------------------------------
@@ -48,7 +60,7 @@ Types:
 
 /*
   Union type은 모든 타입의 가장 최상위 타입이다.
-  Union type은 최상위 타입이기 때문에 union의 배열을 불가능하다. 즉 (string | number)[] 은 불가하지만
+  Union type은 최상위 타입이기 때문에 union의 배열은 불가능하다. 즉 (string | number)[] 은 불가하지만
   배열의 union은 가능하기 때문에 string[] | number[] 와 같은 형태로 사용할 수 있다.
 */
 UnionType: 
@@ -56,23 +68,20 @@ UnionType:
 
 /*
   타입으로 사용될 수 있는 모든 타입들
-  ElementType은 하나의 항목만을 가지는 타입들이며 
-  CompoundType과 ArrayType은 두개 이상의 항목을 가지는 타입들이다.
-  ArrayType은 동일한 타입이 연속된 구조를 취하는 특수한 Compound 타입이다.
-  ArrayType을 CompoundType과 구분해서 처리하는 것은 표기 방법과 처리가 매우 다르기 때문이다.
-  현재 CompoundType은 ObjectType 밖에 없기 때문에 이를 별도로 구분하지 않고 ObjectType으로 사용한다.
-  이름이 있는 클래스 타입은 elementType의 RefType으로 표현된다.
+  이름이 있는 클래스 타입은 RefType으로 표현된다.
 */
 SimpleType:
-  ArrayType | ObjectType | ElementType;
+  ArrayType | ObjectType | PrimitiveType | FunctionType | RefType;
 
 /*
   해당 개체의 타입이 배열형임을 나타내기 위해 사용된다.
   ex) var ary: number[]
 
-  ArrayType을 elementType=(ObjectType | ElementType) '[' ']'; 으로 정의하면 ElementType에 FunctionType이
-  포함되어져 있어 var t: () -> number[] 의 경우 () -> number 의 배열로 인식된다.
-  현재 (() -> number)[] 와 같은 함수 타입의 배열은 지원하지 않는다. 
+  array의 타입으로는 union과 array를 제외한 거의 모든 타입이 사용될 수 있으나
+  ArrayType을 elementType=(ObjectType | PrimitiveType | FunctionType | RefType) '[' ']'; 으로 정의하면
+  var t: () -> number[] 의 경우 () -> number 의 배열로 인식된다.
+  이를 방지하기 위해서 FunctionType을 빼고 정의하였다.
+  즉 (() -> number)[] 와 같은 함수 타입의 배열은 현재 지원하지 않는다. 
 */
 ArrayType:
   elementType=(ObjectType | PrimitiveType | RefType) '[' ']';
@@ -81,12 +90,12 @@ ArrayType:
   Object Definition
   -----------------------------------------------------------------------------
   Object는 유저가 정의하는 타입중에 하나로 타입스크립트의 Object 타입과 동일하다.
-  이전에는 사용자 정의 자료구조를 별도로 구분하지 않고 모두 오브젝트라는 단일 개념으로 사용하려고 했는데
-  Object는 단순하게 사용할 수 있는데도 불구하고 Class의 복잡한 문법 구조의 영향을 받아 복잡해졌고 그래서 분리하였다. 
-  Object는 복합타입 컨테이너로 모든 타입(단일타입, 다른 복합타입, 배열타입등)을 가질 수 있다.
-  하지만 Object 자체는 이런 값들을 가질 수 있다는 타입이지 객체가 아니라는 점이 중요하다.
+  이전에는 사용자 정의 자료구조를 class, interface, object 등으로 구분하지 않고
+  모두 오브젝트라는 단일 개념으로 통합하려고 했었는데 Class의 복잡한 문법 구조의 영향을 받아
+  단순하게 사용할 수 있는 Object가 복잡해졌고 그래서 오브젝트는 별도로 분리하였다.
 
-  오브젝트형 변수를 정의하거나 오브젝트 타입에 이름을 부여할 수 있을 뿐 Object 자체를 정의하는 문법은 없다.
+  Object는 복합타입 컨테이너로 모든 타입(단일타입, 다른 복합타입, 배열타입등)을 가질 수 있다.
+  하지만 Object 자체는 이런 값들을 가질 수 있는 타입이지 객체가 아니라는 점이 중요하다.
 
   다른 것들과 마찬가지로 스칼라스크립트는 타입에 이름을 부여할 때 def를 사용한다.
   예를들어 name과 age를 property로 가지는 타입이 있으면 이것의 타입은 { name: string, age: number } 이다.
@@ -105,12 +114,7 @@ ObjectTypeElement:
 Property:
   name=Id ':' type=Types;
 
-// 하나의 항목만을 가지는 타입들
-ElementType:
-  PrimitiveType
-  | FunctionType
-  | RefType;
-
+// 기본 자료형들
 PrimitiveType:
   type=('any' | 'nil' | 'void' | 'string' | 'number' | 'boolean');
 
@@ -161,7 +165,8 @@ type NamedElement =
   | ClassDef
   | Parameter
   | Property    // Property는 NamedElement이긴 하지만 꼭 필요하진 않다. 
-  | Iterator;
+  | Iterator
+  | ImportStatement;
 
 //-----------------------------------------------------------------------------
 // Statements
@@ -177,6 +182,7 @@ Statement:
   | WhileStatement
   | ThrowStatement
   | TryCatchStatement
+  | ImportStatement
   | Continue
   | Break;
 
@@ -359,6 +365,11 @@ TryCatchStatement:
   'try' body=Block
   ('catch' ('{' | INDENT) cases+=CaseClause+ ('}' | DEDENT))?
   ('finally' finally=Expression)?;
+
+// Import Statement
+// from이 키워드로 사용되지 않도록 from=Id로 처리하였다.
+ImportStatement:
+  'import' '{' import+=Id (',' import+=Id)* '}' from=Id path=StringLiteral;
 
 Continue: dummy='continue';
 Break: dummy='break';
@@ -544,7 +555,7 @@ Literal:
 
 // ex) ary = [ 1, 2, 3 ], [], [ 1, ...ary ]
 ArrayValue:
-  '[' items+=Expression? (',' items+=Expression )* ']';
+  '[' items+=Expression? (',' items+=Expression )* ','? ']';
 
 // ex) var obj = { name : "samuel", age : 20, ...ary }
 ObjectValue:
@@ -553,23 +564,16 @@ ObjectValue:
 /*
   Binding은 Id : Expression 이거나 또는 ... NamedElement 일 수 있으며 , 는 생략할 수 있다.
   Binding은 원래 : 대신 = 을 사용했는데 이것은 Assignment와 모호성 문제가 발생했다.
-  Binding의 element는 Property의 name을 사용하기 때문에 Id 대신 [Property:Id]를 사용하면 좋겠지만
-  자동으로 cross-reference를 처리해 주지 못한다. reference 문제를 처리하려면 ScopeProvider가 매우 복잡해진다.
-  심지어 불가능해보인다. 예를들면 다음과 같은 코드에서
-  ```
-  def Trade = { item = 'item' }
-  def Sales = { trade: Trade }
-  def SalesHistory = {
-    private var sales: Sales[] = []
-    var add = () => { this.sales.push({ trade: { item: 'item1' } }) }
-  }
-  ```
-  this.sales.push() 함수의 인수로 전달되는 ObjectValue(여기서는 { trade: { item: 'item1' } }) 부분)의
-  trade 라는 Binding의 cross-reference를 설정하기 위해서는 먼저 this.sales의 타입을 찾아서 push의 인수가
-  Sales 타입인지를 알아내야 하고 그 다음에 어디에 있을지 모르는 Sales 정의를 찾아서 trade가 Trade 타입인지를 또 알아내야 한다.
-  그래서 그냥 Id를 사용하고 Validator에서 타입체크를 하는 것으로 한다.
+  Binding이 사용되는 ObjectValue는 오브젝트 타입에만 사용되는 것은 아니다.
+  ClassDef 타입의 객체들에게도 사용되므로 Binding의 element는 [Property:Id]를 사용할 수 없다.
+  [NamedElement:Id]도 적합하지 않는데 이는 그렇게 하면 반드시 Property가 먼저 정의되어야만 하기 때문에
+  ObjectValue만 사용하고 타입은 추론하는 것이 불가능해지기 때문이다.
+
+  ObjectType 없이 ObjectValue 만으로 변수를 선언할 경우에도 타입 추론이 가능하게 하기 위해서는
+  Binding의 element가 CallChain의 ref가 될 수 있어야 하는데 그렇게 하기 위해서 getScope()에서 object value인 경우에도
+  candidates를 리턴할 수 있게 하고 Binding rule의 element 대신 name property로 변경하였다.
 */
-Binding: (element=Id ':' value=Expression | spread=SpreadExpression) (',')?;
+Binding: (name=Id ':' value=Expression | spread=SpreadExpression) (',')?;
 
 /*
   Assignment를 아래와 같이 하면 다중 대입문에서 몇가지 문제가 생긴다.

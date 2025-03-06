@@ -228,28 +228,44 @@ export class ScalaScriptValidator {
     exitLog(log)
   }
 
-  /*
-    스칼라스크립트는 타입스크립트와 마찬가지로 rest parameter의 타입을 배열 형태로 쓴다.
-    타입스크립트에 정의된 많은 rest parameter를 가지는 함수의 정의는 아래의 push()의 정의와 비슷하다.
-    push(...items: T[]): number;
+  /**
+   * Validates an import statement.
+   *
+   * @param stmt - The import statement to validate.
+   * @param accept - The validation acceptor to report validation issues.
+   */
+  checkImportStatement(stmt: ast.ImportStatement, accept: ValidationAcceptor): void {
+    const log = enterLog('checkImportStatement', stmt)
+    if (stmt.from != 'from') {
+      const msg = `checkImportStatement: 'from' is expected but found '${stmt.from}'.`
+      accept('error', msg, {
+        node: stmt,
+        property: 'from',
+      })
+    }
+    exitLog(log)
+  }
 
-    그리고 push()를 [1].push([2,3]) 와 같이 사용하면 number[]를 number에 할당할 수 없다고 나온다.
-    또한 rest parameter를 사용할 경우에도 예를들어 아래와 같이 rest parameter를 배열로 표시하지 않으면 에러가 된다.
-    f(msg: string, ...optionalParams: number) { ... } // error
-
-    즉 items의 각 항목은 T 이고 ...items 가 T[] 이라고 보는 것 같다.
-
-    하지만 any[] 대신 any는 사용가능한데 이는 any자체가 배열을 포함하기 때문으로 보인다.
-    여튼 타입스크립트는 rest parameter를 T[] 로 표현하고 스칼라스크립트도 마찬가지이지만
-    items의 각 항목은 T의 배열이 아니라 T 이기 때문에 이를 고려해야 한다.
-
-    스칼라스크립트에서 rest parameter를 처리하는데 있어 한가지 예외가 있는데 그것은 concat()의 처리이다.
-    concat은 T와 T[] 모두를 취할 수 있는데 스칼라스크립트는 아직 배열의 배열형이나 union의 배열형을
-    지원하지 않기 때문에 이를 표현할 방법이 없다. generic의 union도 아직 지원하지 않는다
-    그래서 concat은 any[]형으로 되어져 있다.
-  */
   /**
    * Validates a call chain expression.
+   *
+   * 스칼라스크립트는 타입스크립트와 마찬가지로 rest parameter의 타입을 배열 형태로 쓴다.
+   * 타입스크립트에 정의된 많은 rest parameter를 가지는 함수의 정의는 아래의 `push()`의 정의와 비슷하다.
+   * `push(...items: T[]): number`
+   *
+   * 그리고 `push()`를 `[1].push([2,3])`와 같이 사용하면 number[]를 number에 할당할 수 없다고 나온다.
+   * 또한 rest parameter를 사용할 경우에도 예를들어 아래와 같이 rest parameter를 배열로 표시하지 않으면 에러가 된다.
+   * `f(msg: string, ...optionalParams: number) { ... } // error`
+   * 즉 items의 각 항목은 `T` 이고 `...items` 가 `T[]` 이라고 보는 것 같다.
+   *
+   * 하지만 `any[]` 대신 `any`는 사용가능한데 이는 `any`자체가 배열을 포함하기 때문으로 보인다.
+   * 여튼 타입스크립트는 rest parameter를 `T[]` 로 표현하고 스칼라스크립트도 마찬가지이지만
+   * items의 각 항목은 `T`의 배열이 아니라 `T`이기 때문에 이를 고려해야 한다.
+   *
+   * 스칼라스크립트에서 rest parameter를 처리하는데 있어 한가지 예외가 있는데 그것은 `concat()`의 처리이다.
+   * `concat`은 `T`와 `T[]` 모두를 취할 수 있는데 스칼라스크립트는 아직 배열의 배열형이나 union의 배열형을
+   * 지원하지 않기 때문에 이를 표현할 방법이 없다. generic의 union도 아직 지원하지 않는다.
+   * 그래서 `concat`은 `any[]`형으로 되어져 있다.
    *
    * @param expr - The call chain expression to validate.
    * @param accept - The validation acceptor to collect validation results.
