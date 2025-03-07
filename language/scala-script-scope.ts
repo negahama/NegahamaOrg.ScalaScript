@@ -539,15 +539,32 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
     if (!container) return
     let isProcessed = false
 
-    // Import 문에서의 이름을 처리한다
-    if (ast.isImportStatement(node)) {
-      const log = enterLog('ScopeComputation.processNode', node)
-      node.import.forEach(e => {
-        scopes.add(container, this.descriptions.createDescription(node, e, document))
-      })
-      exitLog(log)
-      isProcessed = true
-    }
+    /*
+      여기와 scala-script-types.ts의 TypeSystem.inferTypeCallChain()에서의 코드는
+      import 문에서 명시된 이름을 any type으로 처리되게 해 준다.
+      문제는 any type과 관련된 것도 any type이 되어져 버린다는 것이다.
+      예를들어 다음의 코드에서
+      ```
+      import { Corp } from './Corp'`
+      val corps = Corp.getCorpList(...)
+      for (n <- 1 to corps.length) { ...}
+      ```
+      `corps`의 타입도 any type이 되고 `corps.length`의 타입도 any type이 되어져 버린다.
+      많은 경우에 이는 문제가 되지 않지만 위와 같이 `corps.length`가가 반드시 number 타입이어야 하는 경우
+      문제가 된다.
+      현재 Langium에서는 특별히 import문이 없어도 프로젝트에 등록된 모두 코드를 대상으로 처리되기 때문에
+      즉 모든 코드가 import되어진 상태이기 때문에 별도로 import문을 처리할 필요는 없다.
+      따라서 일단은 import문을 단순히 변환만 되어지도록 변경한다.
+    */
+    // // Import 문에서의 이름을 처리한다
+    // if (ast.isImportStatement(node)) {
+    //   const log = enterLog('ScopeComputation.processNode', node)
+    //   node.import.forEach(e => {
+    //     scopes.add(container, this.descriptions.createDescription(node, e, document))
+    //   })
+    //   exitLog(log)
+    //   isProcessed = true
+    // }
 
     if (!isProcessed) {
       defaultProcess(node, document, scopes)

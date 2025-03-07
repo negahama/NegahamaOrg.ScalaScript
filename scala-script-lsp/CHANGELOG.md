@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.8 - March 7, 2025
+
+- bug fix
+
 ### 0.6.7 - March 6, 2025
 
 - support import statement

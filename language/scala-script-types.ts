@@ -1509,12 +1509,13 @@ export class TypeSystem {
       }
     }
 
-    // import인 경우
-    else if (element && ast.isImportStatement(element)) {
-      // console.log(chalk.green('import is always any type in ScalaScript'))
-      type = new AnyTypeDescriptor()
-      actual = formal = type
-    }
+    // [[al=30c7407d6425b374442b09ef337f06a2]] 참고
+    // // import인 경우
+    // else if (element && ast.isImportStatement(element)) {
+    //   // console.log(chalk.green('import is always any type in ScalaScript'))
+    //   type = new AnyTypeDescriptor()
+    //   actual = formal = type
+    // }
 
     // this, super인 경우
     else if (node.$cstNode?.text == 'this' || node.$cstNode?.text == 'super') {
