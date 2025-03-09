@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.9 - March 9, 2025
+
+- changed grammar to be possible to support regular expression other flags.(/g -> /gu)
+
 ### 0.6.8 - March 7, 2025
 
 - bug fix

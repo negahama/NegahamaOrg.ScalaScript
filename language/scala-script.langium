@@ -690,7 +690,10 @@ IntegerLiteral2 returns number:
 // terminal StringLiteral: '"' (StringElement)+ '"';
 // terminal StringLiteral: /`[^`]*`|"[^"]*"|'[^']*'/;
 terminal StringLiteral: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'|`(\\.|[^`\\])*`/;
-terminal RegExStringLiteral: /\/[^\/]*\/g/;
+
+// Regular Expression Literals
+// /\/[^\/]*\/[gimsuy]+/ 와 같이 정의하면 //g 가 주석이 아니라 정규식으로 인식된다.
+terminal RegExStringLiteral: /\/[^\/]+\/[gimsuy]+/;
 
 // Identifiers
 // 이것은 BooleanLiteral 다음에 와야 한다.
