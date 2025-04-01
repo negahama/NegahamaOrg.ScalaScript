@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.10 - April 2, 2025
+
+- changed the parameter `digit` of Number.toFixed(digit) to be nullable
+- fixed the bug that the parameter `start` in Array.splice(start, deleteCount, ...) was 0 based index 
+
 ### 0.6.9 - March 9, 2025
 
 - changed grammar to be possible to support regular expression other flags.(/g -> /gu)

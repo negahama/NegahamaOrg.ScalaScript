@@ -134,7 +134,7 @@ export const ScalaScriptBuiltinLibrary = `
   var some: (callbackFn: (arg: T, index?: number) -> boolean) -> boolean
   // 배열의 요소를 제자리 정렬하고 배열을 반환합니다.
   var sort: (callbackFn: (arg1: T, arg2: T) -> number) -> T[]
-  // 배열에서 요소를 추가 및/또는 제거합니다.
+  // 배열의 기존 요소를 삭제 또는 교체하거나 새 요소를 추가하여 배열의 내용을 변경합니다.
   var splice: (start: number, deleteCount?: number, ...item: T[]) -> T[]
   // 호출 배열과 그 요소를 나타내는 문자열을 반환합니다.
   var toString: () -> string
@@ -163,8 +163,12 @@ export const ScalaScriptBuiltinLibrary = `
   var parseInt: (x: string) -> number
   // 지수 표기법으로 표기된 숫자를 표현하는 문자열을 반환한다
   var toExponential: (fractionDigits: number) -> string
-  // 고정 소수점 표기법으로 숫자를 표현하는 문자열을 반환합니다.
-  var toFixed: (digits: number) -> string
+  /**
+   * 고정 소수점 표기법으로 숫자를 표현하는 문자열을 반환합니다.
+   * @param digits 소수점 뒤에 나타날 자릿수. 0 이상 20 이하의 값을 사용할 수 있습니다. 값을 지정하지 않으면 0을 사용합니다.
+   * @returns
+   */
+  var toFixed: (digits?: number) -> string
   // 이 숫자를 해당 언어 방식으로 표현된 문자열을 반환합니다.
   var toLocaleString: (locales: string) -> string
   // 고정 소수점 또는 지수 표기법으로 지정된 정밀도로 숫자를 표현하는 문자열을 반환합니다.

@@ -737,6 +737,7 @@ function transpileCallChain(expr: ast.CallChain, indent: number): string {
       { methodName: 'indexOf', argIndices: [1] },
       { methodName: 'lastIndexOf', argIndices: [1] },
       { methodName: 'slice', argIndices: [0, 1] },
+      { methodName: 'splice', argIndices: [0] },
       { methodName: 'startsWith', argIndices: [1] },
       { methodName: 'substring', argIndices: [0, 1] },
       { methodName: 'at', argIndices: [0] },
