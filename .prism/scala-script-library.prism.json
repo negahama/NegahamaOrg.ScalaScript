@@ -8,10 +8,10 @@
       "title": "`var concat: (...value: any[]) -> T[]` at language\\scala-script-library.ts#86",
       "source": {
         "file": "/language/scala-script-library.ts",
-        "startLine": 86,
-        "startColumn": 22,
-        "endLine": 86,
-        "endColumn": 22
+        "startLine": 275,
+        "startColumn": 0,
+        "endLine": 275,
+        "endColumn": 0
       },
       "notes": [
         {

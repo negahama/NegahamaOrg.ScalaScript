@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.6.11 - April 8, 2025
+
+- bug fix and append extra information to error message for debuging
+
 ### 0.6.10 - April 2, 2025
 
 - changed the parameter `digit` of Number.toFixed(digit) to be nullable

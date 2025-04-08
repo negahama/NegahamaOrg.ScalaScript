@@ -158,18 +158,18 @@ export class ScalaScriptValidator {
   checkArrayValue(expr: ast.ArrayValue, accept: ValidationAcceptor): void {
     const log = enterLog('checkArrayValue', expr)
 
-    let type: TypeDescriptor
-    expr.items.forEach((item, index) => {
-      const itemType = TypeSystem.inferType(item).actual
-      if (!type) {
-        type = itemType
-      } else if (!type.isEqual(itemType)) {
-        const msg = `checkArrayValue: Array item at index ${index} has type '${itemType.toString()}' but expected '${type.toString()}'.`
-        accept('error', msg, {
-          node: item,
-        })
-      }
-    })
+    // let type: TypeDescriptor
+    // expr.items.forEach((item, index) => {
+    //   const itemType = TypeSystem.inferType(item).actual
+    //   if (!type) {
+    //     type = itemType
+    //   } else if (!type.isEqual(itemType)) {
+    //     const msg = `checkArrayValue: Array item at index ${index} has type '${itemType.toString()}' but expected '${type.toString()}'.`
+    //     accept('error', msg, {
+    //       node: item,
+    //     })
+    //   }
+    // })
 
     exitLog(log)
   }
@@ -366,7 +366,8 @@ export class ScalaScriptValidator {
           if (errors.length) {
             return (
               `checkCallChain: Function '${funcName}'s` +
-              ` parameter '${argType.toString()}' must to be '${paramType.toString()}'.`
+              ` parameter '${arg.$cstNode?.text}' must to be '${paramType.toString()}'.` + 
+              `\n  ${errors.join(', ')}`
             )
           }
           return ''
@@ -446,7 +447,8 @@ export class ScalaScriptValidator {
 
     // 할당문의 오른쪽이 왼쪽에 할당될 수 있는지 확인한다.
     if (!right.isAssignableTo(left)) {
-      const msg = `checkAssignment: Type '${tr}' is not assignable to type '${tl}'.`
+      const msg = `checkAssignment: Type '${tr}' is not assignable to type '${tl}'.` + 
+        `\n  ${right.checkAssignableTo(left).join(', ')}`
       accept('error', msg, {
         node: expr,
         property: 'value',

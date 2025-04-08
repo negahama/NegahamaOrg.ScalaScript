@@ -744,8 +744,13 @@ export class ClassTypeDescriptor extends TypeDescriptor {
   override compareTo(other: TypeDescriptor): string[] {
     const otherClass = other as ClassTypeDescriptor
     // 동일하거나 상속관계인 경우(자식이 부모 클래스에)만 assignable이다.
-    if (TypeSystem.getClassChain(this.node).includes(otherClass.node)) return []
-    else return [`Object ${otherClass.toString()} is not super class of ${this.toString()} in class chain`]
+    const classChain = TypeSystem.getClassChain(this.node)
+    // if (classChain.includes(otherClass.node)) return []
+    if (classChain.find(e => e.name == otherClass.node.name)) return []
+    else {
+      const classChainNames = classChain.map(c => c.name).join(', ')
+      return [`Object ${otherClass.toString()} is not super class of ${this.toString()} in class chain [${classChainNames}]`]
+    }
   }
 
   /**
