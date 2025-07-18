@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.0 - July 19, 2025
+
+- Langium Version Upgrade (3.3.0 -> 3.5.0)
+- append `readonly` variable modifier
+- correct the bugs about Map class
+- correct the bug with an incorrect close parentheses indent in the class definition
+
 ### 0.6.11 - April 8, 2025
 
 - bug fix and append extra information to error message for debuging

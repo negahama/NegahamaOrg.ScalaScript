@@ -243,10 +243,12 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
   // 이 함수는 일반적인 변수 정의로 변환하는데 함수형 변수인 경우에만 함수로 변환하거나 override를 추가한다.
   // 코드의 가독성을 높이기 위해서 코드가 좀 중복되더라도 함수형 변수인 경우만 따로 처리한다.
   // 먼저 함수형이 아닌 경우를 먼저 처리하고 리턴한다.
+  // private, static, readonly는 순서대로 적용되야 한다.
   if (!(stmt.value && ast.isFunctionValue(stmt.value))) {
     if (stmt.export) result += 'export '
     if (stmt.private) result += 'private '
     if (stmt.static) result += 'static '
+    if (stmt.readonly) result += 'readonly '
 
     if (!isClassMember) {
       if (stmt.kind == 'var') result += 'let '
@@ -343,6 +345,7 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
   if (stmt.export) result += 'export '
   if (stmt.private) result += 'private '
   if (stmt.static) result += 'static '
+  if (stmt.readonly) result += 'readonly '
 
   if (isFunction) {
     result += generateFunction({
@@ -431,6 +434,7 @@ function transpileFunctionDef(stmt: ast.FunctionDef, indent: number, isClassMeth
   if (stmt.export) result += 'export '
   if (stmt.private) result += 'private '
   if (stmt.static) result += 'static '
+  if (stmt.readonly) result += 'readonly '
 
   result += generateFunction({
     includeFunction: !isClassMethod,
@@ -496,7 +500,7 @@ function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
     result += '\n'
   })
 
-  result += '}'
+  result += applyIndent(indent, '}')
   return result
 }
 

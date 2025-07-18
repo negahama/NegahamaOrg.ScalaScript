@@ -1421,6 +1421,7 @@ export class TypeSystem {
           }
           return false
         }
+
         // 인수 t에 Generic이 있으면 t가 실제 어떤 타입이어야 하는지를 g를 통해 판단한다.
         const replaceGeneric = (
           t: TypeDescriptor,
@@ -1433,8 +1434,11 @@ export class TypeSystem {
             const m = g.find(e => e.name == t.name)
             return m?.type || new AnyTypeDescriptor()
           } else if (this.isArrayType(t)) {
-            if (this.isGenericType(t.elementType) && g.length > 0) return new ArrayTypeDescriptor(g[0].type)
-            else return new ArrayTypeDescriptor(t.elementType)
+            const arrayElementType = t.elementType
+            if (this.isGenericType(arrayElementType) && g.length > 0) {
+              const m = g.find(e => e.name == arrayElementType.name)
+              return new ArrayTypeDescriptor(m?.type || new AnyTypeDescriptor())
+            } else return new ArrayTypeDescriptor(arrayElementType)
           } else if (this.isFunctionType(t)) {
             const desc = new FunctionTypeDescriptor()
             desc.changeReturnType(replaceGeneric(t.returnType, g))

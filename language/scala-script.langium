@@ -220,7 +220,7 @@ fragment Annotation:
   '@' annotate=Id;
 
 fragment Modifier:
-  (export?='export')? (private?='private')? (static?='static')?;
+  (export?='export')? (private?='private')? (static?='static')? (readonly?='readonly')?;
 
 fragment TypedId:
   name=Id (nullable?='?')? (':' type=Types)?;
@@ -469,7 +469,7 @@ UnaryOperator infers Expression:
   CallChain을 아래와 같이 보다 간략하게 정의할 수도 있는데 현재와 같이 정의하게 된 이유는...
   ```
   CallChain infers Expression:
-    SimpleExpression ({infer CallChain.previous=current} "." CallableElements )* (assertion=('!'|'?'))? )*;
+    SimpleExpression ({infer CallChain.previous=current} "." CallableElements (assertion=('!'|'?'))? )*;
   fragment CallableElements:
     element=[NamedElement:Id] ( FunctionCallSignature | ArrayCallSignature )?;
   fragment FunctionCallSignature:
@@ -482,12 +482,28 @@ UnaryOperator infers Expression:
   심지어 FunctionCallSignature의 내용인 isFunction?='(' Arguments? ')'을 사용하는 것도 안된다.
 
   이 부분은 [Fragment와 Ref 동시 사용시 문제점](/.prism/docs/1d29c20692a691a8fb6ba4b666d9ccef.md) 참고
+
+  이 문제는 Langium 3.3.1에서 수정되었다.
+  그래서 원래 코드를 보관하고 위의 방법으로 대체한다.
+  위의 방법은 token이 간단하게 구성되어져 있기 때문에 성능면에서 훨씬 유리하다고 한다.
+  ```
+  CallChain infers Expression:
+    SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
+    (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')?
+    (assertion=('!'|'?'))? )*;
+  ```
 */
-//todo Langium이 버전업되면 수정되어야 한다.
 CallChain infers Expression:
-  SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
-  (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')?
-  (assertion=('!'|'?'))? )*;
+  SimpleExpression ({infer CallChain.previous=current} "." CallableElements (assertion=('!'|'?'))? )*;
+
+fragment CallableElements:
+  element=[NamedElement:Id] ( FunctionCallSignature | ArrayCallSignature )?;
+
+fragment FunctionCallSignature:
+  isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')';
+
+fragment ArrayCallSignature:
+  isArray?='[' index=Expression ']';
 
 /*
   CallChain의 시작점으로 사용되는 atomic expressions

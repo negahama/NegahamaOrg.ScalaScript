@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "publisher": "NegahamaOrg",
@@ -30,7 +30,7 @@
     "url": "https://github.com/negahama/NegahamaOrg.ScalaScript.git"
   },
   "dependencies": {
-    "langium": "~3.3.0",
+    "langium": "~3.5.0",
     "vscode-languageclient": "~9.0.1",
     "vscode-languageserver": "~9.0.1"
   },
@@ -42,7 +42,7 @@
     "concurrently": "~8.2.1",
     "esbuild": "~0.20.2",
     "eslint": "~8.57.0",
-    "langium-cli": "~3.3.0",
+    "langium-cli": "~3.5.0",
     "typescript": "~5.1.6",
     "vitest": "^2.1.8"
   },

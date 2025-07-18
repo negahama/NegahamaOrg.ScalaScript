@@ -23,7 +23,7 @@
     },
     {
       "name": "storage.modifier.scala-script",
-      "match": "\\b(export|private|static|super|this)\\b"
+      "match": "\\b(export|private|static|readonly|super|this)\\b"
     },
     {
       "name": "storage.type.scala-script",

@@ -1158,18 +1158,20 @@ export const ScalaScriptBuiltinLibrary = `
 
   /**
    * key를 이용해 value를 저장합니다.
+   * 이 메서드는 key가 이미 존재하면 해당 값을 업데이트하고, 존재하지 않으면 새로 추가합니다.
+   * Javascript에서 이 메서드는 맵 자신을 반환하지만 ScalaScript에서는 이를 지원하지 않습니다.
    * @param key
    * @param value
    * @returns
    */
-  var set: (key: K, value: V) -> V
+  var set: (key: K, value: V) -> any
 
   /**
    * key에 해당하는 값을 반환합니다. key가 존재하지 않으면 undefined를 반환합니다.
    * @param key
    * @returns
    */
-  var get: (key: K) -> V
+  var get: (key: K) -> V | nil
 
   /**
    * key가 존재하면 true, 존재하지 않으면 false를 반환합니다.
@@ -1191,19 +1193,29 @@ export const ScalaScriptBuiltinLibrary = `
   var clear: () -> void
 
   /**
-   * 각 요소의 키를 모은 반복 가능한(iterable, 이터러블) 객체를 반환합니다.
+   * Javascript에서 이 메서드는 각 요소의 키를 모은 반복 가능한(iterable, 이터러블) 객체를 반환합니다.
+   * ScalaScript에서는 이터러블 객체를 지원하지 않기 때문에 반환값을 직접 사용하는 것을 지원하지는 않지만
+   * for..of 반복문을 사용하여 키를 순회할 수 있습니다.
+   * for (key <- map.keys()) {
+   *   console.log('key:', key)
+   * }
    * @returns
    */
   var keys: () -> K[]
 
   /**
-   * 각 요소의 값을 모은 이터러블 객체를 반환합니다.
+   * Javascript에서 이 메서드는 각 요소의 값을 모은 이터러블 객체를 반환합니다.
+   * ScalaScript에서는 이터러블 객체를 지원하지 않기 때문에 반환값을 직접 사용하는 것을 지원하지는 않지만
+   * for..of 반복문을 사용하여 값을 순회할 수 있습니다.
+   * for (value <- map.values()) {
+   *   console.log('value:', value)
+   * }
    * @returns
    */
-  var values: () -> any[]
+  var values: () -> V[]
 
   /**
-   * 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다. 이 이터러블 객체는 for..of반복문의 기초로 쓰입니다.
+   * 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다. 이 이터러블 객체는 for..of 반복문의 기초로 쓰입니다.
    * @returns
    */
   var entries: () -> any
@@ -1213,7 +1225,7 @@ export const ScalaScriptBuiltinLibrary = `
    * @param thisArg
    * @returns
    */
-  var forEach: (callbackFn: (arg: V, index?: number) -> any, thisArg?: any) -> void
+  var forEach: (callbackFn: (value: V, key?: K) -> any, thisArg?: any) -> void
 }
 
 @NotTrans export def Set<T> = {
@@ -1249,22 +1261,28 @@ export const ScalaScriptBuiltinLibrary = `
   var clear: () -> void
 
   /**
-   * 각 요소의 키를 모은 반복 가능한(iterable, 이터러블) 객체를 반환합니다.
+   * Javascript에서 이 메서드는 각 요소의 키를 모은 반복 가능한(iterable, 이터러블) 객체를 반환합니다.
+   * ScalaScript에서는 이터러블 객체를 지원하지 않기 때문에 반환값을 직접 사용하는 것을 지원하지는 않지만
+   * for..of 반복문을 사용하여 값을 순회할 수 있습니다.
    * @returns
    */
-  var keys: () -> any
+  var keys: () -> T[]
 
   /**
-   * 각 요소의 값을 모은 이터러블 객체를 반환합니다.
+   * Javascript에서 이 메서드는 각 요소의 값을 모은 이터러블 객체를 반환합니다.
+   * ScalaScript에서는 이터러블 객체를 지원하지 않기 때문에 반환값을 직접 사용하는 것을 지원하지는 않지만
+   * for..of 반복문을 사용하여 값을 순회할 수 있습니다.
    * @returns
    */
-  var values: () -> any
+  var values: () -> T[]
 
   /**
-   * 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다. 이 이터러블 객체는 for..of반복문의 기초로 쓰입니다.
+   * Javascript에서 이 메서드는 요소의 [키, 값]을 한 쌍으로 하는 이터러블 객체를 반환합니다.
+   * ScalaScript에서는 이터러블 객체를 지원하지 않기 때문에 반환값을 직접 사용하는 것을 지원하지는 않지만
+   * for..of 반복문을 사용하여 값을 순회할 수 있습니다.
    * @returns
    */
-  var entries: () -> any
+  var entries: () -> T[]
 
   /**
    * @param callbackFn
