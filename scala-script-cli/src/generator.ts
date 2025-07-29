@@ -589,25 +589,18 @@ function transpileThrowStatement(stmt: ast.ThrowStatement, indent: number): stri
 function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number): string {
   let result = ''
   result += `try ${generateBlock(stmt.body, indent)}`
-  result += applyIndent(indent, 'catch {\n')
-  stmt.cases.forEach(mc => {
-    if (ast.isLiteral(mc.pattern)) {
-      const pattern = generateExpression(mc.pattern, indent)
-      result += applyIndent(indent + 1, `case ${pattern}: `)
-    } else {
-      result += applyIndent(indent + 1, `default: `)
-    }
-    if (mc.body) {
-      result += generateBlock(mc.body, indent + 1, (lastCode, indent) => {
-        if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
-        else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
-        else return ''
-      })
-    }
-    result += '\n'
-  })
-  result += applyIndent(indent, '}')
-  result += applyIndent(indent, `finally ${generateExpression(stmt.finally, indent)}`)
+  if (stmt.catch) {
+    result += ' catch (' + stmt.catch.name + ') '
+    result += generateBlock(stmt.catch.body, indent, (lastCode, indent) => {
+      if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
+      else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)
+      else return ''
+    })
+  }
+  if (stmt.finally) {
+    result += ' finally '
+    result += generateBlock(stmt.finally.body, indent)
+  }
   return result
 }
 
@@ -643,7 +636,7 @@ function transpileBypass(stmt: ast.Bypass, indent: number): string {
       result += '\n' + applyIndent(indent, stmt.bypass.replaceAll('%%', ''))
     } else {
       const t = stmt.bypass.replaceAll('%%\r\n', '').replaceAll('\r\n%%', '').replaceAll('%%', '')
-      result += '\n' + applyIndent(indent, t)
+      result += t // '\n' + applyIndent(indent, t)
     }
   }
   return result

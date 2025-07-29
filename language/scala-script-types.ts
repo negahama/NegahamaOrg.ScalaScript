@@ -1151,6 +1151,8 @@ export class TypeSystem {
       result = this.inferTypeObjectValue(node, options)
     } else if (ast.isFunctionValue(node)) {
       result = this.inferTypeFunctionValue(node, options)
+    } else if (ast.isCatchClause(node)) {
+      result = this.inferTypeCatchClause(node, options)
     } else if (ast.isLiteral(node)) {
       result = this.inferTypeLiteral(node, options)
     } else if (ast.isBlock(node)) {
@@ -2095,6 +2097,20 @@ export class TypeSystem {
     const type = this.createFunctionType(node)
     exitLog(log, type)
     return { actual: type, formal: type }
+  }
+
+  /**
+   *
+   * @param node - The `ForTo` AST node to infer the type for.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
+   */
+  static inferTypeCatchClause(node: ast.CatchClause, options?: InferOptions): InferResult {
+    const log = enterLog('inferTypeCatchClause', node)
+    const type: TypeDescriptor = new AnyTypeDescriptor()
+    let result: InferResult = { actual: type, formal: type }
+    exitLog(log, result.actual)
+    return result
   }
 
   /**

@@ -1148,7 +1148,36 @@ export const ScalaScriptBuiltinLibrary = `
   static var notEqual: (value1: any, value2: any, message?: string) -> void
 }
 
-@NotTrans export def Array = {}
+@NotTrans export def Array = {
+  /**
+   * 순회 가능 또는 유사 배열 객체에서 새 Array인스턴스를 생성합니다.
+   * @returns
+   */
+  static var from: (arrayLike: any, mapFn?: (value: any, index?: number) -> any, thisArg?: any) -> any[]
+
+  /**
+   * 비동기 순회 가능, 순회 가능, 또는 유사 배열 객체에서 새 Array 인스턴스를 생성합니다.
+   * @returns
+   */
+  static var fromAsync: (arrayLike: any, mapFn?: (value: any, index?: number) -> any, thisArg?: any) -> any[]
+
+  /**
+   * 인자가 배열이면 true를 반환하고, 그렇지 않으면 false를 반환합니다.
+   * @returns
+   */
+  static var isArray: (arg: any) -> boolean
+
+  /**
+   * 인자의 개수나 유형에 관계없이 가변적인 수의 인자를 가진 새 Array 인스턴스를 생성합니다.
+   * @returns
+   */
+  static var of: (...items: any[]) -> any[]
+
+  /**
+   * 배열 요소의 개수를 반영합니다.
+   */
+  static var length: number
+}
 
 @NotTrans export def Map<K, V> = {
   /**
@@ -1185,7 +1214,7 @@ export const ScalaScriptBuiltinLibrary = `
    * @param key
    * @returns
    */
-  var delete: (key: K) -> void
+  var delete: (key: K) -> boolean
 
   /**
    * 맵 안의 모든 요소를 제거합니다.

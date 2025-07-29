@@ -166,6 +166,7 @@ type NamedElement =
   | Parameter
   | Property    // Property는 NamedElement이긴 하지만 꼭 필요하진 않다. 
   | Iterator
+  | CatchClause
   | ImportStatement;
 
 //-----------------------------------------------------------------------------
@@ -363,8 +364,14 @@ ThrowStatement:
 // Try Statement
 TryCatchStatement:
   'try' body=Block
-  ('catch' ('{' | INDENT) cases+=CaseClause+ ('}' | DEDENT))?
-  ('finally' finally=Expression)?;
+  (catch=CatchClause)?
+  (finally=FinallyClause)?;
+
+CatchClause:
+  'catch' '(' name=Id ')' body=Block;
+
+FinallyClause:
+  'finally' body=Block;
 
 // Import Statement
 // from이 키워드로 사용되지 않도록 from=Id로 처리하였다.

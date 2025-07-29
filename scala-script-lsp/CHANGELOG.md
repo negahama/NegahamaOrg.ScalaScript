@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.1 - July 30, 2025
+
+- change the try-catch statement like Scala to one like JavaScript
+- support static methods of Array such like Array.from
+
 ### 0.7.0 - July 19, 2025
 
 - Langium Version Upgrade (3.3.0 -> 3.5.0)
@@ -70,45 +75,3 @@ All notable changes to this project will be documented in this file.
 ### 0.6.0 - December 19, 2024
 
 - A parameter check function was implemented
-
-### 0.5.8 - December 10, 2024
-
-- reinforce Generic processing
-- bug fix
-
-### 0.5.7 - December 9, 2024
-
-- make comma to be possible in ObjectDef, ObjectValue
-- improve the Generic and functional method
-- reinforce Scope and TypeSystem
-- and bug fix
-
-### 0.5.6 - December 2, 2024
-
-- reinforce TypeSystem
-- fixed bug about inferTypeSimpleType
-
-### 0.5.5 - November 29, 2024
-
-- refactoring TypeSystem
-- The Langium version upgrade to 3.3.0
-- support block with indent such as Python
-
-### 0.5.4 - November 24, 2024
-
-- fixed some bugs about function type variables
-
-### 0.5.3 - November 22, 2024
-
-- prepare to remove the FunctionDef
-
-### 0.5.2 - November 21, 2024
-
-- changed the grammar from `def object_type => { ... }` to `def object_type = { ... }`
-- The readme is reinforced.
-- refactoring
-
-### 0.5.1 - November 19, 2024
-
-- remove the TsAstViewer
-- fixed the bug that is not parse correctly stuff like this : `var t: (arg: number) -> number[]`
