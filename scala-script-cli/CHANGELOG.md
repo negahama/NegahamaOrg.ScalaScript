@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.2 - July 30, 2025
+
+- Changed the logical operator to be available for all types
+- fixed the bug: `extends` at interface don't be transpiled properly
+
 ### 0.7.1 - July 30, 2025
 
 - change the try-catch statement like Scala to one like JavaScript

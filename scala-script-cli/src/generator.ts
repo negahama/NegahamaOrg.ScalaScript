@@ -480,7 +480,7 @@ function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
   if (isInterface) {
     result += `interface ${stmt.name}`
     result += generateGeneric(stmt.generic, indent) + ' '
-    result += '{\n'
+    result += stmt.superClass ? `extends ${stmt.superClass.$refText} {\n` : '{\n'
   } else {
     result += `class ${stmt.name}`
     result += generateGeneric(stmt.generic, indent) + ' '

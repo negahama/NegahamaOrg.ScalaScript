@@ -659,7 +659,12 @@ export class ScalaScriptValidator {
           return false
         }
 
-        return TypeSystem.isBooleanType(l) && TypeSystem.isBooleanType(r)
+        // 이전에는 논리 연산자는 boolean 타입이 아니면 적용할 수 없었는데
+        // JavaScript와 호환성과 편이성을 위해 모든 타입에 적용할 수 있도록 한다.
+        // 이렇게 변경하는 가장 결정적인 이유는 `val r = f() || 10` 과 같은 것을 처리하기 위해서이다.
+        // 아니면 매번 `val r = if f() != nil then f() else 10` 과 같이 해야 하는데 f가 반복되고 상당히 불편하다.
+        // return TypeSystem.isBooleanType(l) && TypeSystem.isBooleanType(r)
+        return true
       }
 
       // 부정(논리적 NOT) 단항 연산자
