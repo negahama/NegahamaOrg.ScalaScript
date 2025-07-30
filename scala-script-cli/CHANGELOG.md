@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.3 - July 30, 2025
+
+- fixed the bug on version 0.7.2
+
 ### 0.7.2 - July 30, 2025
 
 - Changed the logical operator to be available for all types

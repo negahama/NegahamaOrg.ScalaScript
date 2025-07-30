@@ -407,7 +407,7 @@ Expression:
 // Binary Operators
 // 논리 연산자 처리
 Logical infers Expression:
-  InstanceOf     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '&&' | '||') right=InstanceOf)*;
+  InstanceOf     ({infer BinaryExpression.left=current} operator=('and' | 'or' | '??' | '&&' | '||') right=InstanceOf)*;
 
 // instanceof 연산자의 우선 순위는 비교연산자와 동일하다.
 InstanceOf infers Expression:

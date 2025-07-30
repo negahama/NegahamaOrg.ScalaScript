@@ -1932,7 +1932,8 @@ export class TypeSystem {
    * @returns An object containing the inferred type as both `actual` and `formal` properties.
    *
    * The function handles different binary operators and infers the type based on the operator:
-   * - Logical operators (`and`, `or`, `&&`, `||`, `<`, `<=`, `>`, `>=`, `==`, `!=`) result in a boolean type.
+   * - Logical operators (`and`, `or`, `&&`, `||`) result in a type of first element or union of both elements.
+   * - Logical operators (`<`, `<=`, `>`, `>=`, `==`, `!=`) result in a boolean type.
    * - Arithmetic operators (`-`, `+`, `**`, `*`, `/`, `%`) result in a number type.
    * - The range operator (`..`) results in a string type if either operand is a string.
    * - The `instanceof` operator results in an any type.
@@ -1942,7 +1943,19 @@ export class TypeSystem {
   static inferTypeBinaryExpression(node: ast.BinaryExpression, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeBinaryExpression', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('Could not infer type from binary expression', node)
-    if (['and', 'or', '&&', '||', '<', '<=', '>', '>=', '==', '!='].includes(node.operator)) {
+    if (['and', 'or', '??', '&&', '||'].includes(node.operator)) {
+      // 먼저 이렇게 처리하는 이유에 대해서는 [[al=ca932d6fb7c8105671cff22f7e27e015]]을 참고한다.
+      // 이 논리 연산자들이 리턴하는 타입은 첫번째 항과 두번째 항의 타입을 보고 판단하는데 첫번째 항을 좀 더 우선시 한다.
+      // 왜냐하면 이들 연산자가 연속되어져 있을 때 즉 a || b || c와 같은 경우 단락 평가(short-circuit evaluation)가
+      // 적용될 수 있기 때문에 평가가 되지 않을 수도 있는 두번째 항보다 첫번째 항에 비중을 두는게 맞을 것 같다.
+      const left = this.inferType(node.left, options).actual
+      const right = this.inferType(node.right, options).actual
+      if (right.isAssignableTo(left)) {
+        type = left
+      } else {
+        type = new UnionTypeDescriptor([left, right])
+      }
+    } else if (['<', '<=', '>', '>=', '==', '!='].includes(node.operator)) {
       type = new BooleanTypeDescriptor(node)
     } else if (['-', '+', '**', '*', '/', '%'].includes(node.operator)) {
       type = new NumberTypeDescriptor(node)

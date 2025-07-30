@@ -653,7 +653,7 @@ export class ScalaScriptValidator {
 
       // 논리 연산자
       // 모두 이항 연산자이며 boolean 타입과 관련된 연산자이다
-      else if (['and', 'or', '&&', '||'].includes(operator)) {
+      else if (['and', 'or', '??', '&&', '||'].includes(operator)) {
         if (!r) {
           console.error(chalk.red('internal error in logical operator'))
           return false
