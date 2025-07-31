@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.5 - July 31, 2025
+
+- ROLL BACK to 0.7.3 : cause out of heap memory
+
+### 0.7.4 - July 31, 2025
+
+- add new features to grammar
+
 ### 0.7.3 - July 30, 2025
 
 - fixed the bug on version 0.7.2

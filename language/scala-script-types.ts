@@ -2114,7 +2114,7 @@ export class TypeSystem {
 
   /**
    *
-   * @param node - The `ForTo` AST node to infer the type for.
+   * @param node - The `CatchClause` AST node to infer the type for.
    * @param options - Optional inference options that may influence the type inference process.
    * @returns An object containing the inferred type as both `actual` and `formal` properties.
    */
