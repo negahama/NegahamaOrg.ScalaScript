@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.6 - October 11, 2025
+
+- change generated code formatting
+    * "use strict"; -> 'use strict'
+    * For single parameters, remove parentheses : ex) forEach((e) => {...}) -> forEach(e => {...})
+    * For else/else if statement, remove new line : ex) if (...) {...} /n else {...} -> if (...) {...} else {...}  
+
 ### 0.7.5 - July 31, 2025
 
 - ROLL BACK to 0.7.3 : cause out of heap memory

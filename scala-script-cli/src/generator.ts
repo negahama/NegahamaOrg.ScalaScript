@@ -21,7 +21,7 @@ export function generateTypeScript(program: ast.Program, filePath: string, desti
 
   const fileNode = expandToNode`
     // This is transpiled by ScalaScript
-    "use strict";
+    'use strict'
 
     ${joinToNode(program.codes, code => generateCode(code), {
       appendNewLineIfNotEmpty: true,
@@ -866,13 +866,13 @@ function transpileIfExpression(expr: ast.IfExpression, indent: number): string {
     result += generateBlock(expr.then, indent)
   }
   expr.elif.forEach(elif => {
-    result += '\n' + applyIndent(indent, 'else if ' + generateCondition(elif.condition, indent) + ' ')
+    result += ' else if ' + generateCondition(elif.condition, indent) + ' '
     if (elif.elif) {
       result += generateBlock(elif.elif, indent)
     }
   })
   if (expr.else) {
-    result += '\n' + applyIndent(indent, 'else ' + generateBlock(expr.else, indent))
+    result += ' else ' + generateBlock(expr.else, indent)
   }
   return result
 }
@@ -1303,10 +1303,10 @@ function generateFunction(param: GenerateFunctionParams): string {
     .join(', ')
 
   // name이 있으면 무조건 괄호를 표시한다.
-  param.paramsForceBracket = param.name ? true : param.paramsForceBracket
+  if (param.name) param.paramsForceBracket = true
 
   if (
-    param.paramsForceBracket == false &&
+    (param.paramsForceBracket == undefined || param.paramsForceBracket == false) &&
     param.params.length == 1 &&
     param.params[0].type == undefined &&
     ast.isParameter(param.params[0])
