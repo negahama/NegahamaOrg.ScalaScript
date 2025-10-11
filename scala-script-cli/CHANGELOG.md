@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.7 - October 11, 2025
+
+- fixed the bug on version 0.7.6
+
 ### 0.7.6 - October 11, 2025
 
 - change generated code formatting

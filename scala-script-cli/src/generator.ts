@@ -1309,6 +1309,7 @@ function generateFunction(param: GenerateFunctionParams): string {
     (param.paramsForceBracket == undefined || param.paramsForceBracket == false) &&
     param.params.length == 1 &&
     param.params[0].type == undefined &&
+    param.params[0].value == undefined &&
     ast.isParameter(param.params[0])
   )
     result += paramsText
