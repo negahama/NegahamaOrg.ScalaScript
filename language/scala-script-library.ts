@@ -346,7 +346,7 @@ export const ScalaScriptBuiltinLibrary = `
    * @param callbackFn
    * @returns
    */
-  var flatMap: (callbackFn: (arg: T, index?: number) -> T) -> T[]
+  var flatMap: (callbackFn: (arg: T, index?: number) -> any) -> any[]
 
   /**
    * 호출 배열의 각 요소로 함수를 호출합니다.

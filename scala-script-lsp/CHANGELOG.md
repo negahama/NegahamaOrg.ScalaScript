@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.8 - November 25, 2025
+
+- changed the type of flatMap
+
 ### 0.7.5 - July 31, 2025
 
 - ROLL BACK to 0.7.3 : cause out of heap memory

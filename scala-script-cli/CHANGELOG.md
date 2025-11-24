@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.8 - November 25, 2025
+
+- changed the type of flatMap
+
 ### 0.7.7 - October 11, 2025
 
 - fixed the bug on version 0.7.6
