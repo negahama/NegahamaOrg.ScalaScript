@@ -106,7 +106,7 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
     ast.WhileStatement,
     ast.ThrowStatement,
     ast.TryCatchStatement,
-    ast.Bypass,
+    // ast.Bypass,
   ]
 
   if (newLineNode.some(node => node === stmt.$type) && indent == 0) result = '\n' + result
@@ -613,7 +613,12 @@ function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number)
  */
 function transpileImportStatement(stmt: ast.ImportStatement, indent: number): string {
   let result = 'import '
+  if (stmt.type) {
+    // assert.ok(stmt.type == 'type')
+    result += 'type '
+  }
   result += '{ ' + stmt.import.map(e => e).join(', ') + ' } '
+  // assert.ok(stmt.from == 'from')
   result += 'from ' + stmt.path
   return result
 }
@@ -891,11 +896,12 @@ function transpileMatchExpression(expr: ast.MatchExpression, indent: number): st
   expr.cases.forEach(mc => {
     if (ast.isLiteral(mc.pattern)) {
       const pattern = generateExpression(mc.pattern, indent)
-      result += applyIndent(indent + 1, `case ${pattern}: `)
+      result += applyIndent(indent + 1, `case ${pattern}:`)
     } else {
-      result += applyIndent(indent + 1, `default: `)
+      result += applyIndent(indent + 1, `default:`)
     }
     if (mc.body) {
+      result += ' '
       result += generateBlock(mc.body, indent + 1, (lastCode, indent) => {
         if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
         else if (ast.isExpression(lastCode)) return generateExpression(lastCode, indent)

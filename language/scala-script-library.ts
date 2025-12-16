@@ -1115,15 +1115,16 @@ export const ScalaScriptBuiltinLibrary = `
    */
   static var warn: (...args: any[]) -> void
 }
-  
-@NotTrans export var assert: (value: any, message?: any) -> void
+
 @NotTrans export def assert = {
   /**
-   * @param value
+   * The assert.ok() method tests if a given expression is true or not.
+   * If the expression evaluates to 0, or false, an assertion failure is being caused, and the program is terminated.
+   * @param expression
    * @param message
    * @returns
    */
-  static var ok: (value: any, message?: any) -> void
+  static var ok: (expression: any, message?: any) -> void
 
   /**
    * @param message
@@ -1147,6 +1148,232 @@ export const ScalaScriptBuiltinLibrary = `
    */
   static var notEqual: (value1: any, value2: any, message?: string) -> void
 }
+
+@NotTrans export def performance = {
+  /**
+   * performance.now() 메서드는 마이크로초 정밀도까지 표현될 수 있는 부동소수점으로 고해상도 타임스탬프를 반환합니다.
+   * @returns
+   */
+  static var now: () -> number
+}
+
+@NotTrans export def process = {
+  static var stdin: () -> void
+  static var stdout: () -> void
+  static var exit: (code: number) -> void
+}
+
+@NotTrans export def Date = {
+  /**
+   * UTC 기준으로 1970년 1월 1일 0시 0분 0초인 epoch부터 현재까지 경과된 밀리초를 반환합니다.
+   * @returns
+   */
+  static var now: () -> number
+
+  /**
+   * 주어진 날짜 문자열을 구문 분석하고 해당 날짜의 밀리초 단위 타임스탬프를 반환합니다.
+   * 1970 년 1 월 1 일 00:00:00 UTC 이후의 밀리 초 수를 반환하거나 문자열이 인식되지 않거나 경우에 따라 잘못된 날짜 값을 포함하는 경우 NaN을 반환합니다.
+   * @param dateString
+   * @returns
+   */
+  static var parse: (dateString: string) -> number
+  /**
+   * 주어진 날짜의 현지 시간 기준 연도를 반환합니다.
+   * @returns - 현지 시간 기준 연도를 나타내는 4자리 숫자.
+   */
+  var getFullYear: () -> number
+
+  /**
+   * 주어진 날짜의 현지 시간 기준 월을 반환합니다.
+   * @returns - 현지 시간 기준 월을 나타내는 0에서 11 사이의 정수. 0은 1월, 1은 2월... 을 나타냅니다.
+   */
+  var getMonth: () -> number
+
+  /**
+   * 주어진 날짜의 현지 시간 기준 일을 반환합니다.
+   * @returns - 주어진 날짜의 현지 시간 기준 일에 해당하는 1 이상 31 이하의 정수.
+   */
+  var getDate: () -> number
+
+  /**
+   * 주어진 날짜의 현지 시간 기준 요일을 반환합니다.
+   * @returns - 주어진 날짜의 현지 시간 기준 요일에 해당하는 0 이상 6 이하의 정수. (일요일은 0, 월요일은 1, 화요일은 2, ...)
+   */
+  var getDay: () -> number
+
+  /**
+   * 주어진 날짜의 현지 시간 기준 시를 반환합니다.
+   * @returns - 주어진 날짜의 현지 시간 기준 시를 나타내는 0에서 23 사이의 정수.
+   */
+  var getHours: () -> number
+
+  /**
+   * Date 인스턴스의 분을 현지 시간 기준으로 반환합니다.
+   * @returns - 주어진 날짜의 현지 시간 기준 분을 나타내는 0에서 59 사이의 정수.
+   */
+  var getMinutes: () -> number
+
+  /**
+   * Date 인스턴스의 초 값을 현지 시간 기준으로 반환합니다.
+   * @returns - 주어진 날짜의 현지 시간 기준 초를 나타내는 0에서 59 사이의 정수.
+   */
+  var getSeconds: () -> number
+
+  /**
+   * Date 인스턴스의 밀리초를 현지 시간 기준으로 반환합니다.
+   * @returns - 주어진 날짜의 현지 시간 기준 밀리초를 나타내는 0에서 999 사이의 정수.
+   */
+  var getMilliseconds: () -> number
+
+  /**
+   * 표준시에 따라 지정된 날짜의 시간에 해당하는 숫자 값을 반환합니다.
+   * 이 메서드를 사용하면 다른 Date 객체에 날짜와 시간을 지정할 수 있습니다.
+   * 이 메소드는 기능적으로 valueOf() 메소드와 동일합니다.
+   * @returns - 1970 년 1 월 1 일 00:00:00 UTC와 주어진 날짜 사이의 경과 시간 (밀리 초)
+   */
+  var getTime: () -> number
+
+  /**
+   * 현지 시간에 따라 지정된 날짜의 전체 연도를 설정합니다.
+   * @param yearValue - 연도의 숫자 값을 지정하는 정수입니다 (예 : 1995).
+   * @param monthValue - 선택 항목. 1 월에서 12 월까지의 월을 나타내는 0에서 11 사이의 정수입니다.
+   * @param dayValue - 선택 항목. 한 달의 날짜를 나타내는 1 - 31 사이의 정수입니다.
+   * @returns - 1970 년 1 월 1 일 00:00:00 UTC와 업데이트 된 날짜 사이의 밀리 초 숫자입니다.
+   */
+  var setFullYear: (yearValue:number, monthValue?:number, dayValue?:number) -> number
+
+  /**
+   * 현재 설정된 연도에 따라 지정된 날짜의 월을 설정합니다.
+   * @param monthValue - 연도의 시작에서 오프셋된 연도의 월을 나타내는 0 기반 정수입니다.
+   * 그래서 0은 1월, 11은 12월, -1은 전년도의 12월, 12는 다음 해의 1월을 나타냅니다.
+   * @param dayValue - 선택 항목. 한 달의 날짜를 나타내는 1에서 31 사이의 정수입니다.
+   * @returns - 1970년 1월 1일 00:00:00 UTC와 업데이트 된 날짜 사이의 밀리 초 숫자입니다.
+   */
+  var setMonth: (monthValue:number, dayValue?:number) -> number
+
+  /**
+   * 현재 설정된 월의 시작 부분을 기준으로 Date 객체의 날짜를 설정합니다.
+   * @param dayValue - 월의 일을 나타내는 정수입니다.
+   * @returns - 1970 년 1 월 1 일 00:00:00 UTC와 주어진 날짜 사이의 밀리 초 (Date 개체도 변경됩니다).
+   */
+  var setDate: (dayValue:number) -> number
+
+  /**
+   * 현지 시간에 따라 지정된 날짜의 시간을 설정합니다.
+   * @param hoursValue - 시를 나타내는 0에서 23 사이의 정수입니다.
+   * @param minutesValue - 선택 항목. 분을 나타내는 0에서 59 사이의 정수입니다.
+   * @param secondsValue - 선택 항목. 초를 나타내는 0에서 59 사이의 정수입니다.
+   * @param msValue - 선택 항목. 밀리 초를 나타내는 0에서 999 사이의 숫자입니다.
+   * @returns - 1970 년 1 월 1 일 00:00:00 UTC와 업데이트 된 날짜 사이의 밀리 초 숫자입니다.
+   */
+  var setHours: (hoursValue:number, minutesValue?:number, secondsValue?:number, msValue?:number) -> number
+
+  /**
+   * 현지 시간에 따라 지정된 날짜의 분을 설정합니다.
+   * @param minutesValue - 분을 나타내는 0에서 59 사이의 정수입니다.
+   * @param secondsValue - 선택 항목. 초를 나타내는 0에서 59 사이의 정수입니다.
+   * @param msValue - 선택 항목. 밀리 초를 나타내는 0에서 999 사이의 숫자입니다.
+   * @returns - 1970 년 1 월 1 일 00:00:00 UTC와 업데이트 된 날짜 사이의 밀리 초 숫자입니다.
+   */
+  var setMinutes: (minutesValue:number, secondsValue?:number, msValue?:number) -> number
+
+  /**
+   * 현지 시간에 따라 지정된 날짜의 초를 설정합니다.
+   * @param secondsValue - 초를 나타내는 0에서 59 사이의 정수입니다.
+   * @param msValue - 선택 항목. 밀리 초를 나타내는 0에서 999 사이의 숫자입니다.
+   * @returns - 1970 년 1 월 1 일 00:00:00 UTC와 업데이트 된 날짜 사이의 밀리 초 숫자입니다.
+   */
+  var setSeconds: (secondsValue:number, msValue?:number) -> number
+
+  /**
+   * 현지 시간에 따라 지정된 날짜의 밀리 초를 설정합니다.
+   * @param msValue - 밀리 초를 나타내는 0에서 999 사이의 숫자입니다.
+   * @returns - 1970 년 1 월 1 일 00:00:00 UTC와 업데이트 된 날짜 사이의 밀리 초 숫자입니다.
+   */
+  var setMilliseconds: (msValue:number) -> number
+
+  /**
+   * Date 객체를 1970년 1월 1일 00:00:00 UTC부터 밀리 초 단위로 나타내는 시간으로 설정합니다.
+   * @param timeValue - 1970년 1월 1일 00:00:00 UTC 이후의 밀리 초 수를 나타내는 정수 값 입니다.
+   * @returns - 1970 년 1 월 1 일 00:00:00 UTC와 업데이트 된 날짜 사이의 밀리 초 숫자입니다.
+   */
+  var setTime: (timeValue:number) -> number
+
+  /**
+   * 주어진 날짜를 현지 시간대로 해석하고 그 중 날짜 부분만 표시하는 문자열을 반환합니다.
+   * @returns - 주어진 날짜의 날짜 부분을 나타내는 문자열입니다(형식에 대해선 설명 참조).
+   * 날짜가 유효하지 않은 경우 "Invalid Date"를 반환합니다.
+   *
+   * 설명
+   * Date 인스턴스는 특정 시점을 참조합니다.
+   * toDateString()은 날짜를 현지 시간대로 해석하고 날짜 부분을 영어로 형식에 맞춰 출력합니다.
+   * 이 함수는 항상 공백으로 구분된 다음 형식을 사용합니다.
+   * 1. 요일 이름의 처음 세 글자
+   * 2. 월 이름의 첫 세 글자
+   * 3. 필요한 경우 왼쪽에 0을 추가한 두 자리 숫자의 월별 요일
+   * 4. 4자리 연도(최소), 필요한 경우 왼쪽에 0을 추가합니다. 음수 기호를 사용할 수 있습니다.
+   * 예를 들어 "Thu Jan 01 1970"처럼 말이죠.
+   * - 시간 부분만 가져오려면 toTimeString()을 사용하시기 바랍니다.
+   * - 날짜와 시간을 모두 가져오려면 toString()를 사용하시기 바랍니다.
+   * - 날짜를 현지 표준 시간대 대신 UTC로 해석하려면 toUTCString()를 사용하시기 바랍니다.
+   * - 보다 사용자 친화적인 형식(예: 현지화)으로 날짜 형식을 맞추려면 toUTCString()를 사용합니다.
+   */
+  var toDateString: () -> string
+
+  /**
+   * 현지 시간대로 해석된 날짜의 시간 부분을 표현하는 문자열을 반환합니다.
+   * @returns - 주어진 날짜의 시간 부분을 표현하는 문자열입니다 (형식에 대해서는 설명 참고).
+   * 날짜가 유효하지 않으면 "Invalid Date"을 반환합니다.
+   *
+   * 설명
+   * Date 인스턴스는 특정 시점을 참조합니다.
+   * toTimeString()은 날짜를 현지 시간대로 해석하고 시간 부분의 형식을 영어로 지정합니다.
+   * 항상 hh:mm:ss GMT±xxxx (TZ) 형식을 사용합니다.
+   *
+   * 형식 문자열	설명
+   * hh	시간, 필요 시 0으로 시작하는 2자리 숫자
+   * mm	분, 필요 시 0으로 시작하는 2자리 숫자
+   * ss	초, 필요 시 0으로 시작하는 2자리 숫자
+   * ±xxxx	현지 시간대의 오프셋. 시간을 나타내는 2자리 숫자와 분을 나타내는 2자리 숫자 (e.g. -0500, +0800)
+   * TZ	시간대의 이름(e.g. PDT, PST)
+   * 예: "04:42:04 GMT+0000 (협정 세계시)".
+   *
+   * - 날짜 부분만 가져오려면 toDateString()를 사용합니다.
+   * - 날짜와 시간을 모두 가져오려면 toString()를 사용합니다.
+   * - 날짜를 현지 표준 시간대 대신 UTC로 해석하려면 toUTCString()를 사용합니다.
+   * - 보다 사용자 친화적인 형식(예: 현지화)으로 날짜 형식을 지정하려면 toLocaleTimeString()를 사용합니다.
+   */
+  var toTimeString: () -> string
+
+  /**
+   * toISOString() 메서드는 단순화한 확장 ISO 형식(ISO 8601)의 문자열을 반환합니다.
+   * 반환값은 언제나 24글자 또는 27글자(각각 YYYY-MM-DDTHH:mm:ss.sssZ 또는 ±YYYYYY-MM-DDTHH:mm:ss.sssZ)입니다.
+   * 시간대는 언제나 UTC이며 접미어 Z로 표현합니다.
+   * @returns
+   */
+  var toISOString: () -> string
+
+  /**
+   * toUTCString() 메서드는 날짜를 문자열로 변환하여 UTC 시간대로 해석합니다.
+   * @returns
+   */
+  var toUTCString: () -> string
+
+  /**
+   * toLocaleString() 메소드는 날짜를 언어별로 구분하여 나타내는 문자열을 반환합니다.
+   * Intl.DateTimeFormat API 를 지원하는 구현에서 이 메소드는 단순히 Intl.DateTimeFormat를 호출합니다.
+   * @returns
+   */
+  var toLocaleString: () -> string
+}
+
+/**
+ * 타이머를 설정하고 해제하는 함수들
+ */
+@NotTrans export fun setTimeout = (callback: () -> void, delay: number) => {}
+@NotTrans export fun setInterval = (callback: () -> void, delay: number) => {}
+@NotTrans export fun clearTimeout = (timer: any) => {}
+@NotTrans export fun clearInterval = (timer: any) => {}
 
 @NotTrans export def Array = {
   /**

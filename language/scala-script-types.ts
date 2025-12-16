@@ -557,7 +557,7 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
       const otherObject = other as ObjectTypeDescriptor
       const otherElements = otherObject.getElementList()
       if (this.getElementList().length != otherElements.length) {
-        console.log(chalk.red('개수가 다름:'), this.getElementList().length, otherElements.length)
+        // console.log(chalk.red('개수가 다름:'), this.getElementList().length, otherElements.length)
         return false
       }
       for (let e of this.getElementList()) {
@@ -643,9 +643,9 @@ export class ObjectTypeDescriptor extends TypeDescriptor {
           list.push({ name: e.name, node: e })
         } else {
           //todo spread 처리
-          console.error(
-            chalk.red('internal error in createObjectType:', e.spread?.spread.$refText, reduceLog(e.$cstNode?.text))
-          )
+          // console.error(
+          //   chalk.red('internal error in createObjectType:', e.spread?.spread.$refText, reduceLog(e.$cstNode?.text))
+          // )
         }
       })
     }

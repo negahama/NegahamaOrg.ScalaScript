@@ -374,9 +374,9 @@ FinallyClause:
   'finally' body=Block;
 
 // Import Statement
-// from이 키워드로 사용되지 않도록 from=Id로 처리하였다.
+// type, from이 키워드로 사용되지 않도록 type=Id, from=Id로 처리하였다.
 ImportStatement:
-  'import' '{' import+=Id (',' import+=Id)* '}' from=Id path=StringLiteral;
+  'import' (type=Id)? '{' import+=Id (',' import+=Id)* '}' from=Id path=StringLiteral;
 
 Continue: dummy='continue';
 Break: dummy='break';

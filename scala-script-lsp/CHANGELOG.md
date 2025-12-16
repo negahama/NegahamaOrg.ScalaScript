@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.9 - December 15, 2025
+
+- append `Date`, `process`, `performance` classes and some timer functions in library
+- append the `type` keyword at `import` statement
+- remove the new line in front of the bypass statement `%%`
+- remove the space at `case: ` in match-case statement
+- hide the error messages
+
 ### 0.7.8 - November 25, 2025
 
 - changed the type of flatMap
