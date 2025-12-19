@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.10 - December 19, 2025
+
+- Fixed incorrect object assignment behavior when assigning to any type properties
+
 ### 0.7.9 - December 15, 2025
 
 - append `Date`, `process`, `performance` classes and some timer functions in library

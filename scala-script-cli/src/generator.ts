@@ -663,6 +663,8 @@ function transpileBypass(stmt: ast.Bypass, indent: number): string {
  */
 function transpileAssignment(expr: ast.Assignment, indent: number): string {
   /*
+    할당문에서 좌변과 우변의 타입이 전혀 다른 경우는 에러이지만
+    좌변과 우변이 Object 타입인 경우에는 부분적으로만 일치하는 경우가 있을 수 있다.
     ```
     var person: { name: string age: number } = {
       name: 'no name'
@@ -678,18 +680,33 @@ function transpileAssignment(expr: ast.Assignment, indent: number): string {
     ```
     person.name = 'samuel'
     ```
+    하지만 이것만으로 충분하지 않다. 예를 들어 any 타입인 `json`(또는 `json.person`)에 할당하는 경우라면
+    ```
+    json.person = {
+      name = 'samuel'
+      age = 20
+    }
+    ```
+    아래와 같이 개별 항목별로 설정하도록 하는 것이 문제가 될 수 있다.
+    위 구문은 `json`(또는 `json.person`)에 새로 할당하는 구문이지 프로퍼티의 값을 변경하는 구문이 아니기 때문이다.
+    ```
+    json.person.name = 'samuel'
+    json.person.age = 20
+    ```
+    따라서 좌변과 우변이 모두 Object 타입인 경우에만 개별 항목별로 설정하도록 변경한다.
   */
   let result = ''
   let transpiled = false
   const valueType = TypeSystem.inferType(expr.value).actual
   if (TypeSystem.isObjectType(valueType)) {
     const assignType = TypeSystem.inferType(expr.assign).actual
-    if (!valueType.isEqual(assignType)) {
+    if (TypeSystem.isObjectType(assignType) && !valueType.isEqual(assignType)) {
+      // 할당되는 값과 할당되는 대상이 모두 Object 타입이고 둘의 타입이 다르면 개별 항목별로 설정하도록 변경한다.
       const name = generateExpression(expr.assign, 0)
       valueType.getElementList().forEach(e => {
         result += '\n' + applyIndent(indent, `${name}.${e.name} = `)
         if (ast.isBinding(e.node)) result += generateExpression(e.node.value, indent)
-        else console.log('internal error in transpileAssignment')
+        else console.error(chalk.red('internal error in transpileAssignment'))
       })
       transpiled = true
     }
