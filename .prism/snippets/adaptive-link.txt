@@ -1,4 +1,4 @@
-42c6f56d6b52aeb10a6d766534a7d38a,d:\Samuel\NegahamaOrg.ScalaScript\scala-script-cli\src\generator.ts,187,231
+42c6f56d6b52aeb10a6d766534a7d38a,d:\Samuel\NegahamaOrg.ScalaScript\scala-script-cli\src\generator.ts,185,229
 1785320839b3a45eeb60bb2ac837ee3b,d:\Samuel\NegahamaOrg.ScalaScript\language\scala-script-validator.ts,250,270
 0bdb2c40b449f29baae9fee9ce472d96,d:\Samuel\NegahamaOrg.ScalaScript\language\scala-script-types.ts,839,856
 30c7407d6425b374442b09ef337f06a2,d:\Samuel\NegahamaOrg.ScalaScript\language\scala-script-scope.ts,542,568

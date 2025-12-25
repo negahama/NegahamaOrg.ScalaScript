@@ -1133,8 +1133,6 @@ export class TypeSystem {
       result = this.inferTypeIfExpression(node, options)
     } else if (ast.isMatchExpression(node)) {
       result = this.inferTypeMatchExpression(node, options)
-    } else if (ast.isGroupExpression(node)) {
-      result = this.inferTypeGroupExpression(node, options)
     } else if (ast.isUnaryExpression(node)) {
       result = this.inferTypeUnaryExpression(node, options)
     } else if (ast.isBinaryExpression(node)) {
@@ -1143,6 +1141,8 @@ export class TypeSystem {
       result = this.inferTypeReturnExpression(node, options)
     } else if (ast.isSpreadExpression(node)) {
       result = this.inferTypeSpreadExpression(node, options)
+    } else if (ast.isGroupExpression(node)) {
+      result = this.inferTypeGroupExpression(node, options)
     } else if (ast.isNewExpression(node)) {
       result = this.inferTypeNewExpression(node, options)
     } else if (ast.isArrayValue(node)) {
@@ -1192,13 +1192,23 @@ export class TypeSystem {
    */
   static inferTypeTypes(node: ast.Types, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeTypes', node)
-    const al = node.types.map(t => this.inferType(t, options).actual)
-    const fl = node.types.map(t => this.inferType(t, options).formal ?? this.inferType(t, options).actual)
-    // 실제 Union 타입이 아니면 처리를 단순화하기 위해 개별 타입으로 리턴한다.
-    const actual = this.createUnionType(al)
-    const formal = this.createUnionType(fl)
-    exitLog(log, actual)
-    return { actual, formal }
+    let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
+    if (ast.isUnionType(node)) {
+      const al = node.types.map(t => this.inferType(t, options).actual)
+      const fl = node.types.map(t => this.inferType(t, options).formal ?? this.inferType(t, options).actual)
+      // 실제 Union 타입이 아니면 처리를 단순화하기 위해 개별 타입으로 리턴한다.
+      const actual = this.createUnionType(al)
+      const formal = this.createUnionType(fl)
+      if (node.isArray) {
+        type = new ArrayTypeDescriptor(actual)
+        exitLog(log, type)
+        return { actual: type, formal: type }
+      }
+      exitLog(log, actual)
+      return { actual, formal }
+    }
+    exitLog(log, type)
+    return { actual: type, formal: type }
   }
 
   /**
@@ -1215,12 +1225,23 @@ export class TypeSystem {
   static inferTypeSimpleType(node: ast.SimpleType, options?: InferOptions): InferResult {
     const log = enterLog('inferTypeSimpleType', node)
     let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
-    if (ast.isArrayType(node)) {
-      type = new ArrayTypeDescriptor(this.inferType(node.elementType, options).actual)
-    } else if (ast.isObjectType(node)) {
-      type = new ObjectTypeDescriptor(node)
+    if (ast.isSingleType(node)) {
+      type = this.inferTypeSingleType(node, options).actual
     } else if (ast.isFunctionType(node)) {
       type = this.createFunctionType(node)
+    }
+    if (node.isArray) {
+      type = new ArrayTypeDescriptor(type)
+    }
+    exitLog(log, type)
+    return { actual: type, formal: type }
+  }
+
+  static inferTypeSingleType(node: ast.SingleType, options?: InferOptions): InferResult {
+    const log = enterLog('inferTypeSingleType', node)
+    let type: TypeDescriptor = new ErrorTypeDescriptor('internal error', node)
+    if (ast.isObjectType(node)) {
+      type = new ObjectTypeDescriptor(node)
     } else if (ast.isPrimitiveType(node)) {
       switch (node.type) {
         case 'any':
@@ -1876,20 +1897,6 @@ export class TypeSystem {
   }
 
   /**
-   * Infers the type of a function value node.
-   *
-   * @param node - The function value AST node to infer the type for.
-   * @param options - Optional inference options that may influence the type inference process.
-   * @returns An object containing the inferred type as both `actual` and `formal` properties.
-   */
-  static inferTypeGroupExpression(node: ast.GroupExpression, options?: InferOptions): InferResult {
-    const log = enterLog('inferTypeGroupExpression', node)
-    const result = this.inferType(node.value, options)
-    exitLog(log, result.actual)
-    return result
-  }
-
-  /**
    * Infers the type of a unary expression node.
    *
    * @param node - The unary expression AST node to infer the type for.
@@ -2004,6 +2011,20 @@ export class TypeSystem {
     const type: TypeDescriptor = new AnyTypeDescriptor()
     let result: InferResult = { actual: type, formal: type }
     if (node.spread && node.spread.ref) result = this.inferType(node.spread.ref, options)
+    exitLog(log, result.actual)
+    return result
+  }
+
+  /**
+   * Infers the type of a function value node.
+   *
+   * @param node - The function value AST node to infer the type for.
+   * @param options - Optional inference options that may influence the type inference process.
+   * @returns An object containing the inferred type as both `actual` and `formal` properties.
+   */
+  static inferTypeGroupExpression(node: ast.GroupExpression, options?: InferOptions): InferResult {
+    const log = enterLog('inferTypeGroupExpression', node)
+    const result = this.inferType(node.value, options)
     exitLog(log, result.actual)
     return result
   }

@@ -151,8 +151,6 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
     result += transpileIfExpression(expr, indent)
   } else if (ast.isMatchExpression(expr)) {
     result += transpileMatchExpression(expr, indent)
-  } else if (ast.isGroupExpression(expr)) {
-    result += transpileGroupExpression(expr, indent)
   } else if (ast.isUnaryExpression(expr)) {
     result += transpileUnaryExpression(expr, indent)
   } else if (ast.isBinaryExpression(expr)) {
@@ -163,6 +161,8 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
     result += transpileReturnExpression(expr, indent)
   } else if (ast.isSpreadExpression(expr)) {
     result += transplieSpreadExpression(expr, indent)
+  } else if (ast.isGroupExpression(expr)) {
+    result += transpileGroupExpression(expr, indent)
   } else if (ast.isNewExpression(expr)) {
     result += transpileNewExpression(expr, indent)
   } else if (ast.isArrayValue(expr)) {
@@ -932,17 +932,6 @@ function transpileMatchExpression(expr: ast.MatchExpression, indent: number): st
 }
 
 /**
- * Transpiles a GroupExpression AST node into a string representation.
- *
- * @param expr - The GroupExpression AST node to transpile.
- * @param indent - The current indentation level.
- * @returns The transpiled string representation of the GroupExpression.
- */
-function transpileGroupExpression(expr: ast.GroupExpression, indent: number): string {
-  return `(${generateExpression(expr.value, indent)})`
-}
-
-/**
  * Transpiles a unary expression into a string representation.
  *
  * @param expr - The unary expression to transpile.
@@ -1021,6 +1010,17 @@ function transpileReturnExpression(expr: ast.ReturnExpression, indent: number): 
  */
 function transplieSpreadExpression(expr: ast.SpreadExpression, indent: number): string {
   return '...' + expr.spread.$refText
+}
+
+/**
+ * Transpiles a GroupExpression AST node into a string representation.
+ *
+ * @param expr - The GroupExpression AST node to transpile.
+ * @param indent - The current indentation level.
+ * @returns The transpiled string representation of the GroupExpression.
+ */
+function transpileGroupExpression(expr: ast.GroupExpression, indent: number): string {
+  return `(${generateExpression(expr.value, indent)})`
 }
 
 /**
@@ -1108,10 +1108,15 @@ function transpileFunctionValue(expr: ast.FunctionValue, indent: number): string
 function generateTypes(expr: ast.Types | undefined, indent: number): string {
   let result = ''
   if (expr == undefined) return result
+  if (!ast.isUnionType(expr)) return result
   expr.types.forEach((t, index) => {
     if (index != 0) result += ' | '
     result += generateSimpleType(t, indent)
   })
+  if (expr.isArray) {
+    result = `(${result})`
+    result += '[]'
+  }
   return result
 }
 
@@ -1124,9 +1129,7 @@ function generateTypes(expr: ast.Types | undefined, indent: number): string {
  */
 function generateSimpleType(expr: ast.SimpleType, indent: number): string {
   let result = ''
-  if (ast.isArrayType(expr)) {
-    result += generateSimpleType(expr.elementType, indent) + '[]'
-  } else if (ast.isObjectType(expr)) {
+  if (ast.isObjectType(expr)) {
     result += '{\n'
     expr.elements.forEach(e => {
       if (ast.isProperty(e)) {
@@ -1156,6 +1159,13 @@ function generateSimpleType(expr: ast.SimpleType, indent: number): string {
       result += generateGeneric(expr.generic, indent)
     }
   } else result += 'internal error in generateSimpleType(elementType)'
+
+  if (expr.isArray) {
+    if (ast.isFunctionType(expr)) {
+      result = `(${result})`
+    }
+    result += '[]'
+  }
   return result
 }
 

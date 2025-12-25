@@ -7,45 +7,45 @@ Code: Statement | Expression;
 /*
   ScalaScript를 이해하기 위해서는 형(type)과 값(value), 문(statement)과 식(expression)을 구분하는 것이 매우 중요하다.
 
-  변수
-  변수는 타입과 값을 가지는 상자이다.
-  변수 자체는 값을 변경할 수 없는 val과 값을 변경할 수 있는 var 두가지 종류가 있다.
-  변수의 타입으로 primitive, function, array, object, class 타입만 사용할 수 있으나
-  primitive를 제외한 각각의 타입들은 자신의 세부 타입을 정의할 수 있다.
-  이 기본 타입을 구분하는 것은 타입에 따라서 사용법이 달라지기 때문이다.
-  VariableDef   | Definition | val(또는 var) 변수명 : 타입 = 값 예) var n: number = 3
-  VariableType  | X          | 변수의 타입 자체는 새로 정의할 수 없다.
-  VariableValue | X          | 변수의 값도 새로 정의할 수 없다. 해당 타입들의 값이 사용된다.
-  VariableCall  | Name       | 타입이 primitive인 경우 변수 이름만으로 변수 사용
-                | Name(...)  | 타입이 함수인 경우 예) f(msg)
-                | Name[...]  | 타입이 배열인 경우 예) ary[1]
-                | Name.name  | 타입이 오브젝트나 클래스인 경우 예) obj.name
+  타입(type)은 값(value)를 한정한다.
+  타입에 따라서 값을 표현하는 방법이 다르다. 예를들면 0과 "0"은 다른 타입의 다른 값이다.
+  이런 표현 방법의 차이로 인해 값에 별도의 타입을 명시하지 않아도 타입을 알 수 있다.
+  타입이 중요한 이유는 타입에 따라서 이런 표현방법과 사용법이 달라지기 때문이다.
+
+  타입은 특성에 따라 primitive, union, 복합 자료형으로 구분할 수 있다.
+  primitive는 number, string, boolean, any, nil, void 와 function을 포함하며,
+  union은 여러 개의 타입을 묶어서 하나의 타입으로 표현하는 것으로 하나의 항목을 대상으로 하며
+  복합 자료형은 여러 개의 항목(properties)을 가지는 자료형으로 array, object, class 등을 의미한다.
+  union은 primitive와 복합 자료형을 모두 포함할 수 있으며 복합 자료형도 primitive와 union을 포함할 수 있다.
+  즉 string[] | number[]와 (string | number)[] 모두 가능하다. 단 괄호가 필요하다.
 
   함수
-  함수는 파라미터, 리턴타입과 바디를 가진다.
-  함수는 예외적으로 함수 자체를 정의하는 문법이 있지만 매우 예외적인 것이다.
+  함수 타입은 파라미터, 리턴타입으로 구성된다.
+  함수 타입에 함수의 내용인 바디를 포함하면 함수 값이 된다.
+  일반적으로 함수는 함수 값을 가지는 변수의 형태로 사용된다. 함수 자체를 정의하는 문법이 있지만 매우 예외적인 것이다.
+  FunctionType  | Type       | (msg: string) -> void
+  FunctionValue | Expression | (msg: string) -> void => { ... }
   FunctionDef   | Definition | fun f = (msg: string) -> void => { ... } 이것은 함수의 정의이다.
                 |            | val f = (msg: string) -> void => { ... } 이것은 함수형 변수의 정의이다.
                 |            | def f = (msg: string) -> void            이것은 함수 타입에 대한 별칭 선언이다.(미구현)
-  FunctionType  | Type       | (msg: string) -> void
-  FunctionValue | Expression | (msg: string) -> void => { ... }
 
   배열
   배열 자체를 정의할 순 없다. 배열은 단지 특정 타입을 가지는 타입으로만 존재한다.
-  배열의 타입으로 primitive, function, object, class 모두를 사용할 수 있다.
-  (아직 함수 타입의 배열은 지원하지 않음)
-  ArrayDef      | X          | 배열 자체를 정의하지는 않는다.
+  배열의 타입으로 primitive, function, union, object, class 모두를 사용할 수 있다.
+  배열은 별도의 타입이긴 하지만 파싱할 때는 별도의 rule이 아니라 타입들의 옵션으로 처리된다.
+  유니언과 복합자료가 서로를 포함할 수 있기 때문에 배열을 별도의 타입으로 처리하면 순환적으로 정의되기 때문이다. 
   ArrayType     | Type       | number[]
   ArrayValue    | Expression | [ 1, 2, 3 ]
+  ArrayDef      | X          | 배열 자체를 정의하지는 않는다.
 
   오브젝트
   오브젝트 자체를 정의할 순 없다. 오브젝트도 다수의 특정 property를 가지는 타입으로만 존재한다.
   이 타입에 대한 별칭을 지정할 순 있지만 이것이 오브젝트에 대한 정의는 아니다.
+  ObjectType    | Type       | { name: string, age: number }
+  ObjectValue   | Expression | { name: "samuel", age: 20 }
   ObjectDef     | X          | 오브젝트 자체를 정의하지는 않는다.
                 |            | val object: { name: string, age: number}   이것은 오브젝트형 변수 정의이다.
                 |            | def objType = { name: string, age: number} 이것은 오브젝트 타입에 대한 별칭 선언이다.(미구현)
-  ObjectType    | Type       | { name: string, age: number }
-  ObjectValue   | Expression | { name: "samuel", age: 20 }
 
   Class
   오브젝트와 동일한 개념이다. 단지 클래스는 좀 더 복잡하다. 
@@ -55,36 +55,56 @@ Code: Statement | Expression;
 //-----------------------------------------------------------------------------
 // 스칼라스크립트의 자료형 관련
 //-----------------------------------------------------------------------------
+/*
+  SimpleType은 Union으로 구성될 수 있는 타입들로 primitive, ref, function, object, array 등을 포함한다.
+  특히 `string[]`, `(() -> number)[]` 와 같이 primitive와 function의 배열형이 지원되어야 하는데
+  이때 함수의 배열형은 반드시 괄호가 필요하다. `() -> number[]`는 함수의 리턴 타입이 배열형이다.
+
+  이를 위해서 다음과 같이 선언하면 Ambiguous alternative warning이 발생한다.
+  ```
+  Types:      ('(' UnionType ')' ArraySignature) | UnionType;
+  UnionType:  types+=SimpleType ('|' types+=SimpleType)*;
+  SimpleType: ('(' FunctionType ')' ArraySignature) | FunctionType | (SingleType ArraySignature?);
+  ```
+  이는 `(() -> number)[]` 구문이 SimpleType의 ('(' FunctionType ')' ArraySignature)인지
+  아니면 Types의 ('(' UnionType ')' ArraySignature)인지를 구분할 수 없기 때문에 발생한다.
+  유니언의 배열형은 `(string | number)[]` 때문에 반드시 필요한 구문이다.
+
+  이를 해결하기 위해서 UnionType이 SimpleType을 포함하지 않게 다음과 같이 변경하였다.
+  ```
+  Types:      ('(' UnionType ')' ArraySignature) | UnionType | SimpleType;
+  UnionType:  types+=SimpleType '|' types+=SimpleType ('|' types+=SimpleType)*;
+  ```
+  하지만 이 방법으로도 모호성 문제를 해결할 수 없었다.
+  확실한 이유는 아직 모르지만 추측하기에 SimpleType에 포함되는 함수의 리턴 타입이
+  UnionType과 SimpleType 두가지가 될 수 있는 것 때문에 모호성 문제가 발생하는 것으로 보인다. 
+  함수의 리턴형은 `string | nil` 와 같은 형식을 지원해야 하므로 최소 유니언이어야 하기 때문에
+  여기서는 `Types`를 사용하는데 이전 방식에서는 `string`이나 `string | nil`이나 모두
+  UnionType에 포함되었지만 이 방식에서는 둘은 구분되기 때문이다.
+
+  별도의 ArrayType으로 처리하는 방법도 고려해 보았지만 이 경우에는 문법 자체가 상호 포함관계이다보니
+  Left recursion 에러가 발생한다.
+
+  결론적으로 이 문제를 해결할 수 없어서 함수의 배열형은 유니언 할 수 없는 것으로 결정했다.
+  즉 `(() -> number)[]` 구문은 지원하지만 `(() -> number)[] | number`은 지원하지 않는다.
+*/
+// 모든 타입의 가장 최상위의 타입은 Union type이거나 union의 배열(이 경우 괄호가 반드시 필요)이다.
 Types:
-  UnionType;
+  ('(' UnionType ')' ArraySignature) | UnionType;
 
-/*
-  Union type은 모든 타입의 가장 최상위 타입이다.
-  Union type은 최상위 타입이기 때문에 union의 배열은 불가능하다. 즉 (string | number)[] 은 불가하지만
-  배열의 union은 가능하기 때문에 string[] | number[] 와 같은 형태로 사용할 수 있다.
-*/
+fragment ArraySignature:
+  isArray?='[' ']';
+
 UnionType: 
-  types+=SimpleType ('|' types+=SimpleType)*;
+  types+=SimpleType (('or' | '|') types+=SimpleType)*;
 
-/*
-  타입으로 사용될 수 있는 모든 타입들
-  이름이 있는 클래스 타입은 RefType으로 표현된다.
-*/
 SimpleType:
-  ArrayType | ObjectType | PrimitiveType | FunctionType | RefType;
+  FunctionType | (SingleType ArraySignature?);
+  // 아래 구문으로 모호성 문제를 감수하고 함수 배열형을 유니언의 항목으로 포함시킬 수도 있다.
+  // ('(' FunctionType ')' ArraySignature) | FunctionType | (SingleType ArraySignature?);
 
-/*
-  해당 개체의 타입이 배열형임을 나타내기 위해 사용된다.
-  ex) var ary: number[]
-
-  array의 타입으로는 union과 array를 제외한 거의 모든 타입이 사용될 수 있으나
-  ArrayType을 elementType=(ObjectType | PrimitiveType | FunctionType | RefType) '[' ']'; 으로 정의하면
-  var t: () -> number[] 의 경우 () -> number 의 배열로 인식된다.
-  이를 방지하기 위해서 FunctionType을 빼고 정의하였다.
-  즉 (() -> number)[] 와 같은 함수 타입의 배열은 현재 지원하지 않는다. 
-*/
-ArrayType:
-  elementType=(ObjectType | PrimitiveType | RefType) '[' ']';
+SingleType:
+  ObjectType | PrimitiveType | RefType;
 
 /*
   Object Definition
@@ -126,7 +146,10 @@ PrimitiveType:
 FunctionType:
   '(' Parameters? ')' FunctionReturn;
 
-// generic은 var table: Map<string, number> 와 같은 구문에서 필요하다.
+/*
+  이름이 있는 클래스 타입은 RefType으로 표현된다.
+  generic은 var table: Map<string, number> 와 같은 구문에서 필요하다.
+*/
 RefType:
   reference=[ClassDef:Id] (generic=GenericValue)?;
 
@@ -190,6 +213,17 @@ Statement:
 /*
   Variable Declarations and Definitions
   -----------------------------------------------------------------------------
+  변수는 타입과 값을 가지는 상자이다.
+  변수 자체는 값을 변경할 수 없는 val과 값을 변경할 수 있는 var 두가지 종류가 있다.
+
+  VariableDef   | Definition | val(또는 var) 변수명 : 타입 = 값 예) var n: number = 3
+  VariableType  | X          | 변수의 타입 자체는 새로 정의할 수 없다.
+  VariableValue | X          | 변수의 값도 새로 정의할 수 없다. 해당 타입들의 값이 사용된다.
+  VariableCall  | Name       | 타입이 primitive인 경우 변수 이름만으로 변수 사용
+                | Name(...)  | 타입이 함수인 경우 예) f(msg)
+                | Name[...]  | 타입이 배열인 경우 예) ary[1]
+                | Name.name  | 타입이 오브젝트나 클래스인 경우 예) obj.name
+
   모든 변수는 다음의 규칙을 가지고 있다.
   이름 : 타입 = 값
   타입이나 값을 통해서 변수의 타입을 알 수 있어야 한다.
@@ -476,7 +510,7 @@ UnaryOperator infers Expression:
   CallChain을 아래와 같이 보다 간략하게 정의할 수도 있는데 현재와 같이 정의하게 된 이유는...
   ```
   CallChain infers Expression:
-    SimpleExpression ({infer CallChain.previous=current} "." CallableElements (assertion=('!'|'?'))? )*;
+    SimpleExpression ({infer CallChain.previous=current} "." CallableElements (assertion=('!' | '?'))? )*;
   fragment CallableElements:
     element=[NamedElement:Id] ( FunctionCallSignature | ArrayCallSignature )?;
   fragment FunctionCallSignature:
@@ -497,11 +531,11 @@ UnaryOperator infers Expression:
   CallChain infers Expression:
     SimpleExpression ({infer CallChain.previous=current} "." element=[NamedElement:Id]
     (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')?
-    (assertion=('!'|'?'))? )*;
+    (assertion=('!' | '?'))? )*;
   ```
 */
 CallChain infers Expression:
-  SimpleExpression ({infer CallChain.previous=current} "." CallableElements (assertion=('!'|'?'))? )*;
+  SimpleExpression ({infer CallChain.previous=current} "." CallableElements (assertion=('!' | '?'))? )*;
 
 fragment CallableElements:
   element=[NamedElement:Id] ( FunctionCallSignature | ArrayCallSignature )?;
@@ -541,7 +575,7 @@ SimpleExpression infers Expression:
 RefCall: {infer CallChain}
   element=[NamedElement:Id]
   (isFunction?='(' (args+=Expression (',' args+=Expression)*)? ')' | isArray?='[' index=Expression ']')?
-  (assertion=('!'|'?'))?;
+  (assertion=('!' | '?'))?;
 
 /*
   CallChain의 시작점으로 this, super를 가지고 있다.
@@ -641,7 +675,7 @@ InfixExpression:
 
 // return 할 것이 없으면 세미콜론으로 없음을 표시해야 한다.
 ReturnExpression:
-  'return' (value=Expression | ";");
+  'return' (value=Expression | ';');
 
 // spread의 대상은 object, variable, parameter, iterator가 가능하다.
 SpreadExpression:
