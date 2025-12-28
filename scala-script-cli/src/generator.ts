@@ -240,6 +240,10 @@ function transpileVariableDef(stmt: ast.VariableDef, indent: number, isClassMemb
   let result = ''
   if (stmt.annotate == 'NotTrans') return result
 
+  if (stmt.value && ast.isMatchExpression(stmt.value)) {
+    return transpileMatchExpression2(stmt.value, indent, stmt)
+  }
+
   // 이 함수는 일반적인 변수 정의로 변환하는데 함수형 변수인 경우에만 함수로 변환하거나 override를 추가한다.
   // 코드의 가독성을 높이기 위해서 코드가 좀 중복되더라도 함수형 변수인 경우만 따로 처리한다.
   // 먼저 함수형이 아닌 경우를 먼저 처리하고 리턴한다.
@@ -613,12 +617,12 @@ function transpileTryCatchStatement(stmt: ast.TryCatchStatement, indent: number)
  */
 function transpileImportStatement(stmt: ast.ImportStatement, indent: number): string {
   let result = 'import '
-  if (stmt.type) {
-    // assert.ok(stmt.type == 'type')
-    result += 'type '
-  }
-  result += '{ ' + stmt.import.map(e => e).join(', ') + ' } '
+  // assert.ok(stmt.type == 'type')
   // assert.ok(stmt.from == 'from')
+  result += stmt.type ? 'type ' : ''
+  result += stmt.isBracket ? '{ ' : ''
+  result += stmt.import.map(e => e).join(', ')
+  result += stmt.isBracket ? ' } ' : ' '
   result += 'from ' + stmt.path
   return result
 }
@@ -662,6 +666,10 @@ function transpileBypass(stmt: ast.Bypass, indent: number): string {
  * being replaced with `n += 1`).
  */
 function transpileAssignment(expr: ast.Assignment, indent: number): string {
+  if (expr.value && ast.isMatchExpression(expr.value)) {
+    return transpileMatchExpression2(expr.value, indent, expr)
+  }
+
   /*
     할당문에서 좌변과 우변의 타입이 전혀 다른 경우는 에러이지만
     좌변과 우변이 Object 타입인 경우에는 부분적으로만 일치하는 경우가 있을 수 있다.
@@ -931,6 +939,69 @@ function transpileMatchExpression(expr: ast.MatchExpression, indent: number): st
   return result
 }
 
+let matchResultCounter = 0
+function transpileMatchExpression2(expr: ast.MatchExpression, indent: number, prevExpr: ast.Expression | ast.VariableDef): string {
+  /*
+    변수를 선언하고 각 case 문에서 값을 할당하는 형태로 변경한다.
+    변수 선언문과 할당문은 prevExpr에 선언된 변수명을 사용하고 리턴문은 변수를 생성한 후 사용한다.
+    할당문인 경우 즉
+    ```
+    var result = ''
+    result = x match { ... }
+    ```
+    위와 같은 경우에는 indent를 0으로 하여 switch 문을 생성해야 한다.
+  */
+  let result = ''
+  let variableName = 'error'
+  let newIndent = indent
+  if (ast.isAssignment(prevExpr)) {
+    variableName = generateExpression(prevExpr.assign, indent)
+    newIndent = 0
+  } else if (ast.isVariableDef(prevExpr)) {
+    variableName = prevExpr.name
+    result += `let ${variableName}`
+    result += prevExpr.type ? `: ${generateTypes(prevExpr.type, indent)}` : ': any'
+    result += '\n'
+  } else if (ast.isReturnExpression(prevExpr)) {
+    variableName = `$matchResult${matchResultCounter++}`
+    result += `let ${variableName}: any\n`
+  }
+  result += applyIndent(newIndent, `switch (${generateExpression(expr.expr, indent)}) {\n`)
+
+  expr.cases.forEach(mc => {
+    if (ast.isLiteral(mc.pattern)) {
+      const pattern = generateExpression(mc.pattern, indent)
+      result += applyIndent(indent + 1, `case ${pattern}:`)
+    } else {
+      result += applyIndent(indent + 1, `default:`)
+    }
+    if (mc.body) {
+      result += ' '
+      result += generateBlock(mc.body, indent + 1, (lastCode, indent) => {
+        if (ast.isStatement(lastCode)) return generateStatement(lastCode, indent)
+        else if (ast.isExpression(lastCode)) {
+          if (TypeSystem.isVoidType(TypeSystem.inferType(lastCode).actual)) {
+            return generateExpression(lastCode, indent)
+          } else {
+            var e = `${variableName} = `
+            e += generateExpression(lastCode, indent) + '\n'
+            e += applyIndent(indent, 'break')
+            return e
+          }
+        }
+        else return ''
+      })
+    }
+    result += '\n'
+  })
+  result += applyIndent(indent, '}')
+  if (ast.isReturnExpression(prevExpr)) {
+    result += '\n'
+    result += applyIndent(indent, `return ${variableName}`)
+  }
+  return result
+}
+
 /**
  * Transpiles a unary expression into a string representation.
  *
@@ -996,6 +1067,10 @@ function transpileInfixExpression(expr: ast.InfixExpression, indent: number): st
  * @returns The transpiled return expression as a string.
  */
 function transpileReturnExpression(expr: ast.ReturnExpression, indent: number): string {
+  if (expr.value && ast.isMatchExpression(expr.value)) {
+    return transpileMatchExpression2(expr.value, indent, expr)
+  }
+
   let result = 'return'
   if (expr.value) result += ` ${generateExpression(expr.value, indent)}`
   return result

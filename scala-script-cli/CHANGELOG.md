@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.12 - December 28, 2025
+
+- support the import statement without the braket
+- treat the match expression as the value such like `var x = a match { ... }`
+
 ### 0.7.11 - December 24, 2025
 
 - Expand for type system, especially array type
