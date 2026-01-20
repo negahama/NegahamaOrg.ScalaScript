@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.13 - January 21, 2026
+
+- support `return nil` at function with union return type included nil type
+
 ### 0.7.12 - December 28, 2025
 
 - support the import statement without the braket

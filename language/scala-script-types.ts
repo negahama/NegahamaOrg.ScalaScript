@@ -244,9 +244,12 @@ export class UnionTypeDescriptor extends TypeDescriptor {
     const compatibleType = (nt: TypeDescriptor, set: TypeDescriptor[]) => {
       if (set.some(e => nt.isEqual(e))) return true
 
-      // nil type도 매우 빈번하게 발생하고 null check를 제외하면 처리에 큰 영향을 주지 않으므로 일단 제거한다.
+      // union type에서 nil type을 제거하는 것은 여러 모로 편리하기는 하지만 한가지 심각한 문제가 생기는데
+      // 함수의 리턴 타입이 nil을 포함하는 경우 nil을 리턴할 수 없다는 것이다.
+      // 즉 함수의 리턴 타입이 string | nil 이더라도 union이 nil을 포함하지 않으므로
+      // 실제로는 string만 리턴하는 것으로 처리되고 그래서 함수 내의 return nil이 오히려 에러가 된다.
       if (nt.$type == 'any') return true
-      else if (nt.$type == 'nil') return true
+      // else if (nt.$type == 'nil') return true
       else if (nt.$type == 'array') {
         let found = false
         set.forEach(e => {
@@ -1426,6 +1429,24 @@ export class TypeSystem {
       // 이것의 타입이 무엇인가를 결정할 때는 context가 중요하다.
       // 이에 대한 자세한 설명은 InferResult의 주석 [[al=0bdb2c40b449f29baae9fee9ce472d96]]을 참조한다.
 
+      /*
+        ```
+        val map = new Map<string, pair[]>()
+        val pairs = map.get('string')
+        pairs[1].name
+        ```
+        위 코드에서 `pairs`의 결과는 `pair[] | nil` 타입이 된다.
+      */
+      // console.log(`CallChain 요소 '${node.$cstNode?.text}'의 추론된 타입: ${type.toString()}`)
+      if (this.isUnionType(type)) {
+        // console.log(chalk.yellow('inferTypeCallChain: type is union type, try to remove nil type'),
+        //   type.toString(), node.$cstNode?.text)
+        const nonNilTypes = type.elementTypes.filter(t => !this.isNilType(t))
+        if (nonNilTypes.length == 1) {
+          type = nonNilTypes[0]
+        }
+      }
+
       if (this.isArrayType(type) && node.isArray) {
         // 배열 호출이면 배열 요소가 리턴되어야 한다.
         // 즉 `ary[0]`의 타입은 `array<number>`가 아니라 `number`이어야 한다.
@@ -1476,6 +1497,12 @@ export class TypeSystem {
               })
             })
             return desc
+          } else if (this.isUnionType(t)) {
+            const elementTypes: TypeDescriptor[] = []
+            t.elementTypes.forEach(et => {
+              elementTypes.push(replaceGeneric(et, g))
+            })
+            return TypeSystem.createUnionType(elementTypes)
           } else return t
         }
 
@@ -1496,6 +1523,30 @@ export class TypeSystem {
             // console.log(
             //   `node '${node.$cstNode?.text}'s previous '${node.previous?.$cstNode?.text}'s type: ${previous.toString()}`
             // )
+
+            /*
+              ```
+              val map = new Map<string, pair[]>()
+              val pairs = map.get('string')
+              pairs!.push({ name: 항목, value: 내용 }) }
+              ```
+              위 코드에서 `pairs`의 결과는 `pair[] | nil` 타입이 된다.
+              스칼라스크립트에서는 `pairs!`와 `pairs?` 모두 단순히 nil 타입을 제거한 후 사용하는 정도로만 처리되고 있다.
+              이것도 pairs가 type narrowing이 되는 경우 node.previous.assertion이 undefined가 되기 때문에
+              CallChain여부만 체크한다.
+
+              위에서 nil 타입을 제거하기 때문에 아래 코드는 필요없어짐
+            */
+            // if (this.isUnionType(previous)) {
+            //   console.log(chalk.yellow('inferTypeCallChain: previous is union type, try to remove nil type'),
+            //     previous.toString(), node.$cstNode?.text, node.previous.$cstNode?.text, node.previous.$type)
+            //   if (ast.isCallChain(node.previous)) { //&& node.previous.assertion) {
+            //     const nonNilTypes = previous.elementTypes.filter(t => !this.isNilType(t))
+            //     if (nonNilTypes.length == 1) {
+            //       previous = nonNilTypes[0]
+            //     }
+            //   }
+            // }
 
             if (this.isArrayType(previous)) {
               // array이기 때문에 generic이 하나일 것으로 가정하고 있다.
@@ -2448,6 +2499,12 @@ export class TypeSystem {
             })
           })
           return desc
+        } else if (this.isUnionType(t)) {
+          const elementTypes: TypeDescriptor[] = []
+          t.elementTypes.forEach(et => {
+            elementTypes.push(replace(et, g))
+          })
+          return TypeSystem.createUnionType(elementTypes)
         } else return t
       }
 
