@@ -154,7 +154,7 @@ export function registerValidationChecks(services: ScalaScriptServices) {
 }
 
 export class ScalaScriptReferences extends DefaultReferences {
-  override findDeclaration(sourceCstNode: CstNode): AstNode | undefined {
+  findDeclaration(sourceCstNode: CstNode): AstNode | undefined {
     console.log('ScalaScriptReferences findDeclaration:', sourceCstNode.text)
 
     const findAssignment = (cstNode: CstNode): GrammarAST.Assignment | undefined => {
@@ -216,7 +216,7 @@ export class ScalaScriptReferences extends DefaultReferences {
     // return super.findDeclaration(sourceCstNode)
   }
 
-  override findDeclarationNode(sourceCstNode: CstNode): CstNode | undefined {
+  findDeclarationNode(sourceCstNode: CstNode): CstNode | undefined {
     const astNode = this.findDeclaration(sourceCstNode)
     if (astNode?.$cstNode) {
       const targetNode = this.nameProvider.getNameNode(astNode)
@@ -241,7 +241,7 @@ export class ScalaScriptReferences extends DefaultReferences {
     return stream(refs)
   }
 
-  protected override getReferenceToSelf(targetNode: AstNode): ReferenceDescription | undefined {
+  protected getReferenceToSelf(targetNode: AstNode): ReferenceDescription | undefined {
     const nameNode = this.nameProvider.getNameNode(targetNode)
     if (nameNode) {
       const doc = AstUtils.getDocument(targetNode)

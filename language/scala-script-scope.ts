@@ -5,11 +5,12 @@ import {
   DefaultScopeProvider,
   LangiumDocument,
   MapScope,
-  PrecomputedScopes,
   ReferenceInfo,
   Scope,
   stream,
   StreamScope,
+  MultiMap,
+  AstNodeDescription,
 } from 'langium'
 import * as ast from './generated/ast.js'
 import { LangiumServices } from 'langium/lsp'
@@ -521,16 +522,16 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
    *
    * @param node
    * @param document
-   * @param scopes
+   * @param symbols
    */
-  override processNode(node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes): void {
-    const defaultProcess = (node: AstNode, document: LangiumDocument, scopes: PrecomputedScopes) => {
+  override addLocalSymbol(node: AstNode, document: LangiumDocument, symbols: MultiMap<AstNode, AstNodeDescription>): void {
+    const defaultProcess = (node: AstNode, document: LangiumDocument, symbols: MultiMap<AstNode, AstNodeDescription>) => {
       const container = node.$container
       if (container) {
         const name = this.nameProvider.getName(node)
         // traceLog(`node: ${node.$type} '${name}'`)
         if (name) {
-          scopes.add(container, this.descriptions.createDescription(node, name, document))
+          symbols.add(container, this.descriptions.createDescription(node, name, document))
         }
       }
     }
@@ -560,14 +561,14 @@ export class ScalaScriptScopeComputation extends DefaultScopeComputation {
     // if (ast.isImportStatement(node)) {
     //   const log = enterLog('ScopeComputation.processNode', node)
     //   node.import.forEach(e => {
-    //     scopes.add(container, this.descriptions.createDescription(node, e, document))
+    //     symbols.add(container, this.descriptions.createDescription(node, e, document))
     //   })
     //   exitLog(log)
     //   isProcessed = true
     // }
 
     if (!isProcessed) {
-      defaultProcess(node, document, scopes)
+      defaultProcess(node, document, symbols)
     }
   }
 }

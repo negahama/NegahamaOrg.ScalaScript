@@ -100,16 +100,16 @@ function generateStatement(stmt: ast.Statement | undefined, indent: number): str
     세밀하게 조정해야 하지만 효과가 크지 않기 때문에 효과적인 ClassDef, ByPass만 indent가 있는 경우에도 적용되게 하였다.
   */
   const newLineNode = [
-    ast.ClassDef,
-    ast.DoStatement,
-    ast.ForStatement,
-    ast.WhileStatement,
-    ast.ThrowStatement,
-    ast.TryCatchStatement,
-    // ast.Bypass,
+    ast.ClassDef.$type,
+    ast.DoStatement.$type,
+    ast.ForStatement.$type,
+    ast.WhileStatement.$type,
+    ast.ThrowStatement.$type,
+    ast.TryCatchStatement.$type,
+    // ast.Bypass.$type,
   ]
 
-  if (newLineNode.some(node => node === stmt.$type) && indent == 0) result = '\n' + result
+  if (newLineNode.some(nodeType => nodeType === stmt.$type) && indent == 0) result = '\n' + result
   return result
 }
 

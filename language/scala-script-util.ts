@@ -246,13 +246,15 @@ export function Dump(node: AstNode | undefined) {
     console.log('  doc.references:', ref.$refText)
   })
 
-  let index = 0
-  console.log(chalk.bgBlue('doc.precomputedScopes?.size:'), doc.precomputedScopes?.size)
-  doc.precomputedScopes?.forEach((value, key) => {
-    console.log('  doc.precomputedScopes:', index++)
-    console.log(chalk.yellow('    K: ') + `'${reduceLog(key.$cstNode?.text)}'(${chalk.green(key.$type)})`)
-    console.log(chalk.yellow('    V: ') + `${value.name}(${chalk.green(value.type)})`)
-  })
+  // Note: localSymbols in Langium 4.x doesn't have a forEach method
+  // You would need to iterate differently if needed
+  console.log(chalk.bgBlue('doc.localSymbols:'), doc.localSymbols ? 'exists' : 'undefined')
+  // let index = 0
+  // doc.localSymbols?.forEach((value, key) => {
+  //   console.log('  doc.localSymbols:', index++)
+  //   console.log(chalk.yellow('    K: ') + `'${reduceLog(key.$cstNode?.text)}'(${chalk.green(key.$type)})`)
+  //   console.log(chalk.yellow('    V: ') + `${value.name}(${chalk.green(value.type)})`)
+  // })
 
   // const thenKeyword = GrammarUtils.findNodeForKeyword(node.$cstNode, '=')
   // if (thenKeyword) {

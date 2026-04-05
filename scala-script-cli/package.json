@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.7.13",
+  "version": "0.7.14",
   "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "publisher": "NegahamaOrg",
@@ -38,7 +38,7 @@
   },
   "scripts": {
     "all": "npm run langium:generate && npm run build && npm run lint && npm run cli1",
-    "cli0": "node bin/cli.js generate D:/Samuel/NegahamaOrg.Midas.Engine/scalascript-src/*.ss -d D:/Samuel/NegahamaOrg.Midas.Engine/src",
+    "cli0": "node bin/cli.js generate C:/Users/samuel/Projects/NegahamaOrg.Midas.Engine/scalascript-src/*.ss -d C:/Users/samuel/Projects/NegahamaOrg.Midas.Engine/src",
     "cli1": "node bin/cli.js generate test/test.ss -d test/generated",
     "build": "tsc -b tsconfig.json",
     "watch": "tsc -b tsconfig.json --watch",
@@ -48,18 +48,18 @@
     "test": "vitest"
   },
   "dependencies": {
-    "chalk": "~5.3.0",
-    "commander": "~11.0.0",
-    "langium": "~3.5.0"
+    "chalk": "~5.6.2",
+    "commander": "~14.0.3",
+    "langium": "~4.2.1"
   },
   "devDependencies": {
-    "@types/node": "^18.0.0",
-    "@typescript-eslint/eslint-plugin": "~7.3.1",
-    "@typescript-eslint/parser": "~7.3.1",
-    "eslint": "~8.57.0",
-    "langium-cli": "~3.5.0",
-    "typescript": "~5.1.6",
-    "vitest": "^2.1.8"
+    "@types/node": "^25.5.2",
+    "@typescript-eslint/eslint-plugin": "~8.58.0",
+    "@typescript-eslint/parser": "~8.58.0",
+    "eslint": "~10.2.0",
+    "langium-cli": "~4.2.0",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.2"
   },
   "volta": {
     "node": "18.19.1",

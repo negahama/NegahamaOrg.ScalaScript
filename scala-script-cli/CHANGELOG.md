@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.14 - April 5, 2026
+
+- Upgrade Langium version 3.5 to 4.2.1 and upgrade all kind of libraries version
+- Fixed server crash issue with Node.js v22+ due to unhandled OperationCancelled promise rejection
+- Added proper error handling for operation cancellation during document parsing/validation
+
 ### 0.7.13 - January 21, 2026
 
 - support `return nil` at function with union return type included nil type

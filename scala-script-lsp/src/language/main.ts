@@ -1,7 +1,21 @@
 import { startLanguageServer } from 'langium/lsp'
 import { NodeFileSystem } from 'langium/node'
+import { OperationCancelled } from 'langium'
 import { createConnection, ProposedFeatures } from 'vscode-languageserver/node.js'
 import { createScalaScriptServices } from './scala-script-module.js'
+
+// Handle unhandled promise rejections
+// This is necessary to prevent the server from crashing when operations are cancelled
+// (e.g., when a document is being parsed and a new change comes in)
+process.on('unhandledRejection', (reason: unknown) => {
+  if (reason === OperationCancelled) {
+    // Langium uses this symbol to signal operation cancellation, which is expected behavior
+    // and should not crash the server
+    return
+  }
+  // For other unhandled rejections, log the error but don't crash
+  console.error('Unhandled promise rejection:', reason)
+})
 
 /**
  * Create a connection to the client
