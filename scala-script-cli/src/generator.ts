@@ -190,12 +190,12 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
   하지만 스칼라스크립트에서는 부모 클래스에서 val로 정의된 함수형 변수는 자식 클래스에서 재정의할 수 없다.
   var로 정의된 함수형 변수는 타입스크립트의 함수형 변수(프로퍼티)로 변환되는데 일부는 함수로 변환해야 한다.
   fun으로 시작하는 것은 함수 정의이므로 여기서 처리되지 않는다.
-  
+
   2) Override
   override는 타입스크립트의 컴파일 옵션인 noImplicitOverride 옵션의 영향을 받는데
   여기서는 이 옵션이 true인 경우 즉 명시적으로 override를 선언해야 하는 경우를 살펴본다.
   먼저 noImplicitOverride가 true이면 부모 클래스와 동일한 이름은 무조건 override가 있어야 한다.
-  
+
   3) Super
   타입스크립트에서 함수형 변수는 자식 클래스에서 재정의할 수 있지만 super를 사용할 수는 없다.
   이 경우 자식 클래스에서 함수로 변환할 수도 있지만 부모 클래스에서 함수형 변수로 선언되어진 경우에는
@@ -209,7 +209,7 @@ function generateExpression(expr: ast.Expression | undefined, indent: number): s
   함수형 변수는 함수로 변환되어야 하는 경우가 있다. 위의 super를 포함하는 경우도 이에 해당한다.
   이 외에도 constructor, argument가 디폴트 값을 가지는 경우도 타입스크립트에서 함수형 변수로는 처리할 수 없으므로
   함수로 변환되어야 한다. 스칼라스크립트에서는 이것들은 함수이던지, 함수형 변수이든지, 함수형 상수이든지 상관없다.
-  
+
   5) 타입스크립트에서의 함수형 변수와 함수의 차이
   class Parent {
     f1(): number { return 1 }
@@ -493,15 +493,18 @@ function transpileClassDef(stmt: ast.ClassDef, indent: number): string {
 
   stmt.body.elements.forEach(m => {
     if (ast.isVariableDef(m)) {
-      result += applyIndent(indent + 1, transpileVariableDef(m, indent + 1, true))
+      // @NotTrans와 같이 transpileVariableDef()에서 ''이 리턴될 때
+      // 공백으로된 무의미한 indent와 줄바꿈을 적용하지 않기 위해서 구분해서 처리한다.
+      const r = transpileVariableDef(m, indent + 1, true)
+      if (r.trim() != '') result += applyIndent(indent + 1, r) + '\n'
     } else if (ast.isFunctionDef(m)) {
-      result += applyIndent(indent + 1, transpileFunctionDef(m, indent + 1, true))
+      const r = transpileFunctionDef(m, indent + 1, true)
+      if (r.trim() != '') result += applyIndent(indent + 1, r) + '\n'
     } else if (ast.isBypass(m)) {
-      result += generateStatement(m, indent + 1)
+      result += generateStatement(m, indent + 1) + '\n'
     } else {
       console.error(chalk.red('internal error in transpileClassDef'))
     }
-    result += '\n'
   })
 
   result += applyIndent(indent, '}')
@@ -939,7 +942,6 @@ function transpileMatchExpression(expr: ast.MatchExpression, indent: number): st
   return result
 }
 
-let matchResultCounter = 0
 function transpileMatchExpression2(expr: ast.MatchExpression, indent: number, prevExpr: ast.Expression | ast.VariableDef): string {
   /*
     변수를 선언하고 각 case 문에서 값을 할당하는 형태로 변경한다.
@@ -963,7 +965,9 @@ function transpileMatchExpression2(expr: ast.MatchExpression, indent: number, pr
     result += prevExpr.type ? `: ${generateTypes(prevExpr.type, indent)}` : ': any'
     result += '\n'
   } else if (ast.isReturnExpression(prevExpr)) {
-    variableName = `$matchResult${matchResultCounter++}`
+    // match result를 바로 return하는 경우에는 변수를 생성하고 리턴한다.
+    // 이것은 바로 리턴되므로 동일한 변수명을 사용해도 된다.
+    variableName = `$matchResult`
     result += `let ${variableName}: any\n`
   }
   result += applyIndent(newIndent, `switch (${generateExpression(expr.expr, indent)}) {\n`)
@@ -1288,7 +1292,11 @@ function generateBlock(
       else if (ast.isExpression(code)) element += generateExpression(code, indent + 1)
       else console.log(chalk.red('ERROR in Block:', code))
     }
-    // bypass는 indent를 적용하지 않는다. bypass 자체에서 처리하고 있음음
+
+    // 공백으로된 무의미한 indent가 생성되지 않도록 element가 공백이면 skip한다.
+    if (element.trim() == '') return
+
+    // bypass는 indent를 적용하지 않는다. bypass 자체에서 처리하고 있음
     if (ast.isBypass(code)) {
       result += element + '\n'
     } else {

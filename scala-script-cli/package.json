@@ -1,6 +1,6 @@
 {
   "name": "scala-script",
-  "version": "0.7.14",
+  "version": "0.7.15",
   "displayName": "Scala-Script",
   "description": "Programming language that is mixed Scala and TypeScript's features",
   "publisher": "NegahamaOrg",
@@ -38,7 +38,7 @@
   },
   "scripts": {
     "all": "npm run langium:generate && npm run build && npm run lint && npm run cli1",
-    "cli0": "node bin/cli.js generate C:/Users/samuel/Projects/NegahamaOrg.Midas.Engine/scalascript-src/*.ss -d C:/Users/samuel/Projects/NegahamaOrg.Midas.Engine/src",
+    "cli0": "node bin/cli.js generate C:/Users/samuel/MyProjects/NegahamaOrg.Midas.Engine/scalascript-src/*.ss -d C:/Users/samuel/MyProjects/NegahamaOrg.Midas.Engine/src",
     "cli1": "node bin/cli.js generate test/test.ss -d test/generated",
     "build": "tsc -b tsconfig.json",
     "watch": "tsc -b tsconfig.json --watch",

@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
+### 0.7.15 - July 30, 2027
+
+- Fix error causing unnecessary whitespaces during transpiling the @NotTrans.
+- Remove trailed numbers from the $matchResult variable name
+
 ### 0.7.14 - April 5, 2026
 
 - Upgrade Langium version 3.5 to 4.2.1 and upgrade all kind of libraries version
@@ -49,7 +54,7 @@ All notable changes to this project will be documented in this file.
 - change generated code formatting
     * "use strict"; -> 'use strict'
     * For single parameters, remove parentheses : ex) forEach((e) => {...}) -> forEach(e => {...})
-    * For else/else if statement, remove new line : ex) if (...) {...} /n else {...} -> if (...) {...} else {...}  
+    * For else/else if statement, remove new line : ex) if (...) {...} /n else {...} -> if (...) {...} else {...}
 
 ### 0.7.5 - July 31, 2025
 
