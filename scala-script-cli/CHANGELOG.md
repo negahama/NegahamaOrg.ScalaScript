@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## 🔗 Release Notes
 
-### 0.7.15 - July 30, 2027
+### 0.7.16 - October 2, 2026
+
+- When transpiling, Ensured the subfolder structure of the output directory mirrors the source directory
+- Prevent unnecessary file 'library.ts' from being created
+
+### 0.7.15 - July 30, 2026
 
 - Fix error causing unnecessary whitespaces during transpiling the @NotTrans.
 - Remove trailed numbers from the $matchResult variable name

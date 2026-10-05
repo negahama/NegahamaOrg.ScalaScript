@@ -106,7 +106,9 @@ export const generateAction = async (fileName: string, opts: GenerateOptions): P
   // 단일 파일만 트랜스파일하는 경우
   if (baseName != '*.ss') {
     const model = await extractAstNode<Program>(fileName, services)
-    const generatedFilePath = generateTypeScript(model, fileName, opts.destination)
+    const sourceRoot = path.dirname(path.resolve(fileName))
+    const relativeFilePath = path.basename(fileName)
+    const generatedFilePath = generateTypeScript(model, sourceRoot, relativeFilePath, opts.destination)
     console.log(chalk.green(`TypeScript code generated successfully: ${generatedFilePath}`))
     return
   }
@@ -126,6 +128,14 @@ export const generateAction = async (fileName: string, opts: GenerateOptions): P
   console.log(chalk.yellowBright(`elapsed time: ${(Date.now() - start) / 1000} sec`))
 
   for (const doc of workspace.LangiumDocuments.all) {
+    // builtin:///library.ss documents를 스킵하기 위한 것이다.
+    // 이것은 생성할 필요가 없을 뿐만 아니라 이것의 doc.uri.fsPath는 '/libraray.ss'인데
+    // 현재 root와의 상대경로를 넘겨주는 path.relative(root, doc.uri.fsPath)로 인해
+    // root와 합치면 'C:\library.ss'가 되기 때문에 스킵해야 한다.
+    if (doc.uri.scheme !== 'file') {
+      continue
+    }
+
     console.log('Processing:', doc.uri.path)
 
     const validationErrors = (doc.diagnostics ?? []).filter(e => e.severity === 1)
@@ -143,7 +153,12 @@ export const generateAction = async (fileName: string, opts: GenerateOptions): P
       process.exit(1)
     }
 
-    const generatedFilePath = generateTypeScript(doc.parseResult?.value as Program, doc.uri.path, opts.destination)
+    const generatedFilePath = generateTypeScript(
+      doc.parseResult?.value as Program,
+      root,
+      path.relative(root, doc.uri.fsPath),
+      opts.destination
+    )
     console.log(chalk.green(`TypeScript code generated successfully: ${generatedFilePath}`))
   }
 }

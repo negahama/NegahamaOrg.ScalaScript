@@ -74,15 +74,22 @@ interface FilePathData {
  * If the destination is not provided, it defaults to a 'generated' directory
  * within the same directory as the file.
  *
- * @param filePath - The path of the file to process.
+ * @param srcRoot - The root directory of the source files.
+ * @param filePath - The path of the file relative to srcRoot.
  * @param destination - An optional destination directory. If not provided,
- *                      defaults to a 'generated' directory within the same directory as the file.
+ *                      defaults to a 'generated' directory within srcRoot.
  * @returns An object containing the destination directory and the base name of the file.
  */
-export function extractDestinationAndName(filePath: string, destination: string | undefined): FilePathData {
-  filePath = path.basename(filePath, path.extname(filePath)).replace(/[.-]/g, '')
+export function extractDestinationAndName(
+  srcRoot: string,
+  filePath: string,
+  destination: string | undefined
+): FilePathData {
+  const fileName = path.basename(filePath, path.extname(filePath))
+  const outputRoot = destination ?? path.join(srcRoot, 'generated')
+
   return {
-    destination: destination ?? path.join(path.dirname(filePath), 'generated'),
-    name: path.basename(filePath),
+    destination: path.join(outputRoot, path.dirname(filePath)),
+    name: fileName,
   }
 }
